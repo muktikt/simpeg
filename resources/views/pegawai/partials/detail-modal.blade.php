@@ -20,8 +20,8 @@
 <script>
 const detailFieldConfigs = @json($detailTypes);
 const pegawaiId = {{ $pegawai['id'] }};
-const detailStoreUrlTemplate = @json(route('pegawai.detail.store', [$pegawai['id'], '__TYPE__']));
-const detailUpdateUrlTemplate = @json(route('pegawai.detail.update', [$pegawai['id'], '__TYPE__', '__ITEM__']));
+const detailStoreUrlTemplate = {!! json_encode(route('pegawai.detail.store', [$pegawai['id'], '__TYPE__'])) !!};
+const detailUpdateUrlTemplate = {!! json_encode(route('pegawai.detail.update', [$pegawai['id'], '__TYPE__', '__ITEM__'])) !!};
 
 function openDetailModal(type, item = null) {
     const config = detailFieldConfigs[type];
