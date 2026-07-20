@@ -77,11 +77,11 @@
 
     <div class="panel">
         <h3>Tautan cepat</h3>
-        <a href="{{ route('placeholder', 'data-pegawai') }}" class="quick-link">
+        <a href="{{ route('pegawai.index') }}" class="quick-link">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
             Data pegawai
         </a>
-        <a href="{{ route('placeholder', 'laporan-absensi') }}" class="quick-link">
+        <a href="{{ route('absensi.laporan') }}" class="quick-link">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/></svg>
             Laporan absensi
         </a>

@@ -54,7 +54,7 @@
             </div>
 
             <div class="row-between">
-                <label><input type="checkbox" style="accent-color:#0F6E56;"> Ingatkan saya</label>
+                <label><input type="checkbox" style="accent-color: var(--teal);"> Ingatkan saya</label>
                 <a href="#">Lupa kata sandi?</a>
             </div>
             <button type="submit" class="btn-submit">Masuk</button>

@@ -17,7 +17,7 @@ class PegawaiController extends Controller
      * Ganti seluruh method di controller ini pakai Eloquent Model (mis. Pegawai::all())
      * kalau sudah siap dihubungkan ke tabel tbl_pegawai yang asli.
      */
-    protected function seedIfEmpty(): void
+    public function seedIfEmpty(): void
     {
         if (! session()->has('dummy_pegawai')) {
             session()->put('dummy_pegawai', [
