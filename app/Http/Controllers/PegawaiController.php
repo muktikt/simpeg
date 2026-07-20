@@ -69,7 +69,7 @@ class PegawaiController extends Controller
                     'nama' => 'Nur Hidayah',
                     'jabatan' => 'Petugas Lapangan',
                     'unit_kerja' => 'Unit Distribusi',
-                    'status_peg' => 'TK',
+                    'status_peg' => 'CP',
                     'tgl_masuk' => '2022-08-15',
                     'telp' => '081211122233',
                     'alamat' => 'Jl. Melati No. 5, Kota C',
@@ -190,6 +190,34 @@ class PegawaiController extends Controller
         $this->save($data);
 
         return redirect()->route('pegawai.index')->with('success', 'Data pegawai berhasil dihapus.');
+    }
+
+    /**
+     * Mengangkat Calon Pegawai (CP) jadi Pegawai Tetap (PT), sekaligus ganti NIK.
+     * Menggantikan update_nik_capeg_to_peg.php di sistem lama.
+     */
+    public function promoteToTetap(Request $request, int $id)
+    {
+        $pegawai = $this->find($id);
+        abort_if(! $pegawai, 404);
+        abort_unless($pegawai['status_peg'] === 'CP', 400, 'Hanya Calon Pegawai yang bisa diangkat jadi Pegawai Tetap.');
+
+        $validated = $request->validate([
+            'nik_baru' => 'required|string|max:20',
+        ]);
+
+        $data = collect($this->all())->map(function ($p) use ($id, $validated) {
+            if ($p['id'] === $id) {
+                $p['nik'] = $validated['nik_baru'];
+                $p['status_peg'] = 'PT';
+            }
+
+            return $p;
+        })->all();
+
+        $this->save($data);
+
+        return redirect()->route('pegawai.show', $id)->with('success', 'Pegawai berhasil diangkat menjadi Pegawai Tetap dengan NIK baru: '.$validated['nik_baru']);
     }
 
     protected function validateData(Request $request, ?int $ignoreId = null): array

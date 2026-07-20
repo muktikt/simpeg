@@ -902,3 +902,12 @@ table.data-table tr:hover td{ background: rgba(15,110,86,0.03); }
   margin-bottom:18px;
 }
 .flash-success svg{ flex-shrink:0; }
+
+/* ---------- PRINT (buat halaman laporan) ---------- */
+@media print {
+  .sidebar, .topbar, .toolbar, .flash-success { display: none !important; }
+  .layout { display: block !important; }
+  .content { padding: 0 !important; max-width: 100% !important; }
+  body.app-page { background: #fff !important; }
+  .table-card, .stat-card { border: 1px solid #ccc !important; box-shadow: none !important; }
+}
