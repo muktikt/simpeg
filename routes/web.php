@@ -10,6 +10,8 @@ use App\Http\Controllers\AbsensiController;
 use App\Http\Controllers\GajiPokokController;
 use App\Http\Controllers\DrdTukinController;
 use App\Http\Controllers\SanksiController;
+use App\Http\Controllers\PrestasiController;
+use App\Http\Controllers\GajiProsesController;
 
 Route::get('/', [LoginController::class, 'showLoginForm'])->name('login');
 Route::post('/login', [LoginController::class, 'login'])->name('login.attempt');
@@ -103,6 +105,31 @@ Route::middleware(['simpeg.auth'])->group(function () {
             Route::put('/{id}', [SanksiController::class, 'update'])->whereNumber('id')->name('update');
             Route::delete('/{id}', [SanksiController::class, 'destroy'])->whereNumber('id')->name('destroy');
         });
+    });
+
+    // Prestasi (rekap kerja bulanan untuk gaji) - index bisa dilihat semua role
+    // login, tambah/edit/hapus cuma Admin & Keuangan.
+    Route::prefix('prestasi')->name('prestasi.')->group(function () {
+        Route::get('/', [PrestasiController::class, 'index'])->name('index');
+
+        Route::middleware(['simpeg.auth:1,2'])->group(function () {
+            Route::get('/create', [PrestasiController::class, 'create'])->name('create');
+            Route::post('/', [PrestasiController::class, 'store'])->name('store');
+            Route::get('/{id}/edit', [PrestasiController::class, 'edit'])->whereNumber('id')->name('edit');
+            Route::put('/{id}', [PrestasiController::class, 'update'])->whereNumber('id')->name('update');
+            Route::delete('/{id}', [PrestasiController::class, 'destroy'])->whereNumber('id')->name('destroy');
+        });
+    });
+
+    // Proses Gaji Bulanan - Admin & Keuangan.
+    Route::prefix('gaji-proses')->name('gaji-proses.')->middleware(['simpeg.auth:1,2'])->group(function () {
+        Route::get('/', [GajiProsesController::class, 'index'])->name('index');
+        Route::get('/create', [GajiProsesController::class, 'create'])->name('create');
+        Route::post('/', [GajiProsesController::class, 'store'])->name('store');
+        Route::get('/{id}', [GajiProsesController::class, 'show'])->whereNumber('id')->name('show');
+        Route::post('/{id}/terbitkan', [GajiProsesController::class, 'terbitkan'])->whereNumber('id')->name('terbitkan');
+        Route::delete('/{id}', [GajiProsesController::class, 'destroy'])->whereNumber('id')->name('destroy');
+        Route::get('/ajax/hitung-keluarga/{pegawaiId}', [GajiProsesController::class, 'hitungKeluargaJson'])->whereNumber('pegawaiId')->name('hitung-keluarga');
     });
 
     // Semua modul lama yang belum dimigrasikan -> halaman placeholder.
