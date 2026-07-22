@@ -48,11 +48,11 @@ return [
             'icon' => 'calendar',
             'roles' => ['1', '2'],
             'items' => [
-                ['label' => 'Proses THR Pegawai', 'route_name' => null],
-                ['label' => 'Proses THR Dirut', 'route_name' => null],
-                ['label' => 'Proses THR Dirum', 'route_name' => null],
-                ['label' => 'Proses THR Dirtek', 'route_name' => null],
-                ['label' => 'Proses Penerbitan THR', 'route_name' => null, 'restricted' => true],
+                ['label' => 'Proses THR Pegawai', 'route_name' => 'thr.index'],
+                ['label' => 'Proses THR Dirut', 'route_name' => 'thr.index'],
+                ['label' => 'Proses THR Dirum', 'route_name' => 'thr.index'],
+                ['label' => 'Proses THR Dirtek', 'route_name' => 'thr.index'],
+                ['label' => 'Proses Penerbitan THR', 'route_name' => 'thr.index', 'restricted' => true],
             ],
         ],
         [
@@ -106,9 +106,9 @@ return [
             'icon' => 'report',
             'roles' => ['1', '2', '7'],
             'items' => [
-                ['label' => 'Cetak Slip THR', 'route_name' => null],
-                ['label' => 'Lap. Buku Besar THR', 'route_name' => null],
-                ['label' => 'Lap. Buku Besar Per Sub', 'route_name' => null],
+                ['label' => 'Cetak Slip THR', 'route_name' => 'thr.index'],
+                ['label' => 'Lap. Buku Besar THR', 'route_name' => 'thr.index'],
+                ['label' => 'Lap. Buku Besar Per Sub', 'route_name' => 'thr.index'],
             ],
         ],
         [

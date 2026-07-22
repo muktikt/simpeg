@@ -12,6 +12,7 @@ use App\Http\Controllers\DrdTukinController;
 use App\Http\Controllers\SanksiController;
 use App\Http\Controllers\PrestasiController;
 use App\Http\Controllers\GajiProsesController;
+use App\Http\Controllers\ThrController;
 
 Route::get('/', [LoginController::class, 'showLoginForm'])->name('login');
 Route::post('/login', [LoginController::class, 'login'])->name('login.attempt');
@@ -130,6 +131,23 @@ Route::middleware(['simpeg.auth'])->group(function () {
         Route::post('/{id}/terbitkan', [GajiProsesController::class, 'terbitkan'])->whereNumber('id')->name('terbitkan');
         Route::delete('/{id}', [GajiProsesController::class, 'destroy'])->whereNumber('id')->name('destroy');
         Route::get('/ajax/hitung-keluarga/{pegawaiId}', [GajiProsesController::class, 'hitungKeluargaJson'])->whereNumber('pegawaiId')->name('hitung-keluarga');
+    });
+
+    // THR - index/show bisa dilihat Admin, Keuangan, dan Direksi.
+    // Tambah/Terbitkan/Hapus cuma Admin & Keuangan.
+    Route::prefix('thr')->name('thr.')->group(function () {
+        Route::middleware(['simpeg.auth:1,2,7'])->group(function () {
+            Route::get('/', [ThrController::class, 'index'])->name('index');
+            Route::get('/{id}', [ThrController::class, 'show'])->whereNumber('id')->name('show');
+        });
+
+        Route::middleware(['simpeg.auth:1,2'])->group(function () {
+            Route::get('/create', [ThrController::class, 'create'])->name('create');
+            Route::post('/', [ThrController::class, 'store'])->name('store');
+            Route::post('/{id}/terbitkan', [ThrController::class, 'terbitkan'])->whereNumber('id')->name('terbitkan');
+            Route::delete('/{id}', [ThrController::class, 'destroy'])->whereNumber('id')->name('destroy');
+            Route::get('/ajax/hitung-keluarga/{pegawaiId}', [ThrController::class, 'hitungKeluargaJson'])->whereNumber('pegawaiId')->name('hitung-keluarga');
+        });
     });
 
     // Semua modul lama yang belum dimigrasikan -> halaman placeholder.
