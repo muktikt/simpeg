@@ -60,11 +60,11 @@ return [
             'icon' => 'calendar',
             'roles' => ['1', '2'],
             'items' => [
-                ['label' => 'Proses Gaji 13 Pegawai', 'route_name' => null],
-                ['label' => 'Proses Gaji 13 Dirut', 'route_name' => null],
-                ['label' => 'Proses Gaji 13 Dirum', 'route_name' => null],
-                ['label' => 'Proses Gaji 13 Dirtek', 'route_name' => null],
-                ['label' => 'Proses Penerbitan Gaji 13', 'route_name' => null, 'restricted' => true],
+                ['label' => 'Proses Gaji 13 Pegawai', 'route_name' => 'gaji-tigabelas.index'],
+                ['label' => 'Proses Gaji 13 Dirut', 'route_name' => 'gaji-tigabelas.index'],
+                ['label' => 'Proses Gaji 13 Dirum', 'route_name' => 'gaji-tigabelas.index'],
+                ['label' => 'Proses Gaji 13 Dirtek', 'route_name' => 'gaji-tigabelas.index'],
+                ['label' => 'Proses Penerbitan Gaji 13', 'route_name' => 'gaji-tigabelas.index', 'restricted' => true],
             ],
         ],
         [
@@ -116,9 +116,9 @@ return [
             'icon' => 'report',
             'roles' => ['1', '2', '7'],
             'items' => [
-                ['label' => 'Cetak Slip Tunj. Pendidikan', 'route_name' => null],
-                ['label' => 'Lap. Buku Besar Tunj. Pendidikan', 'route_name' => null],
-                ['label' => 'Lap. Buku Besar Per Sub', 'route_name' => null],
+                ['label' => 'Cetak Slip Tunj. Pendidikan', 'route_name' => 'gaji-tigabelas.index'],
+                ['label' => 'Lap. Buku Besar Tunj. Pendidikan', 'route_name' => 'gaji-tigabelas.index'],
+                ['label' => 'Lap. Buku Besar Per Sub', 'route_name' => 'gaji-tigabelas.index'],
             ],
         ],
         [

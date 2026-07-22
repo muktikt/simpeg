@@ -13,6 +13,7 @@ use App\Http\Controllers\SanksiController;
 use App\Http\Controllers\PrestasiController;
 use App\Http\Controllers\GajiProsesController;
 use App\Http\Controllers\ThrController;
+use App\Http\Controllers\GajiTigabelasController;
 
 Route::get('/', [LoginController::class, 'showLoginForm'])->name('login');
 Route::post('/login', [LoginController::class, 'login'])->name('login.attempt');
@@ -147,6 +148,24 @@ Route::middleware(['simpeg.auth'])->group(function () {
             Route::post('/{id}/terbitkan', [ThrController::class, 'terbitkan'])->whereNumber('id')->name('terbitkan');
             Route::delete('/{id}', [ThrController::class, 'destroy'])->whereNumber('id')->name('destroy');
             Route::get('/ajax/hitung-keluarga/{pegawaiId}', [ThrController::class, 'hitungKeluargaJson'])->whereNumber('pegawaiId')->name('hitung-keluarga');
+        });
+    });
+
+    // Gaji 13 / Tunjangan Pendidikan - satu modul yang sama (dicek dari
+    // menu_incl.php asli, "Laporan Tunj. Pendidikan" mengarah ke file yang
+    // sama dengan Gaji 13). Index/show bisa dilihat Admin, Keuangan, Direksi.
+    Route::prefix('gaji-tigabelas')->name('gaji-tigabelas.')->group(function () {
+        Route::middleware(['simpeg.auth:1,2,7'])->group(function () {
+            Route::get('/', [GajiTigabelasController::class, 'index'])->name('index');
+            Route::get('/{id}', [GajiTigabelasController::class, 'show'])->whereNumber('id')->name('show');
+        });
+
+        Route::middleware(['simpeg.auth:1,2'])->group(function () {
+            Route::get('/create', [GajiTigabelasController::class, 'create'])->name('create');
+            Route::post('/', [GajiTigabelasController::class, 'store'])->name('store');
+            Route::post('/{id}/terbitkan', [GajiTigabelasController::class, 'terbitkan'])->whereNumber('id')->name('terbitkan');
+            Route::delete('/{id}', [GajiTigabelasController::class, 'destroy'])->whereNumber('id')->name('destroy');
+            Route::get('/ajax/hitung-keluarga/{pegawaiId}', [GajiTigabelasController::class, 'hitungKeluargaJson'])->whereNumber('pegawaiId')->name('hitung-keluarga');
         });
     });
 
