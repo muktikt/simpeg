@@ -16,6 +16,8 @@ use App\Http\Controllers\ThrController;
 use App\Http\Controllers\GajiTigabelasController;
 use App\Http\Controllers\InsentifController;
 use App\Http\Controllers\PerubahanNikController;
+use App\Http\Controllers\CutiController;
+use App\Http\Controllers\UserAksesController;
 
 Route::get('/', [LoginController::class, 'showLoginForm'])->name('login');
 Route::post('/login', [LoginController::class, 'login'])->name('login.attempt');
@@ -48,19 +50,6 @@ Route::middleware(['simpeg.auth'])->group(function () {
     // Absensi - Read boleh semua role yang login, Create/Update/Delete cuma Admin.
     Route::prefix('absensi')->name('absensi.')->group(function () {
         Route::get('/', [AbsensiController::class, 'index'])->name('index');
-
-        Route::middleware(['simpeg.auth:1'])->group(function () {
-            Route::get('/create', [AbsensiController::class, 'create'])->name('create');
-            Route::post('/', [AbsensiController::class, 'store'])->name('store');
-            Route::get('/{id}/edit', [AbsensiController::class, 'edit'])->whereNumber('id')->name('edit');
-            Route::put('/{id}', [AbsensiController::class, 'update'])->whereNumber('id')->name('update');
-            Route::delete('/{id}', [AbsensiController::class, 'destroy'])->whereNumber('id')->name('destroy');
-        });
-    });
-
-    // Absensi - Read boleh Admin/Keuangan/Direksi, tambah/edit/hapus cuma Admin.
-    Route::prefix('absensi')->name('absensi.')->group(function () {
-        Route::get('/', [AbsensiController::class, 'index'])->name('index');
         Route::get('/laporan', [AbsensiController::class, 'laporan'])->name('laporan');
 
         Route::middleware(['simpeg.auth:1'])->group(function () {
@@ -69,6 +58,10 @@ Route::middleware(['simpeg.auth'])->group(function () {
             Route::get('/{id}/edit', [AbsensiController::class, 'edit'])->whereNumber('id')->name('edit');
             Route::put('/{id}', [AbsensiController::class, 'update'])->whereNumber('id')->name('update');
             Route::delete('/{id}', [AbsensiController::class, 'destroy'])->whereNumber('id')->name('destroy');
+
+            // SET Hari Kerja - satu nilai global, bukan daftar.
+            Route::get('/hari-kerja', [AbsensiController::class, 'hariKerjaEdit'])->name('hari-kerja');
+            Route::put('/hari-kerja', [AbsensiController::class, 'hariKerjaUpdate'])->name('hari-kerja.update');
         });
     });
 
@@ -179,6 +172,20 @@ Route::middleware(['simpeg.auth'])->group(function () {
     Route::prefix('perubahan-nik')->name('perubahan-nik.')->middleware(['simpeg.auth:1'])->group(function () {
         Route::get('/', [PerubahanNikController::class, 'index'])->name('index');
         Route::post('/', [PerubahanNikController::class, 'update'])->name('update');
+    });
+
+    // Cuti - READ ONLY, tidak punya data sendiri (lihat catatan di
+    // CutiController). Semua role yang login boleh lihat.
+    Route::get('/cuti', [CutiController::class, 'index'])->name('cuti.index');
+
+    // Pengaturan Akun Pengguna (Hak Akses User) - Admin only.
+    Route::prefix('user-akses')->name('user-akses.')->middleware(['simpeg.auth:1'])->group(function () {
+        Route::get('/', [UserAksesController::class, 'index'])->name('index');
+        Route::get('/create', [UserAksesController::class, 'create'])->name('create');
+        Route::post('/', [UserAksesController::class, 'store'])->name('store');
+        Route::get('/{id}/edit', [UserAksesController::class, 'edit'])->whereNumber('id')->name('edit');
+        Route::put('/{id}', [UserAksesController::class, 'update'])->whereNumber('id')->name('update');
+        Route::delete('/{id}', [UserAksesController::class, 'destroy'])->whereNumber('id')->name('destroy');
     });
 
     // Semua modul lama yang belum dimigrasikan -> halaman placeholder.

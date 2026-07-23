@@ -21,7 +21,7 @@ return [
             'roles' => ['1'],
             'items' => [
                 ['label' => 'SET Aplikasi', 'route_name' => null],
-                ['label' => 'Pengaturan Akun Pengguna', 'route_name' => null],
+                ['label' => 'Pengaturan Akun Pengguna', 'route_name' => 'user-akses.index'],
                 ['label' => 'Perubahan NIK', 'route_name' => 'perubahan-nik.index'],
             ],
         ],
@@ -31,7 +31,7 @@ return [
             'roles' => ['1', '2'],
             'items' => [
                 ['label' => 'SET Gaji Pokok', 'route_name' => 'gaji-pokok.index'],
-                ['label' => 'SET Hari Kerja', 'route_name' => null],
+                ['label' => 'SET Hari Kerja', 'route_name' => 'absensi.hari-kerja'],
                 ['label' => 'SET Absensi', 'route_name' => 'absensi.index'],
                 ['label' => 'SET Prestasi', 'route_name' => 'prestasi.index'],
                 ['label' => 'SET DRD Tukin', 'route_name' => 'drd-tukin.index'],
@@ -136,7 +136,7 @@ return [
             'icon' => 'report',
             'items' => [
                 ['label' => 'Lap. Anak Diatas 21', 'route_name' => null],
-                ['label' => 'Lap. Cuti Pegawai', 'route_name' => null],
+                ['label' => 'Lap. Cuti Pegawai', 'route_name' => 'cuti.index'],
                 ['label' => 'Lap. Sanksi Pegawai', 'route_name' => 'sanksi.index'],
             ],
         ],
