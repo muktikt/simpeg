@@ -15,6 +15,7 @@ use App\Http\Controllers\GajiProsesController;
 use App\Http\Controllers\ThrController;
 use App\Http\Controllers\GajiTigabelasController;
 use App\Http\Controllers\InsentifController;
+use App\Http\Controllers\PerubahanNikController;
 
 Route::get('/', [LoginController::class, 'showLoginForm'])->name('login');
 Route::post('/login', [LoginController::class, 'login'])->name('login.attempt');
@@ -173,6 +174,12 @@ Route::middleware(['simpeg.auth'])->group(function () {
     // Insentif - READ ONLY, tidak punya data sendiri (lihat catatan di
     // InsentifController). Bisa dilihat Admin, Keuangan, Direksi.
     Route::get('/insentif', [InsentifController::class, 'index'])->middleware(['simpeg.auth:1,2,7'])->name('insentif.index');
+
+    // Perubahan NIK - Admin only.
+    Route::prefix('perubahan-nik')->name('perubahan-nik.')->middleware(['simpeg.auth:1'])->group(function () {
+        Route::get('/', [PerubahanNikController::class, 'index'])->name('index');
+        Route::post('/', [PerubahanNikController::class, 'update'])->name('update');
+    });
 
     // Semua modul lama yang belum dimigrasikan -> halaman placeholder.
     Route::get('/modul/{slug}', [PlaceholderController::class, 'show'])->name('placeholder');

@@ -22,7 +22,7 @@ return [
             'items' => [
                 ['label' => 'SET Aplikasi', 'route_name' => null],
                 ['label' => 'Pengaturan Akun Pengguna', 'route_name' => null],
-                ['label' => 'Perubahan NIK', 'route_name' => null],
+                ['label' => 'Perubahan NIK', 'route_name' => 'perubahan-nik.index'],
             ],
         ],
         [
