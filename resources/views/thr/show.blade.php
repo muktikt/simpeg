@@ -71,7 +71,7 @@
 
 <div class="form-actions" style="max-width:100%;">
     @if ($bisaKelola && $thr['status'] !== 'terbit')
-        <form action="{{ route('thr.terbitkan', $thr['id']) }}" method="POST" onsubmit="return confirm('Terbitkan THR ini? Setelah terbit tidak bisa diubah/dihapus lagi.');">
+        <form action="{{ route('thr.terbitkan', $thr['id']) }}" method="POST" onsubmit="event.preventDefault(); openConfirmModal(this, {title: 'Terbitkan THR', text: 'Terbitkan THR ini? Setelah terbit tidak bisa diubah/dihapus lagi.', btnLabel: 'Ya, Terbitkan', theme: 'info'});">
             @csrf
             <button type="submit" class="btn btn-primary">Terbitkan THR</button>
         </form>

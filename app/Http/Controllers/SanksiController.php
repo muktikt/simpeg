@@ -25,9 +25,16 @@ class SanksiController extends Controller
 
     protected function seedIfEmpty(): void
     {
+        // Pastikan data pegawai juga ada di session.
+        if (! session()->has('dummy_pegawai')) {
+            app(\App\Http\Controllers\PegawaiController::class)->seedIfEmpty();
+        }
+
         if (! session()->has('dummy_sanksi')) {
             session()->put('dummy_sanksi', [
                 ['id' => 1, 'pegawai_id' => 2, 'tanggal' => '2026-06-10', 'jenis_sanksi' => 'Lisan', 'keterangan' => 'Terlambat masuk kerja berulang kali', 'potongan_persen' => 5],
+                ['id' => 2, 'pegawai_id' => 3, 'tanggal' => '2026-05-20', 'jenis_sanksi' => 'Tulisan', 'keterangan' => 'Tidak hadir tanpa keterangan selama 3 hari berturut-turut', 'potongan_persen' => 10],
+                ['id' => 3, 'pegawai_id' => 2, 'tanggal' => '2026-04-15', 'jenis_sanksi' => 'Lisan', 'keterangan' => 'Lalai dalam menjalankan tugas administrasi keuangan', 'potongan_persen' => 3],
             ]);
         }
     }

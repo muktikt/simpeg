@@ -33,12 +33,16 @@ class PegawaiController extends Controller
                     'alamat' => 'Jl. Merdeka No. 10, Kota A',
                     'keluarga' => [
                         ['id' => 1, 'nama' => 'Sri Wahyuni', 'hubungan' => 'Istri/Suami', 'tgl_lahir' => '1992-03-14'],
+                        ['id' => 2, 'nama' => 'Aisyah Kurniawan', 'hubungan' => 'Anak', 'tgl_lahir' => '2018-07-22'],
+                        ['id' => 3, 'nama' => 'Rizki Kurniawan', 'hubungan' => 'Anak', 'tgl_lahir' => '2021-01-10'],
                     ],
                     'golongan' => [
-                        ['id' => 1, 'golongan' => 'III/A', 'tmt' => '2020-01-01'],
+                        ['id' => 1, 'golongan' => 'II/D', 'tmt' => '2017-11-25'],
+                        ['id' => 2, 'golongan' => 'III/A', 'tmt' => '2020-01-01'],
                     ],
                     'jabatan_riwayat' => [
-                        ['id' => 1, 'jabatan' => 'Staf SDM', 'unit_kerja' => 'Kantor Pusat', 'tmt' => '2021-06-01'],
+                        ['id' => 1, 'jabatan' => 'Staf Umum', 'unit_kerja' => 'Kantor Pusat', 'tmt' => '2017-11-25'],
+                        ['id' => 2, 'jabatan' => 'Staf SDM', 'unit_kerja' => 'Kantor Pusat', 'tmt' => '2021-06-01'],
                     ],
                     'pendidikan' => [
                         ['id' => 1, 'jenjang' => 'S1', 'jurusan' => 'Manajemen', 'institusi' => 'Universitas A', 'tahun_lulus' => '2016'],
@@ -77,6 +81,55 @@ class PegawaiController extends Controller
                     'golongan' => [],
                     'jabatan_riwayat' => [],
                     'pendidikan' => [['id' => 1, 'jenjang' => 'SMA/SMK', 'jurusan' => 'IPA', 'institusi' => 'SMA C', 'tahun_lulus' => '2021']],
+                    'prestasi' => [],
+                ],
+                [
+                    'id' => 4,
+                    'nik' => '1800004',
+                    'nama' => 'Bambang Wijaya',
+                    'jabatan' => 'Direktur Utama',
+                    'unit_kerja' => 'Direksi',
+                    'status_peg' => 'DI',
+                    'tgl_masuk' => '2010-04-01',
+                    'telp' => '081344556677',
+                    'alamat' => 'Jl. Gatot Subroto No. 88, Kota A',
+                    'keluarga' => [
+                        ['id' => 1, 'nama' => 'Ratna Sari', 'hubungan' => 'Istri/Suami', 'tgl_lahir' => '1978-09-05'],
+                        ['id' => 2, 'nama' => 'Dimas Wijaya', 'hubungan' => 'Anak', 'tgl_lahir' => '2005-03-18'],
+                        ['id' => 3, 'nama' => 'Putri Wijaya', 'hubungan' => 'Anak', 'tgl_lahir' => '2008-11-25'],
+                    ],
+                    'golongan' => [
+                        ['id' => 1, 'golongan' => 'IV/A', 'tmt' => '2010-04-01'],
+                        ['id' => 2, 'golongan' => 'IV/B', 'tmt' => '2015-04-01'],
+                    ],
+                    'jabatan_riwayat' => [
+                        ['id' => 1, 'jabatan' => 'Direktur Teknik', 'unit_kerja' => 'Direksi', 'tmt' => '2010-04-01'],
+                        ['id' => 2, 'jabatan' => 'Direktur Utama', 'unit_kerja' => 'Direksi', 'tmt' => '2018-04-01'],
+                    ],
+                    'pendidikan' => [
+                        ['id' => 1, 'jenjang' => 'S1', 'jurusan' => 'Teknik Sipil', 'institusi' => 'ITB', 'tahun_lulus' => '2000'],
+                        ['id' => 2, 'jenjang' => 'S2', 'jurusan' => 'Manajemen', 'institusi' => 'Universitas Indonesia', 'tahun_lulus' => '2006'],
+                    ],
+                    'prestasi' => [
+                        ['id' => 1, 'judul' => 'BUMD Terbaik', 'keterangan' => 'Penghargaan dari Pemda atas kinerja perusahaan', 'tanggal' => '2024-08-17'],
+                    ],
+                ],
+                [
+                    'id' => 5,
+                    'nik' => '2200010',
+                    'nama' => 'Agus Salim',
+                    'jabatan' => 'Petugas Meter',
+                    'unit_kerja' => 'Unit Pelayanan',
+                    'status_peg' => 'PH',
+                    'tgl_masuk' => '2022-01-10',
+                    'telp' => '085712345678',
+                    'alamat' => 'Jl. Anggrek No. 15, Kota D',
+                    'keluarga' => [
+                        ['id' => 1, 'nama' => 'Siti Rahayu', 'hubungan' => 'Istri/Suami', 'tgl_lahir' => '1995-06-20'],
+                    ],
+                    'golongan' => [],
+                    'jabatan_riwayat' => [['id' => 1, 'jabatan' => 'Petugas Meter', 'unit_kerja' => 'Unit Pelayanan', 'tmt' => '2022-01-10']],
+                    'pendidikan' => [['id' => 1, 'jenjang' => 'SMA/SMK', 'jurusan' => 'Teknik', 'institusi' => 'SMK D', 'tahun_lulus' => '2020']],
                     'prestasi' => [],
                 ],
             ]);

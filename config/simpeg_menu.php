@@ -126,9 +126,9 @@ return [
             'icon' => 'report',
             'roles' => ['1', '2', '7'],
             'items' => [
-                ['label' => 'Cetak Slip Insentif', 'route_name' => null],
-                ['label' => 'Lap. Buku Besar Insentif', 'route_name' => null],
-                ['label' => 'Lap. Buku Besar Per Sub', 'route_name' => null],
+                ['label' => 'Cetak Slip Insentif', 'route_name' => 'insentif.index'],
+                ['label' => 'Lap. Buku Besar Insentif', 'route_name' => 'insentif.index'],
+                ['label' => 'Lap. Buku Besar Per Sub', 'route_name' => 'insentif.index'],
             ],
         ],
         [

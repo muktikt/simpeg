@@ -22,10 +22,16 @@ class GajiPokokController extends Controller
     {
         if (! session()->has('dummy_gapok')) {
             session()->put('dummy_gapok', [
-                ['id' => 1, 'golongan' => 'II/D', 'masa_kerja' => '0-5 tahun', 'nominal' => 3200000],
-                ['id' => 2, 'golongan' => 'III/A', 'masa_kerja' => '0-5 tahun', 'nominal' => 3800000],
-                ['id' => 3, 'golongan' => 'III/A', 'masa_kerja' => '6-10 tahun', 'nominal' => 4300000],
-                ['id' => 4, 'golongan' => 'III/B', 'masa_kerja' => '0-5 tahun', 'nominal' => 4100000],
+                ['id' => 1, 'golongan' => 'II/C', 'masa_kerja' => '0-5 tahun', 'nominal' => 2900000],
+                ['id' => 2, 'golongan' => 'II/D', 'masa_kerja' => '0-5 tahun', 'nominal' => 3200000],
+                ['id' => 3, 'golongan' => 'II/D', 'masa_kerja' => '6-10 tahun', 'nominal' => 3600000],
+                ['id' => 4, 'golongan' => 'III/A', 'masa_kerja' => '0-5 tahun', 'nominal' => 3800000],
+                ['id' => 5, 'golongan' => 'III/A', 'masa_kerja' => '6-10 tahun', 'nominal' => 4300000],
+                ['id' => 6, 'golongan' => 'III/B', 'masa_kerja' => '0-5 tahun', 'nominal' => 4100000],
+                ['id' => 7, 'golongan' => 'III/B', 'masa_kerja' => '6-10 tahun', 'nominal' => 4600000],
+                ['id' => 8, 'golongan' => 'IV/A', 'masa_kerja' => '0-5 tahun', 'nominal' => 5200000],
+                ['id' => 9, 'golongan' => 'IV/A', 'masa_kerja' => '6-10 tahun', 'nominal' => 5800000],
+                ['id' => 10, 'golongan' => 'IV/B', 'masa_kerja' => '0-5 tahun', 'nominal' => 6500000],
             ]);
         }
     }

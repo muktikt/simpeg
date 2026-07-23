@@ -29,6 +29,11 @@ class PrestasiController extends Controller
 
     protected function seedIfEmpty(): void
     {
+        // Pastikan data pegawai juga ada di session.
+        if (! session()->has('dummy_pegawai')) {
+            app(\App\Http\Controllers\PegawaiController::class)->seedIfEmpty();
+        }
+
         if (! session()->has('dummy_prestasi_gaji')) {
             session()->put('dummy_prestasi_gaji', [
                 [
@@ -36,6 +41,30 @@ class PrestasiController extends Controller
                     'absensi' => 'Baik', 'alpha' => 0, 'izin_ket' => 0, 'izin_non_ket' => 0,
                     'sakit_ket' => 1, 'sakit_non_ket' => 0, 'dinas_luar' => 2, 'cuti' => 0,
                     'alasan_cuti' => '', 'jam_lembur' => 8,
+                ],
+                [
+                    'id' => 2, 'pegawai_id' => 2, 'tanggal' => '2026-06-01', 'karya' => 'Cukup',
+                    'absensi' => 'Cukup', 'alpha' => 1, 'izin_ket' => 2, 'izin_non_ket' => 0,
+                    'sakit_ket' => 0, 'sakit_non_ket' => 1, 'dinas_luar' => 0, 'cuti' => 0,
+                    'alasan_cuti' => '', 'jam_lembur' => 0,
+                ],
+                [
+                    'id' => 3, 'pegawai_id' => 3, 'tanggal' => '2026-06-01', 'karya' => 'Baik',
+                    'absensi' => 'Baik', 'alpha' => 0, 'izin_ket' => 0, 'izin_non_ket' => 0,
+                    'sakit_ket' => 0, 'sakit_non_ket' => 0, 'dinas_luar' => 5, 'cuti' => 0,
+                    'alasan_cuti' => '', 'jam_lembur' => 4,
+                ],
+                [
+                    'id' => 4, 'pegawai_id' => 1, 'tanggal' => '2026-07-01', 'karya' => 'Sangat Baik',
+                    'absensi' => 'Baik', 'alpha' => 0, 'izin_ket' => 0, 'izin_non_ket' => 0,
+                    'sakit_ket' => 0, 'sakit_non_ket' => 1, 'dinas_luar' => 3, 'cuti' => 0,
+                    'alasan_cuti' => '', 'jam_lembur' => 6,
+                ],
+                [
+                    'id' => 5, 'pegawai_id' => 2, 'tanggal' => '2026-07-01', 'karya' => 'Baik',
+                    'absensi' => 'Cukup', 'alpha' => 1, 'izin_ket' => 0, 'izin_non_ket' => 1,
+                    'sakit_ket' => 0, 'sakit_non_ket' => 0, 'dinas_luar' => 0, 'cuti' => 2,
+                    'alasan_cuti' => 'Cuti tahunan', 'jam_lembur' => 0,
                 ],
             ]);
         }

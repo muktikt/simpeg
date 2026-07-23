@@ -61,11 +61,11 @@
                         <div class="row-actions">
                             <a href="{{ route('gaji-tigabelas.show', $g['id']) }}" class="btn btn-outline btn-sm">Lihat</a>
                             @if ($bisaKelola && $g['status'] !== 'terbit')
-                                <form action="{{ route('gaji-tigabelas.terbitkan', $g['id']) }}" method="POST" onsubmit="return confirm('Terbitkan Gaji 13 ini? Setelah terbit tidak bisa diubah/dihapus lagi.');" style="margin:0;">
+                                <form action="{{ route('gaji-tigabelas.terbitkan', $g['id']) }}" method="POST" onsubmit="event.preventDefault(); openConfirmModal(this, {title: 'Terbitkan Gaji 13', text: 'Terbitkan Gaji 13 ini? Setelah terbit tidak bisa diubah/dihapus lagi.', btnLabel: 'Ya, Terbitkan', theme: 'info'});" style="margin:0;">
                                     @csrf
                                     <button type="submit" class="btn btn-primary btn-sm">Terbitkan</button>
                                 </form>
-                                <form action="{{ route('gaji-tigabelas.destroy', $g['id']) }}" method="POST" onsubmit="return confirm('Hapus draft Gaji 13 ini?');" style="margin:0;">
+                                <form action="{{ route('gaji-tigabelas.destroy', $g['id']) }}" method="POST" onsubmit="event.preventDefault(); openConfirmModal(this, {title: 'Hapus Draft Gaji 13', text: 'Apakah Anda yakin ingin menghapus draft Gaji 13 ini?', btnLabel: 'Ya, Hapus', theme: 'danger'});" style="margin:0;">
                                     @csrf
                                     @method('DELETE')
                                     <button type="submit" class="btn btn-danger btn-sm">Hapus</button>

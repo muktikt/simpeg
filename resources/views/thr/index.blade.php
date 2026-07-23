@@ -61,11 +61,11 @@
                         <div class="row-actions">
                             <a href="{{ route('thr.show', $t['id']) }}" class="btn btn-outline btn-sm">Lihat</a>
                             @if ($bisaKelola && $t['status'] !== 'terbit')
-                                <form action="{{ route('thr.terbitkan', $t['id']) }}" method="POST" onsubmit="return confirm('Terbitkan THR ini? Setelah terbit tidak bisa diubah/dihapus lagi.');" style="margin:0;">
+                                <form action="{{ route('thr.terbitkan', $t['id']) }}" method="POST" onsubmit="event.preventDefault(); openConfirmModal(this, {title: 'Terbitkan THR', text: 'Terbitkan THR ini? Setelah terbit tidak bisa diubah/dihapus lagi.', btnLabel: 'Ya, Terbitkan', theme: 'info'});" style="margin:0;">
                                     @csrf
                                     <button type="submit" class="btn btn-primary btn-sm">Terbitkan</button>
                                 </form>
-                                <form action="{{ route('thr.destroy', $t['id']) }}" method="POST" onsubmit="return confirm('Hapus draft THR ini?');" style="margin:0;">
+                                <form action="{{ route('thr.destroy', $t['id']) }}" method="POST" onsubmit="event.preventDefault(); openConfirmModal(this, {title: 'Hapus Draft THR', text: 'Apakah Anda yakin ingin menghapus draft THR ini?', btnLabel: 'Ya, Hapus', theme: 'danger'});" style="margin:0;">
                                     @csrf
                                     @method('DELETE')
                                     <button type="submit" class="btn btn-danger btn-sm">Hapus</button>

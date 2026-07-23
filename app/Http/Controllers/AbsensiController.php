@@ -33,21 +33,29 @@ class AbsensiController extends Controller
                 ['id' => 1,  'pegawai_id' => 1, 'bulan' => 7, 'tahun' => 2026, 'hari_kerja' => 23, 'hadir' => 22, 'sakit' => 1, 'izin' => 0, 'alpha' => 0, 'keterangan' => ''],
                 ['id' => 2,  'pegawai_id' => 2, 'bulan' => 7, 'tahun' => 2026, 'hari_kerja' => 23, 'hadir' => 20, 'sakit' => 0, 'izin' => 2, 'alpha' => 1, 'keterangan' => 'Izin keperluan keluarga'],
                 ['id' => 3,  'pegawai_id' => 3, 'bulan' => 7, 'tahun' => 2026, 'hari_kerja' => 23, 'hadir' => 23, 'sakit' => 0, 'izin' => 0, 'alpha' => 0, 'keterangan' => ''],
+                ['id' => 13, 'pegawai_id' => 4, 'bulan' => 7, 'tahun' => 2026, 'hari_kerja' => 23, 'hadir' => 23, 'sakit' => 0, 'izin' => 0, 'alpha' => 0, 'keterangan' => ''],
+                ['id' => 14, 'pegawai_id' => 5, 'bulan' => 7, 'tahun' => 2026, 'hari_kerja' => 23, 'hadir' => 21, 'sakit' => 1, 'izin' => 1, 'alpha' => 0, 'keterangan' => 'Izin urusan keluarga'],
 
                 // === Juni 2026 ===
                 ['id' => 4,  'pegawai_id' => 1, 'bulan' => 6, 'tahun' => 2026, 'hari_kerja' => 22, 'hadir' => 21, 'sakit' => 0, 'izin' => 1, 'alpha' => 0, 'keterangan' => 'Izin acara pernikahan'],
                 ['id' => 5,  'pegawai_id' => 2, 'bulan' => 6, 'tahun' => 2026, 'hari_kerja' => 22, 'hadir' => 22, 'sakit' => 0, 'izin' => 0, 'alpha' => 0, 'keterangan' => ''],
                 ['id' => 6,  'pegawai_id' => 3, 'bulan' => 6, 'tahun' => 2026, 'hari_kerja' => 22, 'hadir' => 19, 'sakit' => 2, 'izin' => 0, 'alpha' => 1, 'keterangan' => 'Sakit demam'],
+                ['id' => 15, 'pegawai_id' => 4, 'bulan' => 6, 'tahun' => 2026, 'hari_kerja' => 22, 'hadir' => 22, 'sakit' => 0, 'izin' => 0, 'alpha' => 0, 'keterangan' => ''],
+                ['id' => 16, 'pegawai_id' => 5, 'bulan' => 6, 'tahun' => 2026, 'hari_kerja' => 22, 'hadir' => 20, 'sakit' => 0, 'izin' => 2, 'alpha' => 0, 'keterangan' => 'Izin pribadi'],
 
                 // === Mei 2026 ===
                 ['id' => 7,  'pegawai_id' => 1, 'bulan' => 5, 'tahun' => 2026, 'hari_kerja' => 21, 'hadir' => 21, 'sakit' => 0, 'izin' => 0, 'alpha' => 0, 'keterangan' => ''],
                 ['id' => 8,  'pegawai_id' => 2, 'bulan' => 5, 'tahun' => 2026, 'hari_kerja' => 21, 'hadir' => 18, 'sakit' => 1, 'izin' => 1, 'alpha' => 1, 'keterangan' => 'Izin urusan pribadi'],
                 ['id' => 9,  'pegawai_id' => 3, 'bulan' => 5, 'tahun' => 2026, 'hari_kerja' => 21, 'hadir' => 20, 'sakit' => 1, 'izin' => 0, 'alpha' => 0, 'keterangan' => ''],
+                ['id' => 17, 'pegawai_id' => 4, 'bulan' => 5, 'tahun' => 2026, 'hari_kerja' => 21, 'hadir' => 20, 'sakit' => 0, 'izin' => 1, 'alpha' => 0, 'keterangan' => 'Dinas luar kota'],
+                ['id' => 18, 'pegawai_id' => 5, 'bulan' => 5, 'tahun' => 2026, 'hari_kerja' => 21, 'hadir' => 21, 'sakit' => 0, 'izin' => 0, 'alpha' => 0, 'keterangan' => ''],
 
                 // === April 2026 ===
                 ['id' => 10, 'pegawai_id' => 1, 'bulan' => 4, 'tahun' => 2026, 'hari_kerja' => 22, 'hadir' => 20, 'sakit' => 1, 'izin' => 1, 'alpha' => 0, 'keterangan' => ''],
                 ['id' => 11, 'pegawai_id' => 2, 'bulan' => 4, 'tahun' => 2026, 'hari_kerja' => 22, 'hadir' => 22, 'sakit' => 0, 'izin' => 0, 'alpha' => 0, 'keterangan' => ''],
                 ['id' => 12, 'pegawai_id' => 3, 'bulan' => 4, 'tahun' => 2026, 'hari_kerja' => 22, 'hadir' => 21, 'sakit' => 0, 'izin' => 1, 'alpha' => 0, 'keterangan' => 'Izin anak sakit'],
+                ['id' => 19, 'pegawai_id' => 4, 'bulan' => 4, 'tahun' => 2026, 'hari_kerja' => 22, 'hadir' => 21, 'sakit' => 1, 'izin' => 0, 'alpha' => 0, 'keterangan' => ''],
+                ['id' => 20, 'pegawai_id' => 5, 'bulan' => 4, 'tahun' => 2026, 'hari_kerja' => 22, 'hadir' => 19, 'sakit' => 0, 'izin' => 1, 'alpha' => 2, 'keterangan' => ''],
             ]);
         }
     }

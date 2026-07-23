@@ -20,8 +20,11 @@ class DrdTukinController extends Controller
     {
         if (! session()->has('dummy_drd')) {
             session()->put('dummy_drd', [
-                ['id' => 1, 'tanggal' => '2026-05-01', 'nominal_drd' => 50000000, 'nominal_penerimaan' => 47500000],
-                ['id' => 2, 'tanggal' => '2026-06-01', 'nominal_drd' => 50000000, 'nominal_penerimaan' => 49000000],
+                ['id' => 1, 'tanggal' => '2026-03-01', 'nominal_drd' => 48000000, 'nominal_penerimaan' => 44500000],
+                ['id' => 2, 'tanggal' => '2026-04-01', 'nominal_drd' => 50000000, 'nominal_penerimaan' => 46000000],
+                ['id' => 3, 'tanggal' => '2026-05-01', 'nominal_drd' => 50000000, 'nominal_penerimaan' => 47500000],
+                ['id' => 4, 'tanggal' => '2026-06-01', 'nominal_drd' => 50000000, 'nominal_penerimaan' => 49000000],
+                ['id' => 5, 'tanggal' => '2026-07-01', 'nominal_drd' => 52000000, 'nominal_penerimaan' => 50500000],
             ]);
         }
     }

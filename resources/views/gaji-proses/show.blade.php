@@ -60,7 +60,7 @@
 
 <div class="form-actions" style="max-width:100%;">
     @if ($gaji['status'] !== 'terbit')
-        <form action="{{ route('gaji-proses.terbitkan', $gaji['id']) }}" method="POST" onsubmit="return confirm('Terbitkan gaji ini? Setelah terbit tidak bisa diubah/dihapus lagi.');">
+        <form action="{{ route('gaji-proses.terbitkan', $gaji['id']) }}" method="POST" onsubmit="event.preventDefault(); openConfirmModal(this, {title: 'Terbitkan Gaji', text: 'Terbitkan gaji ini? Setelah terbit tidak bisa diubah/dihapus lagi.', btnLabel: 'Ya, Terbitkan', theme: 'info'});">
             @csrf
             <button type="submit" class="btn btn-primary">Terbitkan Gaji</button>
         </form>

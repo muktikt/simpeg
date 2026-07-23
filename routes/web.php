@@ -14,6 +14,7 @@ use App\Http\Controllers\PrestasiController;
 use App\Http\Controllers\GajiProsesController;
 use App\Http\Controllers\ThrController;
 use App\Http\Controllers\GajiTigabelasController;
+use App\Http\Controllers\InsentifController;
 
 Route::get('/', [LoginController::class, 'showLoginForm'])->name('login');
 Route::post('/login', [LoginController::class, 'login'])->name('login.attempt');
@@ -168,6 +169,10 @@ Route::middleware(['simpeg.auth'])->group(function () {
             Route::get('/ajax/hitung-keluarga/{pegawaiId}', [GajiTigabelasController::class, 'hitungKeluargaJson'])->whereNumber('pegawaiId')->name('hitung-keluarga');
         });
     });
+
+    // Insentif - READ ONLY, tidak punya data sendiri (lihat catatan di
+    // InsentifController). Bisa dilihat Admin, Keuangan, Direksi.
+    Route::get('/insentif', [InsentifController::class, 'index'])->middleware(['simpeg.auth:1,2,7'])->name('insentif.index');
 
     // Semua modul lama yang belum dimigrasikan -> halaman placeholder.
     Route::get('/modul/{slug}', [PlaceholderController::class, 'show'])->name('placeholder');

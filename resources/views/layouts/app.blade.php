@@ -169,6 +169,34 @@
     </div>
 </div>
 
+<!-- Reusable Confirm Modal -->
+<div id="confirm-modal" class="modal-overlay">
+    <div class="modal-card">
+        <div class="modal-icon" id="confirm-modal-icon">
+            <svg id="confirm-icon-warning" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                <line x1="12" y1="9" x2="12" y2="13"></line>
+                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+            </svg>
+            <svg id="confirm-icon-danger" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24" style="display:none;">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="15" y1="9" x2="9" y2="15"></line>
+                <line x1="9" y1="9" x2="15" y2="15"></line>
+            </svg>
+            <svg id="confirm-icon-info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24" style="display:none;">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+            </svg>
+        </div>
+        <h3 class="modal-title" id="confirm-modal-title">Konfirmasi</h3>
+        <p class="modal-text" id="confirm-modal-text">Apakah Anda yakin?</p>
+        <div class="modal-actions">
+            <button type="button" class="btn-cancel" onclick="closeConfirmModal()">Batal</button>
+            <button type="button" class="btn-confirm" id="confirm-modal-btn" onclick="executeConfirm()">Ya, Lanjutkan</button>
+        </div>
+    </div>
+</div>
+
 <script>
 function openLogoutModal() {
     const modal = document.getElementById('logout-modal');
@@ -190,6 +218,77 @@ document.getElementById('logout-modal').addEventListener('click', function(event
         closeLogoutModal();
     }
 });
+
+// ──────────────────────────────────────────────
+// Reusable Confirm Modal
+// ──────────────────────────────────────────────
+let _confirmTargetForm = null;
+
+const CONFIRM_THEMES = {
+    danger:  { bg: '#FEE2E2', color: '#DC2626', btnBg: '#DC2626', btnHover: '#B91C1C' },
+    warning: { bg: '#FEF3C7', color: '#D97706', btnBg: '#D97706', btnHover: '#B45309' },
+    info:    { bg: '#CCFBF1', color: '#0D9488', btnBg: '#0D9488', btnHover: '#0F766E' },
+};
+
+/**
+ * Open the reusable confirm modal.
+ *
+ * @param {HTMLFormElement} form   - The form to submit if confirmed.
+ * @param {Object} opts
+ * @param {string} opts.title     - Modal title.
+ * @param {string} opts.text      - Modal body text.
+ * @param {string} opts.btnLabel  - Confirm button label.
+ * @param {string} opts.theme     - 'danger' | 'warning' | 'info' (default: 'warning').
+ */
+function openConfirmModal(form, opts = {}) {
+    _confirmTargetForm = form;
+
+    const theme = CONFIRM_THEMES[opts.theme || 'warning'] || CONFIRM_THEMES.warning;
+
+    // Set title & text
+    document.getElementById('confirm-modal-title').textContent = opts.title || 'Konfirmasi';
+    document.getElementById('confirm-modal-text').textContent  = opts.text  || 'Apakah Anda yakin?';
+
+    // Set button
+    const btn = document.getElementById('confirm-modal-btn');
+    btn.textContent       = opts.btnLabel || 'Ya, Lanjutkan';
+    btn.style.background  = theme.btnBg;
+    btn.onmouseenter      = () => { btn.style.background = theme.btnHover; };
+    btn.onmouseleave      = () => { btn.style.background = theme.btnBg; };
+
+    // Set icon color
+    const iconEl = document.getElementById('confirm-modal-icon');
+    iconEl.style.background = theme.bg;
+    iconEl.style.color      = theme.color;
+
+    // Show the right icon
+    document.getElementById('confirm-icon-warning').style.display = (opts.theme || 'warning') === 'warning' ? 'block' : 'none';
+    document.getElementById('confirm-icon-danger').style.display  = opts.theme === 'danger'  ? 'block' : 'none';
+    document.getElementById('confirm-icon-info').style.display    = opts.theme === 'info'    ? 'block' : 'none';
+
+    // Open
+    document.getElementById('confirm-modal').classList.add('active');
+}
+
+function closeConfirmModal() {
+    document.getElementById('confirm-modal').classList.remove('active');
+    _confirmTargetForm = null;
+}
+
+function executeConfirm() {
+    if (_confirmTargetForm) {
+        _confirmTargetForm.submit();
+    }
+    closeConfirmModal();
+}
+
+// Close when clicking outside
+document.getElementById('confirm-modal').addEventListener('click', function(event) {
+    if (event.target === this) {
+        closeConfirmModal();
+    }
+});
 </script>
 </body>
 </html>
+

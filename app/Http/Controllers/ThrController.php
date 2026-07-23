@@ -78,8 +78,94 @@ class ThrController extends Controller
 
     protected function seedIfEmpty(): void
     {
+        // Pastikan data pegawai juga ada di session.
+        if (! session()->has('dummy_pegawai')) {
+            app(\App\Http\Controllers\PegawaiController::class)->seedIfEmpty();
+        }
+
         if (! session()->has('dummy_thr')) {
-            session()->put('dummy_thr', []);
+            session()->put('dummy_thr', [
+                // === Pegawai 1 - Mukti Kurniawan - 2026 (Terbit) ===
+                [
+                    'id' => 1, 'pegawai_id' => 1, 'kategori' => 'satuan', 'tahun' => 2026,
+                    'nik' => '1711254', 'nama' => 'Mukti Kurniawan', 'kode_ptkp' => 'K',
+                    'gapok' => 3800000, 'tunjangan_istri' => 380000, 'tunjangan_anak' => 0,
+                    'tunjangan_prestasi' => 500000, 'tunjangan_jabatan' => 350000,
+                    'tunjangan_transport' => 300000, 'tunjangan_pangan' => 250000,
+                    'tunjangan_bpjstk' => 150000, 'tunjangan_perumahan' => 200000,
+                    'tunjangan_perusahaan' => 100000, 'tunjangan_airminum' => 50000,
+                    'tunjangan_bpjskes' => 120000, 'tunjangan_komunikasi' => 75000,
+                    'tunjangan_pajak' => 180000, 'lembur' => 0,
+                    'potongan_dapenma' => 95000, 'potongan_bpjstk' => 150000,
+                    'potongan_bpjskes' => 120000, 'potongan_perumahan' => 100000,
+                    'potongan_pajak' => 180000, 'potongan_korpri' => 15000,
+                    'potongan_tperusahaan' => 50000, 'potongan_lain' => 0,
+                    'potongan_koperasi' => 200000, 'potongan_darmawanita' => 0,
+                    'potongan_ledeng' => 25000, 'potongan_kas' => 0,
+                    'potongan_bjb' => 0, 'potongan_bjbs' => 0,
+                    'potongan_asuransi' => 50000, 'potongan_btn' => 0,
+                    'potongan_bpr' => 0, 'potongan_zakat' => 95000,
+                    'total_pendapatan' => 6455000,
+                    'total_potongan_pendapatan' => 710000,
+                    'total_potongan_non_pendapatan' => 370000,
+                    'thr_diterima' => 5375000,
+                    'status' => 'terbit', 'disetujui_oleh' => 'Mukti Kurniawan',
+                    'tgl_terbit' => '2026-06-15',
+                ],
+                // === Pegawai 2 - Dewi Anggraini - 2026 (Terbit) ===
+                [
+                    'id' => 2, 'pegawai_id' => 2, 'kategori' => 'satuan', 'tahun' => 2026,
+                    'nik' => '1800001', 'nama' => 'Dewi Anggraini', 'kode_ptkp' => 'TK',
+                    'gapok' => 3200000, 'tunjangan_istri' => 0, 'tunjangan_anak' => 0,
+                    'tunjangan_prestasi' => 450000, 'tunjangan_jabatan' => 300000,
+                    'tunjangan_transport' => 250000, 'tunjangan_pangan' => 200000,
+                    'tunjangan_bpjstk' => 130000, 'tunjangan_perumahan' => 180000,
+                    'tunjangan_perusahaan' => 80000, 'tunjangan_airminum' => 50000,
+                    'tunjangan_bpjskes' => 100000, 'tunjangan_komunikasi' => 50000,
+                    'tunjangan_pajak' => 140000, 'lembur' => 0,
+                    'potongan_dapenma' => 80000, 'potongan_bpjstk' => 130000,
+                    'potongan_bpjskes' => 100000, 'potongan_perumahan' => 90000,
+                    'potongan_pajak' => 140000, 'potongan_korpri' => 12000,
+                    'potongan_tperusahaan' => 40000, 'potongan_lain' => 0,
+                    'potongan_koperasi' => 150000, 'potongan_darmawanita' => 10000,
+                    'potongan_ledeng' => 25000, 'potongan_kas' => 0,
+                    'potongan_bjb' => 0, 'potongan_bjbs' => 0,
+                    'potongan_asuransi' => 0, 'potongan_btn' => 0,
+                    'potongan_bpr' => 0, 'potongan_zakat' => 80000,
+                    'total_pendapatan' => 5130000,
+                    'total_potongan_pendapatan' => 592000,
+                    'total_potongan_non_pendapatan' => 265000,
+                    'thr_diterima' => 4273000,
+                    'status' => 'terbit', 'disetujui_oleh' => 'Mukti Kurniawan',
+                    'tgl_terbit' => '2026-06-15',
+                ],
+                // === Pegawai 3 - Nur Hidayah - 2026 (Draft) ===
+                [
+                    'id' => 3, 'pegawai_id' => 3, 'kategori' => 'capeg', 'tahun' => 2026,
+                    'nik' => '1800003', 'nama' => 'Nur Hidayah', 'kode_ptkp' => 'TK',
+                    'gapok' => 2800000, 'tunjangan_istri' => 0, 'tunjangan_anak' => 0,
+                    'tunjangan_prestasi' => 300000, 'tunjangan_jabatan' => 0,
+                    'tunjangan_transport' => 200000, 'tunjangan_pangan' => 200000,
+                    'tunjangan_bpjstk' => 100000, 'tunjangan_perumahan' => 0,
+                    'tunjangan_perusahaan' => 0, 'tunjangan_airminum' => 50000,
+                    'tunjangan_bpjskes' => 80000, 'tunjangan_komunikasi' => 0,
+                    'tunjangan_pajak' => 90000, 'lembur' => 0,
+                    'potongan_dapenma' => 70000, 'potongan_bpjstk' => 100000,
+                    'potongan_bpjskes' => 80000, 'potongan_perumahan' => 0,
+                    'potongan_pajak' => 90000, 'potongan_korpri' => 10000,
+                    'potongan_tperusahaan' => 0, 'potongan_lain' => 0,
+                    'potongan_koperasi' => 0, 'potongan_darmawanita' => 0,
+                    'potongan_ledeng' => 0, 'potongan_kas' => 0,
+                    'potongan_bjb' => 0, 'potongan_bjbs' => 0,
+                    'potongan_asuransi' => 0, 'potongan_btn' => 0,
+                    'potongan_bpr' => 0, 'potongan_zakat' => 70000,
+                    'total_pendapatan' => 3820000,
+                    'total_potongan_pendapatan' => 350000,
+                    'total_potongan_non_pendapatan' => 70000,
+                    'thr_diterima' => 3400000,
+                    'status' => 'draft', 'disetujui_oleh' => 'Proses',
+                ],
+            ]);
         }
     }
 
