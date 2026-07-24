@@ -72,7 +72,7 @@ return [
             'icon' => 'shield',
             'roles' => ['1', '2'],
             'items' => [
-                ['label' => 'SET PHDP DAPENMA', 'route_name' => null],
+                ['label' => 'SET PHDP DAPENMA', 'route_name' => 'dapenma.index'],
             ],
         ],
         [
@@ -90,15 +90,15 @@ return [
             'items' => [
                 ['label' => 'Lap. Absensi', 'route_name' => 'absensi.laporan'],
                 ['label' => 'Lap. Prestasi', 'route_name' => 'prestasi.index'],
-                ['label' => 'Lap. Lembur', 'route_name' => null],
-                ['label' => 'Lap. Slip Gaji', 'route_name' => null],
-                ['label' => 'Lap. Buku Besar Gaji', 'route_name' => null],
-                ['label' => 'Lap. Buku Besar Per Sub', 'route_name' => null],
-                ['label' => 'Lap. Payroll', 'route_name' => null],
-                ['label' => 'Lap. Pajak', 'route_name' => null],
+                ['label' => 'Lap. Lembur', 'route_name' => 'gaji-laporan.lembur'],
+                ['label' => 'Lap. Slip Gaji', 'route_name' => 'gaji-laporan.slip-gaji'],
+                ['label' => 'Lap. Buku Besar Gaji', 'route_name' => 'gaji-laporan.buku-besar'],
+                ['label' => 'Lap. Buku Besar Per Sub', 'route_name' => 'gaji-laporan.buku-besar-per-sub'],
+                ['label' => 'Lap. Payroll', 'route_name' => 'gaji-laporan.payroll'],
+                ['label' => 'Lap. Pajak', 'route_name' => 'gaji-laporan.pajak'],
                 ['label' => 'Lap. Gapok / Golongan', 'route_name' => 'gaji-pokok.index'],
-                ['label' => 'Lap. BPJSTK', 'route_name' => null],
-                ['label' => 'Lap. Tunj. Perumahan', 'route_name' => null],
+                ['label' => 'Lap. BPJSTK', 'route_name' => 'gaji-laporan.bpjstk'],
+                ['label' => 'Lap. Tunj. Perumahan', 'route_name' => 'gaji-laporan.tunj-perumahan'],
             ],
         ],
         [

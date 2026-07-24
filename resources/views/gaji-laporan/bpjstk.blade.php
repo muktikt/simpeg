@@ -1,11 +1,11 @@
 @extends('layouts.app')
 
-@section('title', 'Laporan Pajak')
+@section('title', 'Laporan BPJS-TK')
 
 @section('content')
 <div class="page-head">
-    <div class="breadcrumb">Home / Laporan Penggajian / Lap. Pajak</div>
-    <h1>Laporan Pajak (PPh 21)</h1>
+    <div class="breadcrumb">Home / Laporan Penggajian / Lap. BPJSTK</div>
+    <h1>Laporan BPJS Ketenagakerjaan</h1>
 </div>
 
 @include('gaji-laporan.partials.filter-toolbar')
@@ -16,8 +16,8 @@
         <div class="value">{{ $data->count() }}</div>
     </div>
     <div class="stat-card">
-        <div class="label">Total Potongan Pajak</div>
-        <div class="value">Rp {{ number_format($totalPajak, 0, ',', '.') }}</div>
+        <div class="label">Total Tunjangan + Potongan BPJS-TK</div>
+        <div class="value">Rp {{ number_format($totalBpjstk, 0, ',', '.') }}</div>
     </div>
 </div>
 
@@ -27,8 +27,8 @@
             <tr>
                 <th>NIK</th>
                 <th>Nama</th>
-                <th>PTKP</th>
-                <th>Potongan Pajak</th>
+                <th>Tunjangan BPJS-TK</th>
+                <th>Potongan BPJS-TK</th>
             </tr>
         </thead>
         <tbody>
@@ -36,8 +36,8 @@
                 <tr>
                     <td class="cell-nik">{{ $d['nik'] }}</td>
                     <td class="cell-name">{{ $d['nama'] }}</td>
-                    <td>{{ $d['kode_ptkp'] }}</td>
-                    <td>Rp {{ number_format($d['potongan_pajak'], 0, ',', '.') }}</td>
+                    <td>Rp {{ number_format($d['tunjangan_bpjstk'], 0, ',', '.') }}</td>
+                    <td>Rp {{ number_format($d['potongan_bpjstk'], 0, ',', '.') }}</td>
                 </tr>
             @empty
                 <tr><td colspan="4"><div class="table-empty">Belum ada gaji yang terbit untuk periode ini.</div></td></tr>

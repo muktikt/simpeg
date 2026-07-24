@@ -18,6 +18,8 @@ use App\Http\Controllers\InsentifController;
 use App\Http\Controllers\PerubahanNikController;
 use App\Http\Controllers\CutiController;
 use App\Http\Controllers\UserAksesController;
+use App\Http\Controllers\DapenmaController;
+use App\Http\Controllers\GajiLaporanController;
 
 Route::get('/', [LoginController::class, 'showLoginForm'])->name('login');
 Route::post('/login', [LoginController::class, 'login'])->name('login.attempt');
@@ -186,6 +188,29 @@ Route::middleware(['simpeg.auth'])->group(function () {
         Route::get('/{id}/edit', [UserAksesController::class, 'edit'])->whereNumber('id')->name('edit');
         Route::put('/{id}', [UserAksesController::class, 'update'])->whereNumber('id')->name('update');
         Route::delete('/{id}', [UserAksesController::class, 'destroy'])->whereNumber('id')->name('destroy');
+    });
+
+    // Asuransi (Dapenma) - Admin & Keuangan.
+    Route::prefix('dapenma')->name('dapenma.')->middleware(['simpeg.auth:1,2'])->group(function () {
+        Route::get('/', [DapenmaController::class, 'index'])->name('index');
+        Route::get('/create', [DapenmaController::class, 'create'])->name('create');
+        Route::post('/', [DapenmaController::class, 'store'])->name('store');
+        Route::get('/{id}/edit', [DapenmaController::class, 'edit'])->whereNumber('id')->name('edit');
+        Route::put('/{id}', [DapenmaController::class, 'update'])->whereNumber('id')->name('update');
+        Route::delete('/{id}', [DapenmaController::class, 'destroy'])->whereNumber('id')->name('destroy');
+    });
+
+    // Laporan Penggajian (Lembur, Slip Gaji, Buku Besar, Payroll, Pajak,
+    // BPJSTK, Tunj. Perumahan) - Admin, Keuangan, Direksi.
+    Route::prefix('gaji-laporan')->name('gaji-laporan.')->middleware(['simpeg.auth:1,2,7'])->group(function () {
+        Route::get('/lembur', [GajiLaporanController::class, 'lembur'])->name('lembur');
+        Route::get('/slip-gaji', [GajiLaporanController::class, 'slipGaji'])->name('slip-gaji');
+        Route::get('/buku-besar', [GajiLaporanController::class, 'bukuBesar'])->name('buku-besar');
+        Route::get('/buku-besar-per-sub', [GajiLaporanController::class, 'bukuBesarPerSub'])->name('buku-besar-per-sub');
+        Route::get('/payroll', [GajiLaporanController::class, 'payroll'])->name('payroll');
+        Route::get('/pajak', [GajiLaporanController::class, 'pajak'])->name('pajak');
+        Route::get('/bpjstk', [GajiLaporanController::class, 'bpjstk'])->name('bpjstk');
+        Route::get('/tunj-perumahan', [GajiLaporanController::class, 'tunjPerumahan'])->name('tunj-perumahan');
     });
 
     // Semua modul lama yang belum dimigrasikan -> halaman placeholder.
