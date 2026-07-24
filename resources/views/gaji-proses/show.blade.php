@@ -17,7 +17,7 @@
     <div class="meta">
         <div><p>{{ $gaji['nik'] }}</p><p>NIK</p></div>
         <div><p>{{ \App\Http\Controllers\AbsensiController::BULAN[$gaji['bulan']] }} {{ $gaji['tahun'] }}</p><p>Periode</p></div>
-        <div><p>{{ $gaji['status'] === 'terbit' ? 'Terbit' : 'Draft' }}</p><p>Status</p></div>
+        <div><p>{{ $gaji['status'] === 'terbit' ? 'Terbit (Final)' : \App\Http\Controllers\GajiProsesController::approvalStatusLabel($gaji['status']) }}</p><p>Status</p></div>
     </div>
 </div>
 
@@ -59,10 +59,10 @@
 </div>
 
 <div class="form-actions" style="max-width:100%;">
-    @if ($gaji['status'] !== 'terbit')
-        <form action="{{ route('gaji-proses.terbitkan', $gaji['id']) }}" method="POST" onsubmit="event.preventDefault(); openConfirmModal(this, {title: 'Terbitkan Gaji', text: 'Terbitkan gaji ini? Setelah terbit tidak bisa diubah/dihapus lagi.', btnLabel: 'Ya, Terbitkan', theme: 'info'});">
+    @if ($gaji['status'] !== 'terbit' && $gaji['bisa_approve'])
+        <form action="{{ route('gaji-proses.terbitkan', $gaji['id']) }}" method="POST" onsubmit="return confirm('Setujui gaji ini ke tahap berikutnya?');">
             @csrf
-            <button type="submit" class="btn btn-primary">Terbitkan Gaji</button>
+            <button type="submit" class="btn btn-primary">Setujui ke Tahap Berikutnya</button>
         </form>
     @endif
     <a href="{{ route('gaji-proses.index') }}" class="btn btn-outline">Kembali</a>

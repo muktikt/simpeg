@@ -277,7 +277,7 @@ function closeConfirmModal() {
 
 function executeConfirm() {
     if (_confirmTargetForm) {
-        _confirmTargetForm.submit();
+        HTMLFormElement.prototype.submit.call(_confirmTargetForm);
     }
     closeConfirmModal();
 }
@@ -288,6 +288,44 @@ document.getElementById('confirm-modal').addEventListener('click', function(even
         closeConfirmModal();
     }
 });
+
+// Intercept all default browser confirm popups in form submissions globally
+document.addEventListener('submit', function(event) {
+    const form = event.target;
+    const onsubmitAttr = form.getAttribute('onsubmit');
+    if (onsubmitAttr && onsubmitAttr.includes('confirm(')) {
+        event.preventDefault();
+        event.stopPropagation();
+
+        let msg = 'Apakah Anda yakin?';
+        const match = onsubmitAttr.match(/confirm\(['"](.*?)['"]\)/);
+        if (match && match[1]) {
+            msg = match[1];
+        }
+
+        let theme = 'warning';
+        let title = 'Konfirmasi';
+        let btnLabel = 'Ya, Lanjutkan';
+
+        const lowerMsg = msg.toLowerCase();
+        if (lowerMsg.includes('hapus') || lowerMsg.includes('ganti')) {
+            theme = 'danger';
+            title = 'Konfirmasi Hapus';
+            btnLabel = 'Ya, Hapus';
+        } else if (lowerMsg.includes('setujui') || lowerMsg.includes('terbitkan')) {
+            theme = 'info';
+            title = 'Konfirmasi Setuju';
+            btnLabel = 'Ya, Setujui';
+        }
+
+        openConfirmModal(form, {
+            title: title,
+            text: msg,
+            btnLabel: btnLabel,
+            theme: theme
+        });
+    }
+}, true);
 </script>
 </body>
 </html>

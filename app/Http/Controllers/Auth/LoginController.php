@@ -42,6 +42,13 @@ class LoginController extends Controller
             'jabatan' => 'Direktur Utama',
             'userlevel' => '7', // Direksi
         ],
+        '1800005' => [
+            'nik' => '1800005',
+            'password' => 'password',
+            'nama_peg' => 'Hendra Kusuma',
+            'jabatan' => 'Direktur Umum',
+            'userlevel' => '7', // Direksi
+        ],
     ];
 
     public function showLoginForm()

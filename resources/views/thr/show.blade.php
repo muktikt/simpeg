@@ -19,7 +19,7 @@
     <div class="meta">
         <div><p>{{ $thr['nik'] }}</p><p>NIK</p></div>
         <div><p>{{ $thr['tahun'] }}</p><p>Tahun THR</p></div>
-        <div><p>{{ $thr['status'] === 'terbit' ? 'Terbit' : 'Draft' }}</p><p>Status</p></div>
+        <div><p>{{ $thr['status'] === 'terbit' ? 'Terbit (Final)' : \App\Http\Controllers\ThrController::approvalStatusLabel($thr['status']) }}</p><p>Status</p></div>
         <div><p>{{ $thr['disetujui_oleh'] }}</p><p>Disetujui Oleh</p></div>
     </div>
 </div>
@@ -70,10 +70,10 @@
 </div>
 
 <div class="form-actions" style="max-width:100%;">
-    @if ($bisaKelola && $thr['status'] !== 'terbit')
-        <form action="{{ route('thr.terbitkan', $thr['id']) }}" method="POST" onsubmit="event.preventDefault(); openConfirmModal(this, {title: 'Terbitkan THR', text: 'Terbitkan THR ini? Setelah terbit tidak bisa diubah/dihapus lagi.', btnLabel: 'Ya, Terbitkan', theme: 'info'});">
+    @if ($thr['status'] !== 'terbit' && $thr['bisa_approve'])
+        <form action="{{ route('thr.terbitkan', $thr['id']) }}" method="POST" onsubmit="return confirm('Setujui THR ini ke tahap berikutnya?');">
             @csrf
-            <button type="submit" class="btn btn-primary">Terbitkan THR</button>
+            <button type="submit" class="btn btn-primary">Setujui ke Tahap Berikutnya</button>
         </form>
     @endif
     <a href="{{ route('thr.index') }}" class="btn btn-outline">Kembali</a>

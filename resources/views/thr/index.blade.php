@@ -52,24 +52,28 @@
                     <td><strong>Rp {{ number_format($t['thr_diterima'], 0, ',', '.') }}</strong></td>
                     <td>
                         @if ($t['status'] === 'terbit')
-                            <span class="badge badge-PT">Terbit</span>
+                            <span class="badge badge-PT">Terbit (Final)</span>
                         @else
-                            <span class="badge badge-PH">Draft</span>
+                            <span class="badge badge-PH">{{ \App\Http\Controllers\ThrController::approvalStatusLabel($t['status']) }}</span>
                         @endif
                     </td>
                     <td>
                         <div class="row-actions">
                             <a href="{{ route('thr.show', $t['id']) }}" class="btn btn-outline btn-sm">Lihat</a>
-                            @if ($bisaKelola && $t['status'] !== 'terbit')
-                                <form action="{{ route('thr.terbitkan', $t['id']) }}" method="POST" onsubmit="event.preventDefault(); openConfirmModal(this, {title: 'Terbitkan THR', text: 'Terbitkan THR ini? Setelah terbit tidak bisa diubah/dihapus lagi.', btnLabel: 'Ya, Terbitkan', theme: 'info'});" style="margin:0;">
-                                    @csrf
-                                    <button type="submit" class="btn btn-primary btn-sm">Terbitkan</button>
-                                </form>
-                                <form action="{{ route('thr.destroy', $t['id']) }}" method="POST" onsubmit="event.preventDefault(); openConfirmModal(this, {title: 'Hapus Draft THR', text: 'Apakah Anda yakin ingin menghapus draft THR ini?', btnLabel: 'Ya, Hapus', theme: 'danger'});" style="margin:0;">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button type="submit" class="btn btn-danger btn-sm">Hapus</button>
-                                </form>
+                            @if ($t['status'] !== 'terbit')
+                                @if ($t['bisa_approve'])
+                                    <form action="{{ route('thr.terbitkan', $t['id']) }}" method="POST" onsubmit="return confirm('Setujui THR ini ke tahap berikutnya?');" style="margin:0;">
+                                        @csrf
+                                        <button type="submit" class="btn btn-primary btn-sm">Setujui</button>
+                                    </form>
+                                @endif
+                                @if ($bisaKelola)
+                                    <form action="{{ route('thr.destroy', $t['id']) }}" method="POST" onsubmit="return confirm('Hapus draft THR ini?');" style="margin:0;">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="btn btn-danger btn-sm">Hapus</button>
+                                    </form>
+                                @endif
                             @endif
                         </div>
                     </td>

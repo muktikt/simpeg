@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use App\Http\Controllers\Concerns\HasApprovalChain;
 
 class GajiProsesController extends Controller
 {
+    use HasApprovalChain;
     /**
      * DATA DUMMY BERBASIS SESSION.
      *
@@ -282,6 +284,10 @@ class GajiProsesController extends Controller
         $gaji = collect($this->all())
             ->where('bulan', $bulan)
             ->where('tahun', $tahun)
+            ->map(function ($item) {
+                $item['bisa_approve'] = $this->canUserApprove($item['status'] ?? '');
+                return $item;
+            })
             ->sortBy('nama')
             ->values();
 
@@ -350,6 +356,8 @@ class GajiProsesController extends Controller
         $gaji = collect($this->all())->firstWhere('id', $id);
         abort_if(! $gaji, 404);
 
+        $gaji['bisa_approve'] = $this->canUserApprove($gaji['status'] ?? '');
+
         return view('gaji-proses.show', [
             'gaji' => $gaji,
             'komponenPendapatan' => self::KOMPONEN_PENDAPATAN,
@@ -365,8 +373,7 @@ class GajiProsesController extends Controller
     {
         $data = collect($this->all())->map(function ($row) use ($id) {
             if ($row['id'] === $id) {
-                $row['status'] = 'terbit';
-                $row['tgl_terbit'] = now()->toDateString();
+                $row = $this->applyApproval($row);
             }
 
             return $row;
@@ -374,7 +381,7 @@ class GajiProsesController extends Controller
 
         $this->save($data);
 
-        return redirect()->route('gaji-proses.index')->with('success', 'Gaji berhasil diterbitkan.');
+        return redirect()->route('gaji-proses.index')->with('success', 'Persetujuan gaji berhasil diproses.');
     }
 
     public function destroy(int $id)

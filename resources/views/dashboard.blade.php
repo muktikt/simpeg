@@ -85,11 +85,11 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/></svg>
             Laporan absensi
         </a>
-        <a href="{{ route('placeholder', 'laporan-slip-gaji') }}" class="quick-link">
+        <a href="{{ route('gaji-laporan.slip-gaji') }}" class="quick-link">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
             Laporan slip gaji
         </a>
-        <a href="{{ route('placeholder', 'laporan-cuti-pegawai') }}" class="quick-link">
+        <a href="{{ route('cuti.index') }}" class="quick-link">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/></svg>
             Laporan cuti pegawai
         </a>

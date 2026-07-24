@@ -19,7 +19,7 @@
     <div class="meta">
         <div><p>{{ $gaji13['nik'] }}</p><p>NIK</p></div>
         <div><p>{{ $gaji13['tahun'] }}</p><p>Tahun</p></div>
-        <div><p>{{ $gaji13['status'] === 'terbit' ? 'Terbit' : 'Draft' }}</p><p>Status</p></div>
+        <div><p>{{ $gaji13['status'] === 'terbit' ? 'Terbit (Final)' : \App\Http\Controllers\GajiTigabelasController::approvalStatusLabel($gaji13['status']) }}</p><p>Status</p></div>
         <div><p>{{ $gaji13['disetujui_oleh'] }}</p><p>Disetujui Oleh</p></div>
     </div>
 </div>
@@ -70,10 +70,10 @@
 </div>
 
 <div class="form-actions" style="max-width:100%;">
-    @if ($bisaKelola && $gaji13['status'] !== 'terbit')
-        <form action="{{ route('gaji-tigabelas.terbitkan', $gaji13['id']) }}" method="POST" onsubmit="event.preventDefault(); openConfirmModal(this, {title: 'Terbitkan Gaji 13', text: 'Terbitkan Gaji 13 ini? Setelah terbit tidak bisa diubah/dihapus lagi.', btnLabel: 'Ya, Terbitkan', theme: 'info'});">
+    @if ($gaji13['status'] !== 'terbit' && $gaji13['bisa_approve'])
+        <form action="{{ route('gaji-tigabelas.terbitkan', $gaji13['id']) }}" method="POST" onsubmit="return confirm('Setujui Gaji 13 ini ke tahap berikutnya?');">
             @csrf
-            <button type="submit" class="btn btn-primary">Terbitkan Gaji 13</button>
+            <button type="submit" class="btn btn-primary">Setujui ke Tahap Berikutnya</button>
         </form>
     @endif
     <a href="{{ route('gaji-tigabelas.index') }}" class="btn btn-outline">Kembali</a>

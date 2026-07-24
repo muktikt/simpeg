@@ -28,6 +28,7 @@
     <nav class="nav-scroll">
 
         @foreach ($menu['single'] as $item)
+            @continue(! $canSee($item))
             <a href="{{ $item['route_name'] ? route($item['route_name']) : route('placeholder', $slugify($item['label'])) }}"
                class="nav-link {{ request()->routeIs($item['route_name']) ? 'active' : '' }}">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">{!! $icons[$item['icon']] !!}</svg>

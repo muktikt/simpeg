@@ -12,6 +12,7 @@ return [
 
     'single' => [
         ['label' => 'Beranda', 'icon' => 'home', 'route_name' => 'dashboard'],
+        ['label' => 'Approval', 'icon' => 'report', 'route_name' => 'approval.index', 'roles' => ['1', '7']],
     ],
 
     'groups' => [

@@ -19,6 +19,7 @@ use App\Http\Controllers\PerubahanNikController;
 use App\Http\Controllers\CutiController;
 use App\Http\Controllers\UserAksesController;
 use App\Http\Controllers\DapenmaController;
+use App\Http\Controllers\ApprovalController;
 use App\Http\Controllers\GajiLaporanController;
 
 Route::get('/', [LoginController::class, 'showLoginForm'])->name('login');
@@ -120,29 +121,37 @@ Route::middleware(['simpeg.auth'])->group(function () {
         });
     });
 
-    // Proses Gaji Bulanan - Admin & Keuangan.
-    Route::prefix('gaji-proses')->name('gaji-proses.')->middleware(['simpeg.auth:1,2'])->group(function () {
-        Route::get('/', [GajiProsesController::class, 'index'])->name('index');
-        Route::get('/create', [GajiProsesController::class, 'create'])->name('create');
-        Route::post('/', [GajiProsesController::class, 'store'])->name('store');
-        Route::get('/{id}', [GajiProsesController::class, 'show'])->whereNumber('id')->name('show');
-        Route::post('/{id}/terbitkan', [GajiProsesController::class, 'terbitkan'])->whereNumber('id')->name('terbitkan');
-        Route::delete('/{id}', [GajiProsesController::class, 'destroy'])->whereNumber('id')->name('destroy');
-        Route::get('/ajax/hitung-keluarga/{pegawaiId}', [GajiProsesController::class, 'hitungKeluargaJson'])->whereNumber('pegawaiId')->name('hitung-keluarga');
+    // Proses Gaji Bulanan - index/show/terbitkan bisa diakses Admin, Keuangan,
+    // dan Direksi (karena Dirum & Dirut perlu approve di alur berjenjang).
+    // Create/Store/Hapus tetap cuma Admin & Keuangan.
+    Route::prefix('gaji-proses')->name('gaji-proses.')->group(function () {
+        Route::middleware(['simpeg.auth:1,2,7'])->group(function () {
+            Route::get('/', [GajiProsesController::class, 'index'])->name('index');
+            Route::get('/{id}', [GajiProsesController::class, 'show'])->whereNumber('id')->name('show');
+            Route::post('/{id}/terbitkan', [GajiProsesController::class, 'terbitkan'])->whereNumber('id')->name('terbitkan');
+        });
+
+        Route::middleware(['simpeg.auth:1,2'])->group(function () {
+            Route::get('/create', [GajiProsesController::class, 'create'])->name('create');
+            Route::post('/', [GajiProsesController::class, 'store'])->name('store');
+            Route::delete('/{id}', [GajiProsesController::class, 'destroy'])->whereNumber('id')->name('destroy');
+            Route::get('/ajax/hitung-keluarga/{pegawaiId}', [GajiProsesController::class, 'hitungKeluargaJson'])->whereNumber('pegawaiId')->name('hitung-keluarga');
+        });
     });
 
-    // THR - index/show bisa dilihat Admin, Keuangan, dan Direksi.
-    // Tambah/Terbitkan/Hapus cuma Admin & Keuangan.
+    // THR - index/show/terbitkan bisa diakses Admin, Keuangan, dan Direksi
+    // (karena Dirum & Dirut perlu approve di alur berjenjang).
+    // Tambah/Hapus tetap cuma Admin & Keuangan.
     Route::prefix('thr')->name('thr.')->group(function () {
         Route::middleware(['simpeg.auth:1,2,7'])->group(function () {
             Route::get('/', [ThrController::class, 'index'])->name('index');
             Route::get('/{id}', [ThrController::class, 'show'])->whereNumber('id')->name('show');
+            Route::post('/{id}/terbitkan', [ThrController::class, 'terbitkan'])->whereNumber('id')->name('terbitkan');
         });
 
         Route::middleware(['simpeg.auth:1,2'])->group(function () {
             Route::get('/create', [ThrController::class, 'create'])->name('create');
             Route::post('/', [ThrController::class, 'store'])->name('store');
-            Route::post('/{id}/terbitkan', [ThrController::class, 'terbitkan'])->whereNumber('id')->name('terbitkan');
             Route::delete('/{id}', [ThrController::class, 'destroy'])->whereNumber('id')->name('destroy');
             Route::get('/ajax/hitung-keluarga/{pegawaiId}', [ThrController::class, 'hitungKeluargaJson'])->whereNumber('pegawaiId')->name('hitung-keluarga');
         });
@@ -155,12 +164,12 @@ Route::middleware(['simpeg.auth'])->group(function () {
         Route::middleware(['simpeg.auth:1,2,7'])->group(function () {
             Route::get('/', [GajiTigabelasController::class, 'index'])->name('index');
             Route::get('/{id}', [GajiTigabelasController::class, 'show'])->whereNumber('id')->name('show');
+            Route::post('/{id}/terbitkan', [GajiTigabelasController::class, 'terbitkan'])->whereNumber('id')->name('terbitkan');
         });
 
         Route::middleware(['simpeg.auth:1,2'])->group(function () {
             Route::get('/create', [GajiTigabelasController::class, 'create'])->name('create');
             Route::post('/', [GajiTigabelasController::class, 'store'])->name('store');
-            Route::post('/{id}/terbitkan', [GajiTigabelasController::class, 'terbitkan'])->whereNumber('id')->name('terbitkan');
             Route::delete('/{id}', [GajiTigabelasController::class, 'destroy'])->whereNumber('id')->name('destroy');
             Route::get('/ajax/hitung-keluarga/{pegawaiId}', [GajiTigabelasController::class, 'hitungKeluargaJson'])->whereNumber('pegawaiId')->name('hitung-keluarga');
         });
@@ -212,6 +221,10 @@ Route::middleware(['simpeg.auth'])->group(function () {
         Route::get('/bpjstk', [GajiLaporanController::class, 'bpjstk'])->name('bpjstk');
         Route::get('/tunj-perumahan', [GajiLaporanController::class, 'tunjPerumahan'])->name('tunj-perumahan');
     });
+
+    // Approval - dashboard kotak masuk, menggabungkan item pending dari
+    // Gaji Proses/THR/Gaji13 yang menunggu approval user yang login.
+    Route::get('/approval', [ApprovalController::class, 'index'])->middleware(['simpeg.auth:1,2,7'])->name('approval.index');
 
     // Semua modul lama yang belum dimigrasikan -> halaman placeholder.
     Route::get('/modul/{slug}', [PlaceholderController::class, 'show'])->name('placeholder');

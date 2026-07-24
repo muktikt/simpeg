@@ -53,20 +53,22 @@
                     <td><strong>Rp {{ number_format($g['gaji_bersih'], 0, ',', '.') }}</strong></td>
                     <td>
                         @if ($g['status'] === 'terbit')
-                            <span class="badge badge-PT">Terbit</span>
+                            <span class="badge badge-PT">Terbit (Final)</span>
                         @else
-                            <span class="badge badge-PH">Draft</span>
+                            <span class="badge badge-PH">{{ \App\Http\Controllers\GajiProsesController::approvalStatusLabel($g['status']) }}</span>
                         @endif
                     </td>
                     <td>
                         <div class="row-actions">
                             <a href="{{ route('gaji-proses.show', $g['id']) }}" class="btn btn-outline btn-sm">Lihat</a>
                             @if ($g['status'] !== 'terbit')
-                                <form action="{{ route('gaji-proses.terbitkan', $g['id']) }}" method="POST" onsubmit="event.preventDefault(); openConfirmModal(this, {title: 'Terbitkan Gaji', text: 'Terbitkan gaji ini? Setelah terbit tidak bisa diubah/dihapus lagi.', btnLabel: 'Ya, Terbitkan', theme: 'info'});" style="margin:0;">
-                                    @csrf
-                                    <button type="submit" class="btn btn-primary btn-sm">Terbitkan</button>
-                                </form>
-                                <form action="{{ route('gaji-proses.destroy', $g['id']) }}" method="POST" onsubmit="event.preventDefault(); openConfirmModal(this, {title: 'Hapus Draft Gaji', text: 'Apakah Anda yakin ingin menghapus draft gaji ini?', btnLabel: 'Ya, Hapus', theme: 'danger'});" style="margin:0;">
+                                @if ($g['bisa_approve'])
+                                    <form action="{{ route('gaji-proses.terbitkan', $g['id']) }}" method="POST" onsubmit="return confirm('Setujui gaji ini ke tahap berikutnya?');" style="margin:0;">
+                                        @csrf
+                                        <button type="submit" class="btn btn-primary btn-sm">Setujui</button>
+                                    </form>
+                                @endif
+                                <form action="{{ route('gaji-proses.destroy', $g['id']) }}" method="POST" onsubmit="return confirm('Hapus draft ini?');" style="margin:0;">
                                     @csrf
                                     @method('DELETE')
                                     <button type="submit" class="btn btn-danger btn-sm">Hapus</button>
