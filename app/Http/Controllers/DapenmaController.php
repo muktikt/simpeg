@@ -20,7 +20,14 @@ class DapenmaController extends Controller
     {
         if (! session()->has('dummy_dapenma')) {
             session()->put('dummy_dapenma', [
-                ['id' => 1, 'pegawai_id' => 1, 'nomor_peserta' => 'DPM-2017-001', 'nominal_phdp' => 4200000],
+                [
+                    'id' => 1,
+                    'pegawai_id' => 1,
+                    'nomor_peserta' => 'DPM-2017-001',
+                    'nominal_phdp' => 4200000,
+                    'tgl_update' => now()->toDateString(),
+                    'petugas_entri' => 'Admin'
+                ],
             ]);
         }
     }
@@ -54,6 +61,8 @@ class DapenmaController extends Controller
         $row['nik'] = $p['nik'] ?? '-';
         $row['nama'] = $p['nama'] ?? '(pegawai tidak ditemukan)';
         $row['nominal_beban'] = $row['nominal_phdp'] * 0.05;
+        $row['tgl_update'] = $row['tgl_update'] ?? now()->toDateString();
+        $row['petugas_entri'] = $row['petugas_entri'] ?? 'Admin';
 
         return $row;
     }
