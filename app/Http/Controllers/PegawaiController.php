@@ -17,7 +17,7 @@ class PegawaiController extends Controller
      * Ganti seluruh method di controller ini pakai Eloquent Model (mis. Pegawai::all())
      * kalau sudah siap dihubungkan ke tabel tbl_pegawai yang asli.
      */
-    public function seedIfEmpty(): void
+    protected function seedIfEmpty(): void
     {
         if (! session()->has('dummy_pegawai')) {
             session()->put('dummy_pegawai', [
@@ -32,17 +32,15 @@ class PegawaiController extends Controller
                     'telp' => '081234567890',
                     'alamat' => 'Jl. Merdeka No. 10, Kota A',
                     'keluarga' => [
-                        ['id' => 1, 'nama' => 'Sri Wahyuni', 'hubungan' => 'Istri/Suami', 'tgl_lahir' => '1992-03-14'],
-                        ['id' => 2, 'nama' => 'Aisyah Kurniawan', 'hubungan' => 'Anak', 'tgl_lahir' => '2018-07-22'],
-                        ['id' => 3, 'nama' => 'Rizki Kurniawan', 'hubungan' => 'Anak', 'tgl_lahir' => '2021-01-10'],
+                        ['id' => 1, 'nama' => 'Sri Wahyuni', 'hubungan' => 'Istri/Suami', 'tgl_lahir' => '1992-03-14', 'keterangan' => '-'],
+                        ['id' => 2, 'nama' => 'Budi Santoso', 'hubungan' => 'Anak', 'tgl_lahir' => '2002-05-10', 'keterangan' => 'Tidak Kuliah'],
+                        ['id' => 3, 'nama' => 'Citra Santoso', 'hubungan' => 'Anak', 'tgl_lahir' => '2015-08-20', 'keterangan' => '-'],
                     ],
                     'golongan' => [
-                        ['id' => 1, 'golongan' => 'II/D', 'tmt' => '2017-11-25'],
-                        ['id' => 2, 'golongan' => 'III/A', 'tmt' => '2020-01-01'],
+                        ['id' => 1, 'golongan' => 'III/A', 'tmt' => '2020-01-01'],
                     ],
                     'jabatan_riwayat' => [
-                        ['id' => 1, 'jabatan' => 'Staf Umum', 'unit_kerja' => 'Kantor Pusat', 'tmt' => '2017-11-25'],
-                        ['id' => 2, 'jabatan' => 'Staf SDM', 'unit_kerja' => 'Kantor Pusat', 'tmt' => '2021-06-01'],
+                        ['id' => 1, 'jabatan' => 'Staf SDM', 'unit_kerja' => 'Kantor Pusat', 'tmt' => '2021-06-01'],
                     ],
                     'pendidikan' => [
                         ['id' => 1, 'jenjang' => 'S1', 'jurusan' => 'Manajemen', 'institusi' => 'Universitas A', 'tahun_lulus' => '2016'],
@@ -83,55 +81,6 @@ class PegawaiController extends Controller
                     'pendidikan' => [['id' => 1, 'jenjang' => 'SMA/SMK', 'jurusan' => 'IPA', 'institusi' => 'SMA C', 'tahun_lulus' => '2021']],
                     'prestasi' => [],
                 ],
-                [
-                    'id' => 4,
-                    'nik' => '1800004',
-                    'nama' => 'Bambang Wijaya',
-                    'jabatan' => 'Direktur Utama',
-                    'unit_kerja' => 'Direksi',
-                    'status_peg' => 'DI',
-                    'tgl_masuk' => '2010-04-01',
-                    'telp' => '081344556677',
-                    'alamat' => 'Jl. Gatot Subroto No. 88, Kota A',
-                    'keluarga' => [
-                        ['id' => 1, 'nama' => 'Ratna Sari', 'hubungan' => 'Istri/Suami', 'tgl_lahir' => '1978-09-05'],
-                        ['id' => 2, 'nama' => 'Dimas Wijaya', 'hubungan' => 'Anak', 'tgl_lahir' => '2005-03-18'],
-                        ['id' => 3, 'nama' => 'Putri Wijaya', 'hubungan' => 'Anak', 'tgl_lahir' => '2008-11-25'],
-                    ],
-                    'golongan' => [
-                        ['id' => 1, 'golongan' => 'IV/A', 'tmt' => '2010-04-01'],
-                        ['id' => 2, 'golongan' => 'IV/B', 'tmt' => '2015-04-01'],
-                    ],
-                    'jabatan_riwayat' => [
-                        ['id' => 1, 'jabatan' => 'Direktur Teknik', 'unit_kerja' => 'Direksi', 'tmt' => '2010-04-01'],
-                        ['id' => 2, 'jabatan' => 'Direktur Utama', 'unit_kerja' => 'Direksi', 'tmt' => '2018-04-01'],
-                    ],
-                    'pendidikan' => [
-                        ['id' => 1, 'jenjang' => 'S1', 'jurusan' => 'Teknik Sipil', 'institusi' => 'ITB', 'tahun_lulus' => '2000'],
-                        ['id' => 2, 'jenjang' => 'S2', 'jurusan' => 'Manajemen', 'institusi' => 'Universitas Indonesia', 'tahun_lulus' => '2006'],
-                    ],
-                    'prestasi' => [
-                        ['id' => 1, 'judul' => 'BUMD Terbaik', 'keterangan' => 'Penghargaan dari Pemda atas kinerja perusahaan', 'tanggal' => '2024-08-17'],
-                    ],
-                ],
-                [
-                    'id' => 5,
-                    'nik' => '2200010',
-                    'nama' => 'Agus Salim',
-                    'jabatan' => 'Petugas Meter',
-                    'unit_kerja' => 'Unit Pelayanan',
-                    'status_peg' => 'PH',
-                    'tgl_masuk' => '2022-01-10',
-                    'telp' => '085712345678',
-                    'alamat' => 'Jl. Anggrek No. 15, Kota D',
-                    'keluarga' => [
-                        ['id' => 1, 'nama' => 'Siti Rahayu', 'hubungan' => 'Istri/Suami', 'tgl_lahir' => '1995-06-20'],
-                    ],
-                    'golongan' => [],
-                    'jabatan_riwayat' => [['id' => 1, 'jabatan' => 'Petugas Meter', 'unit_kerja' => 'Unit Pelayanan', 'tmt' => '2022-01-10']],
-                    'pendidikan' => [['id' => 1, 'jenjang' => 'SMA/SMK', 'jurusan' => 'Teknik', 'institusi' => 'SMK D', 'tahun_lulus' => '2020']],
-                    'prestasi' => [],
-                ],
             ]);
         }
     }
@@ -158,6 +107,7 @@ class PegawaiController extends Controller
         $keyword = strtolower($request->get('q', ''));
 
         $pegawai = collect($this->all())
+            ->where('status_peg', '!=', 'PN') // pegawai pensiun tidak ditampilkan di daftar utama
             ->when($keyword !== '', function ($collection) use ($keyword) {
                 return $collection->filter(function ($p) use ($keyword) {
                     return str_contains(strtolower($p['nama']), $keyword)
@@ -271,6 +221,43 @@ class PegawaiController extends Controller
         $this->save($data);
 
         return redirect()->route('pegawai.show', $id)->with('success', 'Pegawai berhasil diangkat menjadi Pegawai Tetap dengan NIK baru: '.$validated['nik_baru']);
+    }
+
+    /**
+     * Lap. Anak Diatas 21 - disamakan dengan sistem lama (cetak_laporan_anak.php).
+     * Query aslinya:
+     *   SELECT * FROM tbl_keluarga WHERE YEAR(tgl_lahir) <= (tahun ini - 21)
+     *   AND status_keluarga='Anak' AND keterangan='Tidak Kuliah' AND status_aktif='Y'
+     *
+     * Jadi laporan ini menyaring anak pegawai yang usianya sudah di atas 21
+     * tahun DAN statusnya "Tidak Kuliah" - dipakai HRD untuk mengecek anak
+     * mana yang tunjangan keluarganya perlu dihentikan (biasanya tunjangan
+     * anak berhenti di usia 21 kecuali masih kuliah).
+     */
+    public function laporanAnakDiatas21()
+    {
+        $batasUsia = now()->subYears(21);
+
+        $data = collect($this->all())
+            ->flatMap(function ($p) {
+                return collect($p['keluarga'] ?? [])
+                    ->where('hubungan', 'Anak')
+                    ->map(fn ($anak) => array_merge($anak, [
+                        'nik_pegawai' => $p['nik'],
+                        'nama_pegawai' => $p['nama'],
+                    ]));
+            })
+            ->filter(fn ($anak) => ($anak['keterangan'] ?? '-') === 'Tidak Kuliah'
+                && \Illuminate\Support\Carbon::parse($anak['tgl_lahir'])->lte($batasUsia))
+            ->map(function ($anak) use ($batasUsia) {
+                $anak['usia'] = (int) \Illuminate\Support\Carbon::parse($anak['tgl_lahir'])->diffInYears(now());
+
+                return $anak;
+            })
+            ->sortBy('nama_pegawai')
+            ->values();
+
+        return view('pegawai.laporan-anak', compact('data'));
     }
 
     protected function validateData(Request $request, ?int $ignoreId = null): array

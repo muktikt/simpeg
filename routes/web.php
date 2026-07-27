@@ -20,6 +20,7 @@ use App\Http\Controllers\CutiController;
 use App\Http\Controllers\UserAksesController;
 use App\Http\Controllers\DapenmaController;
 use App\Http\Controllers\ApprovalController;
+use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\GajiLaporanController;
 
 Route::get('/', [LoginController::class, 'showLoginForm'])->name('login');
@@ -32,6 +33,7 @@ Route::middleware(['simpeg.auth'])->group(function () {
     // Data Pegawai - Read boleh semua role yang login, Create/Update/Delete cuma Admin.
     Route::prefix('pegawai')->name('pegawai.')->group(function () {
         Route::get('/', [PegawaiController::class, 'index'])->name('index');
+        Route::get('/laporan-anak', [PegawaiController::class, 'laporanAnakDiatas21'])->name('laporan-anak');
         Route::get('/{id}', [PegawaiController::class, 'show'])->whereNumber('id')->name('show');
 
         Route::middleware(['simpeg.auth:1'])->group(function () {
@@ -225,6 +227,12 @@ Route::middleware(['simpeg.auth'])->group(function () {
     // Approval - dashboard kotak masuk, menggabungkan item pending dari
     // Gaji Proses/THR/Gaji13 yang menunggu approval user yang login.
     Route::get('/approval', [ApprovalController::class, 'index'])->middleware(['simpeg.auth:1,2,7'])->name('approval.index');
+
+    // Profile - semua role yang login, cuma bisa lihat & ubah data sendiri.
+    Route::prefix('profile')->name('profile.')->group(function () {
+        Route::get('/', [ProfileController::class, 'show'])->name('show');
+        Route::put('/password', [ProfileController::class, 'updatePassword'])->name('update-password');
+    });
 
     // Semua modul lama yang belum dimigrasikan -> halaman placeholder.
     Route::get('/modul/{slug}', [PlaceholderController::class, 'show'])->name('placeholder');

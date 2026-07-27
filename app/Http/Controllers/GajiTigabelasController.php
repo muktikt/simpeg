@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
 use App\Http\Controllers\Concerns\HasApprovalChain;
+use Illuminate\Http\Request;
 
 class GajiTigabelasController extends Controller
 {
@@ -71,82 +71,8 @@ class GajiTigabelasController extends Controller
 
     protected function seedIfEmpty(): void
     {
-        // Pastikan data pegawai juga ada di session.
-        if (! session()->has('dummy_pegawai')) {
-            app(\App\Http\Controllers\PegawaiController::class)->seedIfEmpty();
-        }
-
         if (! session()->has('dummy_gaji13')) {
-            session()->put('dummy_gaji13', [
-                // === Pegawai 1 - Mukti Kurniawan - 2026 (Terbit) ===
-                [
-                    'id' => 1, 'pegawai_id' => 1, 'kategori' => 'satuan', 'tahun' => 2026,
-                    'nik' => '1711254', 'nama' => 'Mukti Kurniawan', 'kode_ptkp' => 'K',
-                    'gapok' => 3800000, 'tunjangan_istri' => 380000, 'tunjangan_anak' => 0,
-                    'tunjangan_prestasi' => 500000, 'tunjangan_jabatan' => 350000,
-                    'tunjangan_transport' => 300000, 'tunjangan_pangan' => 250000,
-                    'tunjangan_perumahan' => 200000, 'tunjangan_perusahaan' => 100000,
-                    'tunjangan_airminum' => 50000, 'tunjangan_komunikasi' => 75000,
-                    'tunjangan_pajak' => 180000,
-                    'potongan_pajak' => 180000,
-                    'potongan_koperasi' => 200000, 'potongan_darmawanita' => 0,
-                    'potongan_ledeng' => 25000, 'potongan_kas' => 0,
-                    'potongan_bjb' => 0, 'potongan_bjbs' => 0,
-                    'potongan_asuransi' => 50000, 'potongan_btn' => 0,
-                    'potongan_bpr' => 0, 'potongan_zakat' => 95000,
-                    'total_pendapatan' => 6185000,
-                    'total_potongan_pendapatan' => 180000,
-                    'total_potongan_non_pendapatan' => 370000,
-                    'gaji13_diterima' => 5635000,
-                    'status' => 'terbit', 'disetujui_oleh' => 'Mukti Kurniawan',
-                    'tgl_terbit' => '2026-07-01',
-                ],
-                // === Pegawai 2 - Dewi Anggraini - 2026 (Terbit) ===
-                [
-                    'id' => 2, 'pegawai_id' => 2, 'kategori' => 'satuan', 'tahun' => 2026,
-                    'nik' => '1800001', 'nama' => 'Dewi Anggraini', 'kode_ptkp' => 'TK',
-                    'gapok' => 3200000, 'tunjangan_istri' => 0, 'tunjangan_anak' => 0,
-                    'tunjangan_prestasi' => 450000, 'tunjangan_jabatan' => 300000,
-                    'tunjangan_transport' => 250000, 'tunjangan_pangan' => 200000,
-                    'tunjangan_perumahan' => 180000, 'tunjangan_perusahaan' => 80000,
-                    'tunjangan_airminum' => 50000, 'tunjangan_komunikasi' => 50000,
-                    'tunjangan_pajak' => 140000,
-                    'potongan_pajak' => 140000,
-                    'potongan_koperasi' => 150000, 'potongan_darmawanita' => 10000,
-                    'potongan_ledeng' => 25000, 'potongan_kas' => 0,
-                    'potongan_bjb' => 0, 'potongan_bjbs' => 0,
-                    'potongan_asuransi' => 0, 'potongan_btn' => 0,
-                    'potongan_bpr' => 0, 'potongan_zakat' => 80000,
-                    'total_pendapatan' => 4900000,
-                    'total_potongan_pendapatan' => 140000,
-                    'total_potongan_non_pendapatan' => 265000,
-                    'gaji13_diterima' => 4495000,
-                    'status' => 'terbit', 'disetujui_oleh' => 'Mukti Kurniawan',
-                    'tgl_terbit' => '2026-07-01',
-                ],
-                // === Pegawai 3 - Nur Hidayah - 2026 (Draft) ===
-                [
-                    'id' => 3, 'pegawai_id' => 3, 'kategori' => 'capeg', 'tahun' => 2026,
-                    'nik' => '1800003', 'nama' => 'Nur Hidayah', 'kode_ptkp' => 'TK',
-                    'gapok' => 2800000, 'tunjangan_istri' => 0, 'tunjangan_anak' => 0,
-                    'tunjangan_prestasi' => 300000, 'tunjangan_jabatan' => 0,
-                    'tunjangan_transport' => 200000, 'tunjangan_pangan' => 200000,
-                    'tunjangan_perumahan' => 0, 'tunjangan_perusahaan' => 0,
-                    'tunjangan_airminum' => 50000, 'tunjangan_komunikasi' => 0,
-                    'tunjangan_pajak' => 90000,
-                    'potongan_pajak' => 90000,
-                    'potongan_koperasi' => 0, 'potongan_darmawanita' => 0,
-                    'potongan_ledeng' => 0, 'potongan_kas' => 0,
-                    'potongan_bjb' => 0, 'potongan_bjbs' => 0,
-                    'potongan_asuransi' => 0, 'potongan_btn' => 0,
-                    'potongan_bpr' => 0, 'potongan_zakat' => 70000,
-                    'total_pendapatan' => 3640000,
-                    'total_potongan_pendapatan' => 90000,
-                    'total_potongan_non_pendapatan' => 70000,
-                    'gaji13_diterima' => 3480000,
-                    'status' => 'draft', 'disetujui_oleh' => 'Proses',
-                ],
-            ]);
+            session()->put('dummy_gaji13', []);
         }
     }
 
@@ -164,7 +90,8 @@ class GajiTigabelasController extends Controller
 
     protected function pegawaiList(): array
     {
-        return session('dummy_pegawai', []);
+        // Pegawai berstatus Pensiun (PN) tidak ditampilkan di dropdown pilih pegawai.
+        return collect(session('dummy_pegawai', []))->where('status_peg', '!=', 'PN')->values()->all();
     }
 
     protected function pegawaiById(int $id): ?array
@@ -183,9 +110,10 @@ class GajiTigabelasController extends Controller
 
         $gaji13 = collect($this->all())
             ->where('tahun', $tahun)
-            ->map(function ($item) {
-                $item['bisa_approve'] = $this->canUserApprove($item['status'] ?? '');
-                return $item;
+            ->map(function ($row) {
+                $row['bisa_approve'] = $this->canUserApprove($row['status']);
+
+                return $row;
             })
             ->sortBy('nama')
             ->values();
@@ -251,7 +179,7 @@ class GajiTigabelasController extends Controller
         $gaji13 = collect($this->all())->firstWhere('id', $id);
         abort_if(! $gaji13, 404);
 
-        $gaji13['bisa_approve'] = $this->canUserApprove($gaji13['status'] ?? '');
+        $gaji13['bisa_approve'] = $this->canUserApprove($gaji13['status']);
 
         return view('gaji-tigabelas.show', [
             'gaji13' => $gaji13,
@@ -261,19 +189,28 @@ class GajiTigabelasController extends Controller
         ]);
     }
 
+    /**
+     * Approval berjenjang: Kepegawaian -> Dirum -> Dirut (final = terbit).
+     * Lihat trait HasApprovalChain untuk detail alurnya.
+     */
     public function terbitkan(int $id)
     {
-        $data = collect($this->all())->map(function ($row) use ($id) {
-            if ($row['id'] === $id) {
-                $row = $this->applyApproval($row);
+        $data = $this->all();
+        $row = collect($data)->firstWhere('id', $id);
+        abort_if(! $row, 404);
+        abort_unless($this->canUserApprove($row['status']), 403, 'Kamu tidak berhak menyetujui tahap ini.');
+
+        $data = collect($data)->map(function ($r) use ($id) {
+            if ($r['id'] === $id) {
+                return $this->applyApproval($r);
             }
 
-            return $row;
+            return $r;
         })->all();
 
         $this->save($data);
 
-        return redirect()->route('gaji-tigabelas.index')->with('success', 'Persetujuan Gaji 13 berhasil diproses.');
+        return redirect()->back()->with('success', 'Gaji 13 berhasil disetujui ke tahap berikutnya.');
     }
 
     public function destroy(int $id)

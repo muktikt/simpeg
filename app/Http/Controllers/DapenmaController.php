@@ -18,11 +18,9 @@ class DapenmaController extends Controller
      */
     protected function seedIfEmpty(): void
     {
-        if (! session()->has('dummy_dapenma') || count(session('dummy_dapenma', [])) <= 1) {
+        if (! session()->has('dummy_dapenma')) {
             session()->put('dummy_dapenma', [
-                ['id' => 1, 'pegawai_id' => 1, 'nomor_peserta' => 'DPM-2017-001', 'nominal_phdp' => 4200000, 'tgl_update' => '2026-07-24'],
-                ['id' => 2, 'pegawai_id' => 2, 'nomor_peserta' => 'DPM-2018-002', 'nominal_phdp' => 3800000, 'tgl_update' => '2026-07-24'],
-                ['id' => 3, 'pegawai_id' => 3, 'nomor_peserta' => 'DPM-2022-003', 'nominal_phdp' => 3200000, 'tgl_update' => '2026-07-24'],
+                ['id' => 1, 'pegawai_id' => 1, 'nomor_peserta' => 'DPM-2017-001', 'nominal_phdp' => 4200000],
             ]);
         }
     }
@@ -41,7 +39,8 @@ class DapenmaController extends Controller
 
     protected function pegawaiList(): array
     {
-        return session('dummy_pegawai', []);
+        // Pegawai berstatus Pensiun (PN) tidak ditampilkan di dropdown pilih pegawai.
+        return collect(session('dummy_pegawai', []))->where('status_peg', '!=', 'PN')->values()->all();
     }
 
     protected function pegawaiById(int $id): ?array
@@ -55,7 +54,6 @@ class DapenmaController extends Controller
         $row['nik'] = $p['nik'] ?? '-';
         $row['nama'] = $p['nama'] ?? '(pegawai tidak ditemukan)';
         $row['nominal_beban'] = $row['nominal_phdp'] * 0.05;
-        $row['tgl_update'] = $row['tgl_update'] ?? now()->toDateString();
 
         return $row;
     }

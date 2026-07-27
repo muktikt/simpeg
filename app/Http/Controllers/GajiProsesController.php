@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
 use App\Http\Controllers\Concerns\HasApprovalChain;
+use Illuminate\Http\Request;
 
 class GajiProsesController extends Controller
 {
@@ -86,139 +86,8 @@ class GajiProsesController extends Controller
 
     protected function seedIfEmpty(): void
     {
-        // Pastikan data pegawai juga ada di session.
-        if (! session()->has('dummy_pegawai')) {
-            app(\App\Http\Controllers\PegawaiController::class)->seedIfEmpty();
-        }
-
         if (! session()->has('dummy_gaji_proses')) {
-            session()->put('dummy_gaji_proses', [
-                // === Pegawai 1 - Mukti Kurniawan - Juni 2026 (Terbit) ===
-                [
-                    'id' => 1, 'pegawai_id' => 1, 'kategori' => 'satuan',
-                    'bulan' => 6, 'tahun' => 2026,
-                    'nik' => '1711254', 'nama' => 'Mukti Kurniawan', 'kode_ptkp' => 'K',
-                    'gapok' => 3800000, 'tunjangan_istri' => 380000, 'tunjangan_anak' => 0,
-                    'tunjangan_prestasi' => 500000, 'tunjangan_jabatan' => 350000,
-                    'tunjangan_transport' => 300000, 'tunjangan_pangan' => 250000,
-                    'tunjangan_bpjstk' => 150000, 'tunjangan_perumahan' => 200000,
-                    'tunjangan_perusahaan' => 100000, 'tunjangan_airminum' => 50000,
-                    'tunjangan_bpjskes' => 120000, 'tunjangan_komunikasi' => 75000,
-                    'tunjangan_pajak' => 180000, 'lembur' => 75000,
-                    'potongan_sanksi' => 0, 'potongan_dapenma' => 95000,
-                    'potongan_bpjstk' => 150000, 'potongan_bpjskes' => 120000,
-                    'potongan_perumahan' => 100000, 'potongan_pajak' => 180000,
-                    'potongan_korpri' => 15000, 'potongan_tperusahaan' => 50000,
-                    'potongan_lain' => 0, 'potongan_koperasi' => 200000,
-                    'potongan_darmawanita' => 0, 'potongan_ledeng' => 25000,
-                    'potongan_kas' => 0, 'potongan_bjb' => 0,
-                    'potongan_bjbs' => 0, 'potongan_asuransi' => 50000,
-                    'potongan_btn' => 0, 'potongan_bpr' => 0, 'potongan_zakat' => 95000,
-                    'total_pendapatan' => 6530000, 'total_potongan' => 1080000,
-                    'gaji_bersih' => 5450000,
-                    'status' => 'terbit', 'tgl_terbit' => '2026-06-28',
-                ],
-                // === Pegawai 2 - Dewi Anggraini - Juni 2026 (Terbit) ===
-                [
-                    'id' => 2, 'pegawai_id' => 2, 'kategori' => 'satuan',
-                    'bulan' => 6, 'tahun' => 2026,
-                    'nik' => '1800001', 'nama' => 'Dewi Anggraini', 'kode_ptkp' => 'TK',
-                    'gapok' => 3200000, 'tunjangan_istri' => 0, 'tunjangan_anak' => 0,
-                    'tunjangan_prestasi' => 450000, 'tunjangan_jabatan' => 300000,
-                    'tunjangan_transport' => 250000, 'tunjangan_pangan' => 200000,
-                    'tunjangan_bpjstk' => 130000, 'tunjangan_perumahan' => 180000,
-                    'tunjangan_perusahaan' => 80000, 'tunjangan_airminum' => 50000,
-                    'tunjangan_bpjskes' => 100000, 'tunjangan_komunikasi' => 50000,
-                    'tunjangan_pajak' => 140000, 'lembur' => 0,
-                    'potongan_sanksi' => 160000, 'potongan_dapenma' => 80000,
-                    'potongan_bpjstk' => 130000, 'potongan_bpjskes' => 100000,
-                    'potongan_perumahan' => 90000, 'potongan_pajak' => 140000,
-                    'potongan_korpri' => 12000, 'potongan_tperusahaan' => 40000,
-                    'potongan_lain' => 0, 'potongan_koperasi' => 150000,
-                    'potongan_darmawanita' => 10000, 'potongan_ledeng' => 25000,
-                    'potongan_kas' => 0, 'potongan_bjb' => 0,
-                    'potongan_bjbs' => 0, 'potongan_asuransi' => 0,
-                    'potongan_btn' => 0, 'potongan_bpr' => 0, 'potongan_zakat' => 80000,
-                    'total_pendapatan' => 5130000, 'total_potongan' => 1017000,
-                    'gaji_bersih' => 4113000,
-                    'status' => 'terbit', 'tgl_terbit' => '2026-06-28',
-                ],
-                // === Pegawai 3 - Nur Hidayah - Juni 2026 (Terbit) ===
-                [
-                    'id' => 3, 'pegawai_id' => 3, 'kategori' => 'capeg',
-                    'bulan' => 6, 'tahun' => 2026,
-                    'nik' => '1800003', 'nama' => 'Nur Hidayah', 'kode_ptkp' => 'TK',
-                    'gapok' => 2800000, 'tunjangan_istri' => 0, 'tunjangan_anak' => 0,
-                    'tunjangan_prestasi' => 300000, 'tunjangan_jabatan' => 0,
-                    'tunjangan_transport' => 200000, 'tunjangan_pangan' => 200000,
-                    'tunjangan_bpjstk' => 100000, 'tunjangan_perumahan' => 0,
-                    'tunjangan_perusahaan' => 0, 'tunjangan_airminum' => 50000,
-                    'tunjangan_bpjskes' => 80000, 'tunjangan_komunikasi' => 0,
-                    'tunjangan_pajak' => 90000, 'lembur' => 37500,
-                    'potongan_sanksi' => 0, 'potongan_dapenma' => 70000,
-                    'potongan_bpjstk' => 100000, 'potongan_bpjskes' => 80000,
-                    'potongan_perumahan' => 0, 'potongan_pajak' => 90000,
-                    'potongan_korpri' => 10000, 'potongan_tperusahaan' => 0,
-                    'potongan_lain' => 0, 'potongan_koperasi' => 0,
-                    'potongan_darmawanita' => 0, 'potongan_ledeng' => 0,
-                    'potongan_kas' => 0, 'potongan_bjb' => 0,
-                    'potongan_bjbs' => 0, 'potongan_asuransi' => 0,
-                    'potongan_btn' => 0, 'potongan_bpr' => 0, 'potongan_zakat' => 70000,
-                    'total_pendapatan' => 3857500, 'total_potongan' => 420000,
-                    'gaji_bersih' => 3437500,
-                    'status' => 'terbit', 'tgl_terbit' => '2026-06-28',
-                ],
-                // === Pegawai 1 - Mukti Kurniawan - Juli 2026 (Draft) ===
-                [
-                    'id' => 4, 'pegawai_id' => 1, 'kategori' => 'satuan',
-                    'bulan' => 7, 'tahun' => 2026,
-                    'nik' => '1711254', 'nama' => 'Mukti Kurniawan', 'kode_ptkp' => 'K',
-                    'gapok' => 3800000, 'tunjangan_istri' => 380000, 'tunjangan_anak' => 0,
-                    'tunjangan_prestasi' => 500000, 'tunjangan_jabatan' => 350000,
-                    'tunjangan_transport' => 300000, 'tunjangan_pangan' => 250000,
-                    'tunjangan_bpjstk' => 150000, 'tunjangan_perumahan' => 200000,
-                    'tunjangan_perusahaan' => 100000, 'tunjangan_airminum' => 50000,
-                    'tunjangan_bpjskes' => 120000, 'tunjangan_komunikasi' => 75000,
-                    'tunjangan_pajak' => 180000, 'lembur' => 56250,
-                    'potongan_sanksi' => 0, 'potongan_dapenma' => 95000,
-                    'potongan_bpjstk' => 150000, 'potongan_bpjskes' => 120000,
-                    'potongan_perumahan' => 100000, 'potongan_pajak' => 180000,
-                    'potongan_korpri' => 15000, 'potongan_tperusahaan' => 50000,
-                    'potongan_lain' => 0, 'potongan_koperasi' => 200000,
-                    'potongan_darmawanita' => 0, 'potongan_ledeng' => 25000,
-                    'potongan_kas' => 0, 'potongan_bjb' => 0,
-                    'potongan_bjbs' => 0, 'potongan_asuransi' => 50000,
-                    'potongan_btn' => 0, 'potongan_bpr' => 0, 'potongan_zakat' => 95000,
-                    'total_pendapatan' => 6511250, 'total_potongan' => 1080000,
-                    'gaji_bersih' => 5431250,
-                    'status' => 'draft',
-                ],
-                // === Pegawai 2 - Dewi Anggraini - Juli 2026 (Draft) ===
-                [
-                    'id' => 5, 'pegawai_id' => 2, 'kategori' => 'satuan',
-                    'bulan' => 7, 'tahun' => 2026,
-                    'nik' => '1800001', 'nama' => 'Dewi Anggraini', 'kode_ptkp' => 'TK',
-                    'gapok' => 3200000, 'tunjangan_istri' => 0, 'tunjangan_anak' => 0,
-                    'tunjangan_prestasi' => 450000, 'tunjangan_jabatan' => 300000,
-                    'tunjangan_transport' => 250000, 'tunjangan_pangan' => 200000,
-                    'tunjangan_bpjstk' => 130000, 'tunjangan_perumahan' => 180000,
-                    'tunjangan_perusahaan' => 80000, 'tunjangan_airminum' => 50000,
-                    'tunjangan_bpjskes' => 100000, 'tunjangan_komunikasi' => 50000,
-                    'tunjangan_pajak' => 140000, 'lembur' => 0,
-                    'potongan_sanksi' => 0, 'potongan_dapenma' => 80000,
-                    'potongan_bpjstk' => 130000, 'potongan_bpjskes' => 100000,
-                    'potongan_perumahan' => 90000, 'potongan_pajak' => 140000,
-                    'potongan_korpri' => 12000, 'potongan_tperusahaan' => 40000,
-                    'potongan_lain' => 0, 'potongan_koperasi' => 150000,
-                    'potongan_darmawanita' => 10000, 'potongan_ledeng' => 25000,
-                    'potongan_kas' => 0, 'potongan_bjb' => 0,
-                    'potongan_bjbs' => 0, 'potongan_asuransi' => 0,
-                    'potongan_btn' => 0, 'potongan_bpr' => 0, 'potongan_zakat' => 80000,
-                    'total_pendapatan' => 5130000, 'total_potongan' => 857000,
-                    'gaji_bersih' => 4273000,
-                    'status' => 'draft',
-                ],
-            ]);
+            session()->put('dummy_gaji_proses', []);
         }
     }
 
@@ -236,7 +105,8 @@ class GajiProsesController extends Controller
 
     protected function pegawaiList(): array
     {
-        return session('dummy_pegawai', []);
+        // Pegawai berstatus Pensiun (PN) tidak ditampilkan di dropdown pilih pegawai.
+        return collect(session('dummy_pegawai', []))->where('status_peg', '!=', 'PN')->values()->all();
     }
 
     protected function pegawaiById(int $id): ?array
@@ -284,9 +154,10 @@ class GajiProsesController extends Controller
         $gaji = collect($this->all())
             ->where('bulan', $bulan)
             ->where('tahun', $tahun)
-            ->map(function ($item) {
-                $item['bisa_approve'] = $this->canUserApprove($item['status'] ?? '');
-                return $item;
+            ->map(function ($row) {
+                $row['bisa_approve'] = $this->canUserApprove($row['status']);
+
+                return $row;
             })
             ->sortBy('nama')
             ->values();
@@ -356,7 +227,7 @@ class GajiProsesController extends Controller
         $gaji = collect($this->all())->firstWhere('id', $id);
         abort_if(! $gaji, 404);
 
-        $gaji['bisa_approve'] = $this->canUserApprove($gaji['status'] ?? '');
+        $gaji['bisa_approve'] = $this->canUserApprove($gaji['status']);
 
         return view('gaji-proses.show', [
             'gaji' => $gaji,
@@ -366,22 +237,28 @@ class GajiProsesController extends Controller
     }
 
     /**
-     * Menerbitkan gaji (draft -> terbit). Setelah terbit, dianggap final
-     * dan tidak bisa diedit lagi - mengikuti pola terbitkan_gaji_all.php.
+     * Approval berjenjang: Kepegawaian -> Dirum -> Dirut (final = terbit).
+     * Menggantikan proses_terbit_gaji_dirum.php dkk - lihat trait
+     * HasApprovalChain untuk detail alurnya.
      */
     public function terbitkan(int $id)
     {
-        $data = collect($this->all())->map(function ($row) use ($id) {
-            if ($row['id'] === $id) {
-                $row = $this->applyApproval($row);
+        $data = $this->all();
+        $row = collect($data)->firstWhere('id', $id);
+        abort_if(! $row, 404);
+        abort_unless($this->canUserApprove($row['status']), 403, 'Kamu tidak berhak menyetujui tahap ini.');
+
+        $data = collect($data)->map(function ($r) use ($id) {
+            if ($r['id'] === $id) {
+                return $this->applyApproval($r);
             }
 
-            return $row;
+            return $r;
         })->all();
 
         $this->save($data);
 
-        return redirect()->route('gaji-proses.index')->with('success', 'Persetujuan gaji berhasil diproses.');
+        return redirect()->back()->with('success', 'Gaji berhasil disetujui ke tahap berikutnya.');
     }
 
     public function destroy(int $id)

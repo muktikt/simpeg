@@ -28,6 +28,7 @@ class PegawaiDetailController extends Controller
                     ['key' => 'nama', 'label' => 'Nama', 'type' => 'text'],
                     ['key' => 'hubungan', 'label' => 'Hubungan', 'type' => 'select', 'options' => ['Istri/Suami', 'Anak', 'Orang Tua']],
                     ['key' => 'tgl_lahir', 'label' => 'Tanggal Lahir', 'type' => 'date'],
+                    ['key' => 'keterangan', 'label' => 'Status Kuliah (khusus Anak)', 'type' => 'select', 'options' => ['Kuliah', 'Tidak Kuliah', '-']],
                 ],
             ],
             'golongan' => [

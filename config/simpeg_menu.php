@@ -136,7 +136,7 @@ return [
             'label' => 'Laporan Kepegawaian',
             'icon' => 'report',
             'items' => [
-                ['label' => 'Lap. Anak Diatas 21', 'route_name' => null],
+                ['label' => 'Lap. Anak Diatas 21', 'route_name' => 'pegawai.laporan-anak'],
                 ['label' => 'Lap. Cuti Pegawai', 'route_name' => 'cuti.index'],
                 ['label' => 'Lap. Sanksi Pegawai', 'route_name' => 'sanksi.index'],
             ],
