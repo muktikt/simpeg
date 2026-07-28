@@ -33,6 +33,7 @@ Route::middleware(['simpeg.auth'])->group(function () {
     // Data Pegawai - Read boleh semua role yang login, Create/Update/Delete cuma Admin.
     Route::prefix('pegawai')->name('pegawai.')->group(function () {
         Route::get('/', [PegawaiController::class, 'index'])->name('index');
+        Route::get('/per-unit-kerja', [PegawaiController::class, 'perUnitKerja'])->name('per-unit-kerja');
         Route::get('/laporan-anak', [PegawaiController::class, 'laporanAnakDiatas21'])->name('laporan-anak');
         Route::get('/{id}', [PegawaiController::class, 'show'])->whereNumber('id')->name('show');
 

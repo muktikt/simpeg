@@ -81,7 +81,7 @@ return [
             'icon' => 'user',
             'items' => [
                 ['label' => 'Data Pegawai All', 'route_name' => 'pegawai.index'],
-                ['label' => 'Data Per Unit Kerja', 'route_name' => null],
+                ['label' => 'Data Per Unit Kerja', 'route_name' => 'pegawai.per-unit-kerja'],
             ],
         ],
         [
