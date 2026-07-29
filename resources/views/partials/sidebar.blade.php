@@ -19,7 +19,9 @@
 
 <aside class="sidebar">
     <div class="sidebar-brand">
-        <div class="brand-mark">SP</div>
+        <div class="brand-mark">
+            <img src="{{ asset('logo-pdam.png') }}" alt="Logo PDAM" style="width: 100%; height: 100%; object-fit: contain; padding: 2px;">
+        </div>
         <div>
             <div class="brand-text-name">SIMPEG</div>
             <div class="brand-text-sub">v2.0</div>

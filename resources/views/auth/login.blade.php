@@ -7,7 +7,9 @@
     <div class="login-side">
         <div>
             <div class="brand">
-                <div class="brand-mark">SP</div>
+                <div class="brand-mark">
+                    <img src="{{ asset('logo-pdam.png') }}" alt="Logo PDAM" style="width: 100%; height: 100%; object-fit: contain; padding: 2px;">
+                </div>
                 <div>
                     <div class="brand-name">SIMPEG</div>
                     <div class="brand-sub">Sistem Informasi Kepegawaian</div>

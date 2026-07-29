@@ -121,6 +121,54 @@ class GajiTigabelasController extends Controller
         return view('gaji-tigabelas.index', compact('gaji13', 'tahun'));
     }
 
+    /**
+     * 3 halaman Laporan (read-only, format cetak) - dipisah dari index()
+     * yang jadi halaman kelola/proses. Hanya menampilkan Gaji 13 yang
+     * sudah terbit (final).
+     */
+    protected function gaji13Terbit(int $tahun)
+    {
+        return collect($this->all())
+            ->where('tahun', $tahun)
+            ->filter(fn ($row) => $row['status'] === 'terbit')
+            ->map(function ($row) {
+                $p = $this->pegawaiById($row['pegawai_id']);
+                $row['unit_kerja'] = $p['unit_kerja'] ?? '-';
+
+                return $row;
+            });
+    }
+
+    public function laporanSlip(Request $request)
+    {
+        $tahun = (int) $request->get('tahun', now()->year);
+        $data = $this->gaji13Terbit($tahun)->sortBy('nama')->values();
+
+        return view('gaji-tigabelas.laporan-slip', compact('data', 'tahun'));
+    }
+
+    public function laporanBukuBesar(Request $request)
+    {
+        $tahun = (int) $request->get('tahun', now()->year);
+        $data = $this->gaji13Terbit($tahun)->sortBy('nama')->values();
+        $total = $data->sum('gaji13_diterima');
+
+        return view('gaji-tigabelas.laporan-buku-besar', compact('data', 'tahun', 'total'));
+    }
+
+    public function laporanBukuBesarPerSub(Request $request)
+    {
+        $tahun = (int) $request->get('tahun', now()->year);
+        $data = $this->gaji13Terbit($tahun)
+            ->groupBy('unit_kerja')
+            ->map(fn ($group) => [
+                'rows' => $group->sortBy('nama')->values(),
+                'total' => $group->sum('gaji13_diterima'),
+            ]);
+
+        return view('gaji-tigabelas.laporan-buku-besar-per-sub', compact('data', 'tahun'));
+    }
+
     public function create()
     {
         return view('gaji-tigabelas.create', [

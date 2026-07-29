@@ -81,7 +81,7 @@ return [
             'icon' => 'user',
             'items' => [
                 ['label' => 'Data Pegawai All', 'route_name' => 'pegawai.index'],
-                ['label' => 'Data Per Unit Kerja', 'route_name' => 'pegawai.per-unit-kerja'],
+                ['label' => 'Data Per Unit Kerja', 'route_name' => null],
             ],
         ],
         [
@@ -90,14 +90,14 @@ return [
             'roles' => ['1', '2', '7'],
             'items' => [
                 ['label' => 'Lap. Absensi', 'route_name' => 'absensi.laporan'],
-                ['label' => 'Lap. Prestasi', 'route_name' => 'prestasi.index'],
+                ['label' => 'Lap. Prestasi', 'route_name' => 'prestasi.laporan'],
                 ['label' => 'Lap. Lembur', 'route_name' => 'gaji-laporan.lembur'],
                 ['label' => 'Lap. Slip Gaji', 'route_name' => 'gaji-laporan.slip-gaji'],
                 ['label' => 'Lap. Buku Besar Gaji', 'route_name' => 'gaji-laporan.buku-besar'],
                 ['label' => 'Lap. Buku Besar Per Sub', 'route_name' => 'gaji-laporan.buku-besar-per-sub'],
                 ['label' => 'Lap. Payroll', 'route_name' => 'gaji-laporan.payroll'],
                 ['label' => 'Lap. Pajak', 'route_name' => 'gaji-laporan.pajak'],
-                ['label' => 'Lap. Gapok / Golongan', 'route_name' => 'gaji-pokok.index'],
+                ['label' => 'Lap. Gapok / Golongan', 'route_name' => 'gaji-pokok.laporan'],
                 ['label' => 'Lap. BPJSTK', 'route_name' => 'gaji-laporan.bpjstk'],
                 ['label' => 'Lap. Tunj. Perumahan', 'route_name' => 'gaji-laporan.tunj-perumahan'],
             ],
@@ -107,9 +107,9 @@ return [
             'icon' => 'report',
             'roles' => ['1', '2', '7'],
             'items' => [
-                ['label' => 'Cetak Slip THR', 'route_name' => 'thr.index'],
-                ['label' => 'Lap. Buku Besar THR', 'route_name' => 'thr.index'],
-                ['label' => 'Lap. Buku Besar Per Sub', 'route_name' => 'thr.index'],
+                ['label' => 'Cetak Slip THR', 'route_name' => 'thr.laporan-slip'],
+                ['label' => 'Lap. Buku Besar THR', 'route_name' => 'thr.laporan-buku-besar'],
+                ['label' => 'Lap. Buku Besar Per Sub', 'route_name' => 'thr.laporan-buku-besar-per-sub'],
             ],
         ],
         [
@@ -117,9 +117,9 @@ return [
             'icon' => 'report',
             'roles' => ['1', '2', '7'],
             'items' => [
-                ['label' => 'Cetak Slip Tunj. Pendidikan', 'route_name' => 'gaji-tigabelas.index'],
-                ['label' => 'Lap. Buku Besar Tunj. Pendidikan', 'route_name' => 'gaji-tigabelas.index'],
-                ['label' => 'Lap. Buku Besar Per Sub', 'route_name' => 'gaji-tigabelas.index'],
+                ['label' => 'Cetak Slip Tunj. Pendidikan', 'route_name' => 'gaji-tigabelas.laporan-slip'],
+                ['label' => 'Lap. Buku Besar Tunj. Pendidikan', 'route_name' => 'gaji-tigabelas.laporan-buku-besar'],
+                ['label' => 'Lap. Buku Besar Per Sub', 'route_name' => 'gaji-tigabelas.laporan-buku-besar-per-sub'],
             ],
         ],
         [
@@ -127,9 +127,9 @@ return [
             'icon' => 'report',
             'roles' => ['1', '2', '7'],
             'items' => [
-                ['label' => 'Cetak Slip Insentif', 'route_name' => 'insentif.index'],
-                ['label' => 'Lap. Buku Besar Insentif', 'route_name' => 'insentif.index'],
-                ['label' => 'Lap. Buku Besar Per Sub', 'route_name' => 'insentif.index'],
+                ['label' => 'Cetak Slip Insentif', 'route_name' => 'insentif.laporan-slip'],
+                ['label' => 'Lap. Buku Besar Insentif', 'route_name' => 'insentif.laporan-buku-besar'],
+                ['label' => 'Lap. Buku Besar Per Sub', 'route_name' => 'insentif.laporan-buku-besar-per-sub'],
             ],
         ],
         [
@@ -138,7 +138,7 @@ return [
             'items' => [
                 ['label' => 'Lap. Anak Diatas 21', 'route_name' => 'pegawai.laporan-anak'],
                 ['label' => 'Lap. Cuti Pegawai', 'route_name' => 'cuti.index'],
-                ['label' => 'Lap. Sanksi Pegawai', 'route_name' => 'sanksi.index'],
+                ['label' => 'Lap. Sanksi Pegawai', 'route_name' => 'sanksi.laporan'],
             ],
         ],
     ],

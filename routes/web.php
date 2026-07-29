@@ -33,7 +33,6 @@ Route::middleware(['simpeg.auth'])->group(function () {
     // Data Pegawai - Read boleh semua role yang login, Create/Update/Delete cuma Admin.
     Route::prefix('pegawai')->name('pegawai.')->group(function () {
         Route::get('/', [PegawaiController::class, 'index'])->name('index');
-        Route::get('/per-unit-kerja', [PegawaiController::class, 'perUnitKerja'])->name('per-unit-kerja');
         Route::get('/laporan-anak', [PegawaiController::class, 'laporanAnakDiatas21'])->name('laporan-anak');
         Route::get('/{id}', [PegawaiController::class, 'show'])->whereNumber('id')->name('show');
 
@@ -76,6 +75,7 @@ Route::middleware(['simpeg.auth'])->group(function () {
     Route::prefix('gaji-pokok')->name('gaji-pokok.')->group(function () {
         Route::middleware(['simpeg.auth:1,2,7'])->group(function () {
             Route::get('/', [GajiPokokController::class, 'index'])->name('index');
+            Route::get('/laporan', [GajiPokokController::class, 'laporan'])->name('laporan');
         });
 
         Route::middleware(['simpeg.auth:1'])->group(function () {
@@ -100,6 +100,7 @@ Route::middleware(['simpeg.auth'])->group(function () {
     // buat menu "Lap. Sanksi Pegawai"), tambah/edit/hapus cuma Admin & Keuangan.
     Route::prefix('sanksi')->name('sanksi.')->group(function () {
         Route::get('/', [SanksiController::class, 'index'])->name('index');
+        Route::get('/laporan', [SanksiController::class, 'laporan'])->name('laporan');
 
         Route::middleware(['simpeg.auth:1,2'])->group(function () {
             Route::get('/create', [SanksiController::class, 'create'])->name('create');
@@ -114,6 +115,7 @@ Route::middleware(['simpeg.auth'])->group(function () {
     // login, tambah/edit/hapus cuma Admin & Keuangan.
     Route::prefix('prestasi')->name('prestasi.')->group(function () {
         Route::get('/', [PrestasiController::class, 'index'])->name('index');
+        Route::get('/laporan', [PrestasiController::class, 'laporan'])->name('laporan');
 
         Route::middleware(['simpeg.auth:1,2'])->group(function () {
             Route::get('/create', [PrestasiController::class, 'create'])->name('create');
@@ -148,6 +150,9 @@ Route::middleware(['simpeg.auth'])->group(function () {
     Route::prefix('thr')->name('thr.')->group(function () {
         Route::middleware(['simpeg.auth:1,2,7'])->group(function () {
             Route::get('/', [ThrController::class, 'index'])->name('index');
+            Route::get('/laporan/slip', [ThrController::class, 'laporanSlip'])->name('laporan-slip');
+            Route::get('/laporan/buku-besar', [ThrController::class, 'laporanBukuBesar'])->name('laporan-buku-besar');
+            Route::get('/laporan/buku-besar-per-sub', [ThrController::class, 'laporanBukuBesarPerSub'])->name('laporan-buku-besar-per-sub');
             Route::get('/{id}', [ThrController::class, 'show'])->whereNumber('id')->name('show');
             Route::post('/{id}/terbitkan', [ThrController::class, 'terbitkan'])->whereNumber('id')->name('terbitkan');
         });
@@ -166,6 +171,9 @@ Route::middleware(['simpeg.auth'])->group(function () {
     Route::prefix('gaji-tigabelas')->name('gaji-tigabelas.')->group(function () {
         Route::middleware(['simpeg.auth:1,2,7'])->group(function () {
             Route::get('/', [GajiTigabelasController::class, 'index'])->name('index');
+            Route::get('/laporan/slip', [GajiTigabelasController::class, 'laporanSlip'])->name('laporan-slip');
+            Route::get('/laporan/buku-besar', [GajiTigabelasController::class, 'laporanBukuBesar'])->name('laporan-buku-besar');
+            Route::get('/laporan/buku-besar-per-sub', [GajiTigabelasController::class, 'laporanBukuBesarPerSub'])->name('laporan-buku-besar-per-sub');
             Route::get('/{id}', [GajiTigabelasController::class, 'show'])->whereNumber('id')->name('show');
             Route::post('/{id}/terbitkan', [GajiTigabelasController::class, 'terbitkan'])->whereNumber('id')->name('terbitkan');
         });
@@ -180,7 +188,11 @@ Route::middleware(['simpeg.auth'])->group(function () {
 
     // Insentif - READ ONLY, tidak punya data sendiri (lihat catatan di
     // InsentifController). Bisa dilihat Admin, Keuangan, Direksi.
-    Route::get('/insentif', [InsentifController::class, 'index'])->middleware(['simpeg.auth:1,2,7'])->name('insentif.index');
+    Route::prefix('insentif')->name('insentif.')->middleware(['simpeg.auth:1,2,7'])->group(function () {
+        Route::get('/laporan/slip', [InsentifController::class, 'laporanSlip'])->name('laporan-slip');
+        Route::get('/laporan/buku-besar', [InsentifController::class, 'laporanBukuBesar'])->name('laporan-buku-besar');
+        Route::get('/laporan/buku-besar-per-sub', [InsentifController::class, 'laporanBukuBesarPerSub'])->name('laporan-buku-besar-per-sub');
+    });
 
     // Perubahan NIK - Admin only.
     Route::prefix('perubahan-nik')->name('perubahan-nik.')->middleware(['simpeg.auth:1'])->group(function () {

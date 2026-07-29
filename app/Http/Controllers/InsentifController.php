@@ -17,12 +17,14 @@ class InsentifController extends Controller
      *
      * Jadi di sini TIDAK dibuat CRUD baru - cukup gabungkan data yang sudah
      * ada dari GajiProsesController & GajiTigabelasController, ditampilkan
-     * sebagai laporan. Ini menghindari duplikasi data yang sama dua kali.
+     * sebagai 3 laporan terpisah (Slip / Buku Besar / Buku Besar Per Sub),
+     * masing-masing tetap bisa toggle sumber data (Gaji 13 / Gaji Bulanan).
      */
-    public function index(Request $request)
+    protected function ambilData(Request $request): array
     {
         $sumber = $request->get('sumber', 'gaji13');
         $tahun = (int) $request->get('tahun', now()->year);
+        $bulan = null;
 
         if ($sumber === 'gaji_bulanan') {
             $bulan = (int) $request->get('bulan', now()->month);
@@ -30,31 +32,62 @@ class InsentifController extends Controller
             $data = collect(session('dummy_gaji_proses', []))
                 ->where('bulan', $bulan)
                 ->where('tahun', $tahun)
-                ->filter(fn ($row) => $row['status'] === 'terbit')
-                ->sortBy('nama')
-                ->values();
-
-            return view('insentif.index', [
-                'data' => $data,
-                'sumber' => $sumber,
-                'tahun' => $tahun,
-                'bulan' => $bulan,
-                'bulanList' => AbsensiController::BULAN,
-            ]);
+                ->filter(fn ($row) => $row['status'] === 'terbit');
+        } else {
+            $data = collect(session('dummy_gaji13', []))
+                ->where('tahun', $tahun)
+                ->filter(fn ($row) => $row['status'] === 'terbit');
         }
 
-        $data = collect(session('dummy_gaji13', []))
-            ->where('tahun', $tahun)
-            ->filter(fn ($row) => $row['status'] === 'terbit')
-            ->sortBy('nama')
-            ->values();
+        $pegawaiList = session('dummy_pegawai', []);
+        $data = $data->map(function ($row) use ($pegawaiList) {
+            $p = collect($pegawaiList)->firstWhere('id', $row['pegawai_id']);
+            $row['unit_kerja'] = $p['unit_kerja'] ?? '-';
 
-        return view('insentif.index', [
-            'data' => $data,
-            'sumber' => $sumber,
-            'tahun' => $tahun,
-            'bulan' => null,
-            'bulanList' => AbsensiController::BULAN,
+            return $row;
+        });
+
+        return compact('data', 'sumber', 'tahun', 'bulan');
+    }
+
+    protected function nominalKey(string $sumber): string
+    {
+        return $sumber === 'gaji_bulanan' ? 'gaji_bersih' : 'gaji13_diterima';
+    }
+
+    public function laporanSlip(Request $request)
+    {
+        $ctx = $this->ambilData($request);
+        $ctx['data'] = $ctx['data']->sortBy('nama')->values();
+        $ctx['nominalKey'] = $this->nominalKey($ctx['sumber']);
+        $ctx['bulanList'] = AbsensiController::BULAN;
+
+        return view('insentif.laporan-slip', $ctx);
+    }
+
+    public function laporanBukuBesar(Request $request)
+    {
+        $ctx = $this->ambilData($request);
+        $nominalKey = $this->nominalKey($ctx['sumber']);
+        $ctx['data'] = $ctx['data']->sortBy('nama')->values();
+        $ctx['nominalKey'] = $nominalKey;
+        $ctx['total'] = $ctx['data']->sum($nominalKey);
+        $ctx['bulanList'] = AbsensiController::BULAN;
+
+        return view('insentif.laporan-buku-besar', $ctx);
+    }
+
+    public function laporanBukuBesarPerSub(Request $request)
+    {
+        $ctx = $this->ambilData($request);
+        $nominalKey = $this->nominalKey($ctx['sumber']);
+        $ctx['nominalKey'] = $nominalKey;
+        $ctx['bulanList'] = AbsensiController::BULAN;
+        $ctx['data'] = $ctx['data']->groupBy('unit_kerja')->map(fn ($group) => [
+            'rows' => $group->sortBy('nama')->values(),
+            'total' => $group->sum($nominalKey),
         ]);
+
+        return view('insentif.laporan-buku-besar-per-sub', $ctx);
     }
 }

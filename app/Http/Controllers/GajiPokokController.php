@@ -57,6 +57,19 @@ class GajiPokokController extends Controller
         return view('gaji-pokok.index', compact('gapok'));
     }
 
+    /**
+     * Halaman Laporan (read-only, format cetak) - dipisah dari index()
+     * yang jadi halaman kelola/SET. Data sumbernya sama, tampilannya beda.
+     */
+    public function laporan()
+    {
+        $gapok = collect($this->all())
+            ->sortBy(['golongan', 'masa_kerja'])
+            ->values();
+
+        return view('gaji-pokok.laporan', compact('gapok'));
+    }
+
     public function create()
     {
         return view('gaji-pokok.create');

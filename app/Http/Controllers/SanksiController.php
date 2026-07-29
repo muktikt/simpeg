@@ -75,6 +75,19 @@ class SanksiController extends Controller
         return view('sanksi.index', compact('sanksi'));
     }
 
+    /**
+     * Halaman Laporan (read-only, format cetak) - dipisah dari index()
+     * yang jadi halaman kelola/SET. Data sumbernya sama, tampilannya beda.
+     */
+    public function laporan()
+    {
+        $sanksi = collect($this->withPegawai($this->all()))
+            ->sortByDesc('tanggal')
+            ->values();
+
+        return view('sanksi.laporan', compact('sanksi'));
+    }
+
     public function create()
     {
         return view('sanksi.create', [

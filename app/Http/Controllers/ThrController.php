@@ -134,6 +134,54 @@ class ThrController extends Controller
         return view('thr.index', compact('thr', 'tahun'));
     }
 
+    /**
+     * 3 halaman Laporan (read-only, format cetak) - dipisah dari index()
+     * yang jadi halaman kelola/proses. Hanya menampilkan THR yang sudah
+     * terbit (final), sesuai kebutuhan laporan.
+     */
+    protected function thrTerbit(int $tahun)
+    {
+        return collect($this->all())
+            ->where('tahun', $tahun)
+            ->filter(fn ($row) => $row['status'] === 'terbit')
+            ->map(function ($row) {
+                $p = $this->pegawaiById($row['pegawai_id']);
+                $row['unit_kerja'] = $p['unit_kerja'] ?? '-';
+
+                return $row;
+            });
+    }
+
+    public function laporanSlip(Request $request)
+    {
+        $tahun = (int) $request->get('tahun', now()->year);
+        $data = $this->thrTerbit($tahun)->sortBy('nama')->values();
+
+        return view('thr.laporan-slip', compact('data', 'tahun'));
+    }
+
+    public function laporanBukuBesar(Request $request)
+    {
+        $tahun = (int) $request->get('tahun', now()->year);
+        $data = $this->thrTerbit($tahun)->sortBy('nama')->values();
+        $total = $data->sum('thr_diterima');
+
+        return view('thr.laporan-buku-besar', compact('data', 'tahun', 'total'));
+    }
+
+    public function laporanBukuBesarPerSub(Request $request)
+    {
+        $tahun = (int) $request->get('tahun', now()->year);
+        $data = $this->thrTerbit($tahun)
+            ->groupBy('unit_kerja')
+            ->map(fn ($group) => [
+                'rows' => $group->sortBy('nama')->values(),
+                'total' => $group->sum('thr_diterima'),
+            ]);
+
+        return view('thr.laporan-buku-besar-per-sub', compact('data', 'tahun'));
+    }
+
     public function create()
     {
         return view('thr.create', [

@@ -85,6 +85,20 @@ class PrestasiController extends Controller
         return view('prestasi.index', compact('prestasi'));
     }
 
+    /**
+     * Halaman Laporan (read-only, format cetak) - dipisah dari index()
+     * yang jadi halaman kelola/SET. Data sumbernya sama, tampilannya beda.
+     */
+    public function laporan()
+    {
+        $prestasi = collect($this->all())
+            ->map(fn ($row) => $this->withCalculated($row))
+            ->sortByDesc('tanggal')
+            ->values();
+
+        return view('prestasi.laporan', compact('prestasi'));
+    }
+
     public function create()
     {
         return view('prestasi.create', ['pegawaiList' => $this->pegawaiList()]);
