@@ -12,7 +12,6 @@ return [
 
     'single' => [
         ['label' => 'Beranda', 'icon' => 'home', 'route_name' => 'dashboard', 'roles' => ['1', '2', '7']],
-        ['label' => 'Profil Saya', 'icon' => 'user', 'route_name' => 'profile.show'],
         ['label' => 'Approval', 'icon' => 'report', 'route_name' => 'approval.index', 'roles' => ['1', '7']],
     ],
 

@@ -21,9 +21,39 @@ class ProfileController extends Controller
     {
         $userLogin = session('simpeg_user');
 
-        $pegawai = collect(session('dummy_pegawai', []))->firstWhere('nik', $userLogin['nik']);
+        // Pastikan session dummy_pegawai terisi jika belum ada
+        if (! session()->has('dummy_pegawai')) {
+            app(PegawaiController::class)->index(request());
+        }
 
-        return view('profile.show', compact('userLogin', 'pegawai'));
+        $allPegawai = session('dummy_pegawai', []);
+        $pegawai = collect($allPegawai)->firstWhere('nik', $userLogin['nik']);
+
+        if (! $pegawai) {
+            $pegawai = [
+                'id' => 999,
+                'nik' => $userLogin['nik'],
+                'nama' => $userLogin['nama_peg'],
+                'jabatan' => $userLogin['jabatan'],
+                'unit_kerja' => 'Unit Kerja',
+                'status_peg' => 'PT',
+                'tgl_masuk' => date('Y-m-d'),
+                'telp' => '-',
+                'alamat' => '-',
+                'keluarga' => [],
+                'golongan' => [],
+                'jabatan_riwayat' => [],
+                'pendidikan' => [],
+                'prestasi' => [],
+            ];
+        }
+
+        $detailTypes = [];
+        foreach (PegawaiDetailController::TYPES as $type) {
+            $detailTypes[$type] = PegawaiDetailController::fieldConfig($type);
+        }
+
+        return view('profile.show', compact('userLogin', 'pegawai', 'detailTypes'));
     }
 
     public function updatePassword(Request $request)

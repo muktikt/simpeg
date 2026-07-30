@@ -17,27 +17,27 @@
   --navy: #0F172A; /* Slate 900 - Navy modern gelap dan premium */
   --navy-2: #1E293B; /* Slate 800 */
   --navy-light: #334155; /* Slate 700 */
-  --teal: #0D9488; /* Teal 600 - Warna aksen utama yang modern dan segar */
-  --teal-dark: #0F766E; /* Teal 700 */
-  --teal-light: #14B8A6; /* Teal 500 */
-  --teal-soft: #F0FDFA; /* Teal 50 - Latar belakang tag/badge yang soft */
+  --teal: #0284C7; /* Sky 600 - Biru Air Tirta Darma Ayu */
+  --teal-dark: #0369A1; /* Sky 700 - Biru Air Gelap */
+  --teal-light: #38BDF8; /* Sky 400 - Biru Air Cerah */
+  --teal-soft: #F0F9FF; /* Sky 50 - Latar belakang tag/badge yang soft */
   --text: #0F172A; /* Slate 900 - Teks kontras tinggi yang nyaman dibaca */
   --text-muted: #64748B; /* Slate 500 */
   --border: #E2E8F0; /* Slate 200 - Garis pembatas yang tipis dan bersih */
 
   --purple-mid: #8B5CF6; /* Violet 500 */
-  --blue-mid: #3B82F6; /* Blue 500 */
+  --blue-mid: #0284C7; /* Sky 600 */
   --amber-mid: #F59E0B; /* Amber 500 */
   --coral-mid: #F97316; /* Orange 500 */
   --gray-mid: #64748B; /* Slate 500 */
-  --teal-mid: #0D9488; /* Teal 600 */
+  --teal-mid: #0284C7; /* Sky 600 */
 
   /* Modern Shadow System */
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   --shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.06), 0 2px 4px -2px rgba(15, 23, 42, 0.06);
   --shadow-lg: 0 10px 25px -5px rgba(15, 23, 42, 0.08), 0 8px 10px -6px rgba(15, 23, 42, 0.08);
   --shadow-xl: 0 25px 50px -12px rgba(15, 23, 42, 0.12);
-  --shadow-glow: 0 0 20px rgba(13, 148, 136, 0.15);
+  --shadow-glow: 0 0 20px rgba(2, 132, 199, 0.15);
 }
 
 body {
@@ -53,7 +53,7 @@ body.login-page {
   min-height: 100vh;
   background: var(--bg);
   background-image:
-    radial-gradient(circle at 10% 20%, rgba(13, 148, 136, 0.05) 0, transparent 40%),
+    radial-gradient(circle at 10% 20%, rgba(2, 132, 199, 0.05) 0, transparent 40%),
     radial-gradient(circle at 90% 80%, rgba(59, 130, 246, 0.05) 0, transparent 40%);
   display: flex;
   align-items: center;
@@ -93,7 +93,7 @@ body.login-page {
   width: 300px;
   height: 300px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(20, 184, 166, 0.15), transparent 70%);
+  background: radial-gradient(circle, rgba(56, 189, 248, 0.15), transparent 70%);
   pointer-events: none;
 }
 
@@ -253,7 +253,7 @@ body.login-page {
 .field input:focus {
   border-color: var(--teal);
   background: #fff;
-  box-shadow: 0 0 0 4px rgba(13, 148, 136, 0.15);
+  box-shadow: 0 0 0 4px rgba(2, 132, 199, 0.15);
 }
 
 .field .icon {
@@ -323,13 +323,13 @@ body.login-page {
   font-weight: 600;
   font-size: 14px;
   cursor: pointer;
-  box-shadow: 0 4px 12px rgba(13, 148, 136, 0.2);
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.2);
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .btn-submit:hover {
   background: linear-gradient(135deg, var(--teal) 0%, var(--teal-light) 100%);
-  box-shadow: 0 6px 16px rgba(13, 148, 136, 0.3);
+  box-shadow: 0 6px 16px rgba(2, 132, 199, 0.3);
   transform: translateY(-1px);
 }
 
@@ -452,7 +452,7 @@ body.app-page {
   background: linear-gradient(90deg, var(--teal-dark) 0%, var(--teal) 100%);
   color: #fff;
   font-weight: 600;
-  box-shadow: 0 4px 12px rgba(13, 148, 136, 0.15);
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.15);
 }
 
 .nav-link.active::before {
@@ -555,6 +555,12 @@ body.app-page {
   color: #fff;
 }
 
+.nav-group-items a.active {
+  background: rgba(2, 132, 199, 0.2);
+  color: #38BDF8;
+  font-weight: 600;
+}
+
 .main {
   flex: 1;
   display: flex;
@@ -593,7 +599,7 @@ body.app-page {
 .search-box:focus-within {
   background: var(--surface);
   border-color: var(--teal);
-  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
+  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.1);
 }
 
 .search-box svg {
@@ -656,7 +662,7 @@ body.app-page {
   width: 40px;
   height: 40px;
   border-radius: 12px;
-  background: linear-gradient(135deg, var(--teal-soft) 0%, #CCFBF1 100%);
+  background: linear-gradient(135deg, var(--teal-soft) 0%, #E0F2FE 100%);
   color: var(--teal-dark);
   font-family: 'Plus Jakarta Sans', sans-serif;
   font-weight: 700;
@@ -664,7 +670,7 @@ body.app-page {
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1.5px solid #99F6E4;
+  border: 1.5px solid #BAE6FD;
 }
 
 .profile-name {

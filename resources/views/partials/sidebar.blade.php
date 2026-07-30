@@ -15,6 +15,13 @@
     $slugify = fn ($label) => \Illuminate\Support\Str::slug($label);
 
     $canSee = fn ($group) => empty($group['roles']) || in_array($myRole, $group['roles'], true);
+
+    $isItemActive = function($item) use ($slugify) {
+        if (!empty($item['route_name'])) {
+            return request()->routeIs($item['route_name']);
+        }
+        return request()->is('placeholder/' . $slugify($item['label']));
+    };
 @endphp
 
 <aside class="sidebar">
@@ -31,8 +38,11 @@
 
         @foreach ($menu['single'] as $item)
             @continue(! $canSee($item))
+            @php
+                $active = $isItemActive($item);
+            @endphp
             <a href="{{ $item['route_name'] ? route($item['route_name']) : route('placeholder', $slugify($item['label'])) }}"
-               class="nav-link {{ request()->routeIs($item['route_name']) ? 'active' : '' }}">
+               class="nav-link {{ $active ? 'active' : '' }}">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">{!! $icons[$item['icon']] !!}</svg>
                 {{ $item['label'] }}
             </a>
@@ -40,7 +50,10 @@
 
         @foreach ($menu['groups'] as $group)
             @continue(! $canSee($group))
-            <div class="nav-group">
+            @php
+                $hasActiveChild = collect($group['items'])->contains(fn($item) => $isItemActive($item));
+            @endphp
+            <div class="nav-group {{ $hasActiveChild ? 'open' : '' }}">
                 <button class="nav-group-btn" onclick="toggleGroup(this)">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="16" height="16">{!! $icons[$group['icon']] !!}</svg>
                     {{ $group['label'] }}
@@ -48,7 +61,11 @@
                 </button>
                 <div class="nav-group-items">
                     @foreach ($group['items'] as $item)
-                        <a href="{{ $item['route_name'] ? route($item['route_name']) : route('placeholder', $slugify($item['label'])) }}">
+                        @php
+                            $active = $isItemActive($item);
+                        @endphp
+                        <a href="{{ $item['route_name'] ? route($item['route_name']) : route('placeholder', $slugify($item['label'])) }}"
+                           class="{{ $active ? 'active' : '' }}">
                             {{ $item['label'] }}
                         </a>
                     @endforeach
