@@ -28,12 +28,20 @@ Route::post('/login', [LoginController::class, 'login'])->name('login.attempt');
 Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 
 Route::middleware(['simpeg.auth'])->group(function () {
-    Route::get('/beranda', [DashboardController::class, 'index'])->name('dashboard');
+    // Beranda (dashboard perusahaan) - bukan untuk role Pegawai, yang
+    // landing page-nya adalah profil sendiri (lihat LoginController).
+    Route::get('/beranda', [DashboardController::class, 'index'])->middleware(['simpeg.auth:1,2,7'])->name('dashboard');
 
-    // Data Pegawai - Read boleh semua role yang login, Create/Update/Delete cuma Admin.
+    // Data Pegawai - list & laporan perusahaan TIDAK untuk role Pegawai
+    // (mereka hanya boleh lihat data diri sendiri lewat halaman Profil).
+    // show() tetap terbuka tapi dibatasi di controller: role 5 cuma bisa
+    // lihat record miliknya sendiri.
     Route::prefix('pegawai')->name('pegawai.')->group(function () {
-        Route::get('/', [PegawaiController::class, 'index'])->name('index');
-        Route::get('/laporan-anak', [PegawaiController::class, 'laporanAnakDiatas21'])->name('laporan-anak');
+        Route::middleware(['simpeg.auth:1,2,7'])->group(function () {
+            Route::get('/', [PegawaiController::class, 'index'])->name('index');
+            Route::get('/laporan-anak', [PegawaiController::class, 'laporanAnakDiatas21'])->name('laporan-anak');
+        });
+
         Route::get('/{id}', [PegawaiController::class, 'show'])->whereNumber('id')->name('show');
 
         Route::middleware(['simpeg.auth:1'])->group(function () {
@@ -96,9 +104,9 @@ Route::middleware(['simpeg.auth'])->group(function () {
         Route::delete('/{id}', [DrdTukinController::class, 'destroy'])->whereNumber('id')->name('destroy');
     });
 
-    // Sanksi Pegawai - index bisa dilihat semua role yang login (dipakai juga
-    // buat menu "Lap. Sanksi Pegawai"), tambah/edit/hapus cuma Admin & Keuangan.
-    Route::prefix('sanksi')->name('sanksi.')->group(function () {
+    // Sanksi Pegawai - index/laporan untuk Admin, Keuangan, Direksi (bukan
+    // role Pegawai). Tambah/edit/hapus cuma Admin & Keuangan.
+    Route::prefix('sanksi')->name('sanksi.')->middleware(['simpeg.auth:1,2,7'])->group(function () {
         Route::get('/', [SanksiController::class, 'index'])->name('index');
         Route::get('/laporan', [SanksiController::class, 'laporan'])->name('laporan');
 
@@ -201,8 +209,8 @@ Route::middleware(['simpeg.auth'])->group(function () {
     });
 
     // Cuti - READ ONLY, tidak punya data sendiri (lihat catatan di
-    // CutiController). Semua role yang login boleh lihat.
-    Route::get('/cuti', [CutiController::class, 'index'])->name('cuti.index');
+    // CutiController). Admin, Keuangan, Direksi (bukan role Pegawai).
+    Route::get('/cuti', [CutiController::class, 'index'])->middleware(['simpeg.auth:1,2,7'])->name('cuti.index');
 
     // Pengaturan Akun Pengguna (Hak Akses User) - Admin only.
     Route::prefix('user-akses')->name('user-akses.')->middleware(['simpeg.auth:1'])->group(function () {

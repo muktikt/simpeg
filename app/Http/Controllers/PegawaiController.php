@@ -153,6 +153,12 @@ class PegawaiController extends Controller
 
         abort_if(! $pegawai, 404);
 
+        // Role Pegawai (5) cuma boleh lihat datanya sendiri, tidak boleh
+        // intip data pegawai lain lewat tebak-tebak URL.
+        if (session('simpeg_user.userlevel') === '5' && $pegawai['nik'] !== session('simpeg_user.nik')) {
+            abort(403, 'Kamu hanya bisa melihat data diri sendiri.');
+        }
+
         $detailTypes = collect(\App\Http\Controllers\PegawaiDetailController::TYPES)
             ->mapWithKeys(fn ($type) => [$type => \App\Http\Controllers\PegawaiDetailController::fieldConfig($type)])
             ->all();
@@ -250,7 +256,7 @@ class PegawaiController extends Controller
             ->filter(fn ($anak) => ($anak['keterangan'] ?? '-') === 'Tidak Kuliah'
                 && \Illuminate\Support\Carbon::parse($anak['tgl_lahir'])->lte($batasUsia))
             ->map(function ($anak) use ($batasUsia) {
-                $anak['usia'] = \Illuminate\Support\Carbon::parse($anak['tgl_lahir'])->diffInYears(now());
+                $anak['usia'] = (int) \Illuminate\Support\Carbon::parse($anak['tgl_lahir'])->diffInYears(now());
 
                 return $anak;
             })
@@ -258,21 +264,6 @@ class PegawaiController extends Controller
             ->values();
 
         return view('pegawai.laporan-anak', compact('data'));
-    }
-
-    /**
-     * Data Per Unit Kerja - disamakan dengan sistem lama (daftar_pegawai_unit_kerja.php).
-     * Data sumbernya SAMA PERSIS dengan Data Pegawai All (tbl_pegawai) -
-     * bukan dataset terpisah, cuma dikelompokkan per unit kerja.
-     */
-    public function perUnitKerja()
-    {
-        $data = collect($this->all())
-            ->where('status_peg', '!=', 'PN')
-            ->groupBy('unit_kerja')
-            ->sortKeys();
-
-        return view('pegawai.per-unit-kerja', compact('data'));
     }
 
     protected function validateData(Request $request, ?int $ignoreId = null): array

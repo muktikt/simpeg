@@ -157,6 +157,7 @@ body.login-page {
   font-weight: 700;
   margin: 0 0 16px;
   background: linear-gradient(to right, #FFFFFF, #E2E8F0);
+  background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }

@@ -11,7 +11,8 @@
 return [
 
     'single' => [
-        ['label' => 'Beranda', 'icon' => 'home', 'route_name' => 'dashboard'],
+        ['label' => 'Beranda', 'icon' => 'home', 'route_name' => 'dashboard', 'roles' => ['1', '2', '7']],
+        ['label' => 'Profil Saya', 'icon' => 'user', 'route_name' => 'profile.show'],
         ['label' => 'Approval', 'icon' => 'report', 'route_name' => 'approval.index', 'roles' => ['1', '7']],
     ],
 
@@ -79,6 +80,7 @@ return [
         [
             'label' => 'Data Pegawai',
             'icon' => 'user',
+            'roles' => ['1', '2', '7'],
             'items' => [
                 ['label' => 'Data Pegawai All', 'route_name' => 'pegawai.index'],
                 ['label' => 'Data Per Unit Kerja', 'route_name' => null],
@@ -135,6 +137,7 @@ return [
         [
             'label' => 'Laporan Kepegawaian',
             'icon' => 'report',
+            'roles' => ['1', '2', '7'],
             'items' => [
                 ['label' => 'Lap. Anak Diatas 21', 'route_name' => 'pegawai.laporan-anak'],
                 ['label' => 'Lap. Cuti Pegawai', 'route_name' => 'cuti.index'],

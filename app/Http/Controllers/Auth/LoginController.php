@@ -51,10 +51,20 @@ class LoginController extends Controller
         ],
     ];
 
+    /**
+     * Pegawai (userlevel 5) tidak diarahkan ke dashboard perusahaan -
+     * mengikuti sistem lama (menu_incl_pdam.php) yang landing page-nya
+     * langsung profil diri sendiri, bukan dashboard statistik perusahaan.
+     */
+    protected function redirectRouteFor(array $user): string
+    {
+        return $user['userlevel'] === '5' ? 'profile.show' : 'dashboard';
+    }
+
     public function showLoginForm()
     {
-        if (session('simpeg_user')) {
-            return redirect()->route('dashboard');
+        if ($user = session('simpeg_user')) {
+            return redirect()->route($this->redirectRouteFor($user));
         }
 
         return view('auth.login');
@@ -73,7 +83,7 @@ class LoginController extends Controller
             $request->session()->regenerate();
             $request->session()->put('simpeg_user', $user);
 
-            return redirect()->route('dashboard');
+            return redirect()->route($this->redirectRouteFor($user));
         }
 
         return back()
