@@ -12,6 +12,7 @@ return [
 
     'single' => [
         ['label' => 'Beranda', 'icon' => 'home', 'route_name' => 'dashboard', 'roles' => ['1', '2', '7']],
+        ['label' => 'Profil Saya', 'icon' => 'user', 'route_name' => 'profile.show'],
         ['label' => 'Approval', 'icon' => 'report', 'route_name' => 'approval.index', 'roles' => ['1', '7']],
     ],
 
@@ -90,17 +91,17 @@ return [
             'icon' => 'report',
             'roles' => ['1', '2', '7'],
             'items' => [
-                ['label' => 'Lap. Absensi', 'route_name' => 'absensi.laporan'],
-                ['label' => 'Lap. Prestasi', 'route_name' => 'prestasi.laporan'],
-                ['label' => 'Lap. Lembur', 'route_name' => 'gaji-laporan.lembur'],
+                ['label' => 'Lap. Absensi', 'route_name' => 'absensi.laporan', 'roles' => ['1', '2']],
+                ['label' => 'Lap. Prestasi', 'route_name' => 'prestasi.laporan', 'roles' => ['1', '2']],
+                ['label' => 'Lap. Lembur', 'route_name' => 'gaji-laporan.lembur', 'roles' => ['1', '2']],
                 ['label' => 'Lap. Slip Gaji', 'route_name' => 'gaji-laporan.slip-gaji'],
                 ['label' => 'Lap. Buku Besar Gaji', 'route_name' => 'gaji-laporan.buku-besar'],
                 ['label' => 'Lap. Buku Besar Per Sub', 'route_name' => 'gaji-laporan.buku-besar-per-sub'],
-                ['label' => 'Lap. Payroll', 'route_name' => 'gaji-laporan.payroll'],
-                ['label' => 'Lap. Pajak', 'route_name' => 'gaji-laporan.pajak'],
-                ['label' => 'Lap. Gapok / Golongan', 'route_name' => 'gaji-pokok.laporan'],
-                ['label' => 'Lap. BPJSTK', 'route_name' => 'gaji-laporan.bpjstk'],
-                ['label' => 'Lap. Tunj. Perumahan', 'route_name' => 'gaji-laporan.tunj-perumahan'],
+                ['label' => 'Lap. Payroll', 'route_name' => 'gaji-laporan.payroll', 'roles' => ['1', '2']],
+                ['label' => 'Lap. Pajak', 'route_name' => 'gaji-laporan.pajak', 'roles' => ['1', '2']],
+                ['label' => 'Lap. Gapok / Golongan', 'route_name' => 'gaji-pokok.laporan', 'roles' => ['1', '2']],
+                ['label' => 'Lap. BPJSTK', 'route_name' => 'gaji-laporan.bpjstk', 'roles' => ['1', '2']],
+                ['label' => 'Lap. Tunj. Perumahan', 'route_name' => 'gaji-laporan.tunj-perumahan', 'roles' => ['1', '2']],
             ],
         ],
         [
@@ -126,7 +127,7 @@ return [
         [
             'label' => 'Laporan Insentif',
             'icon' => 'report',
-            'roles' => ['1', '2', '7'],
+            'roles' => ['1', '2'],
             'items' => [
                 ['label' => 'Cetak Slip Insentif', 'route_name' => 'insentif.laporan-slip'],
                 ['label' => 'Lap. Buku Besar Insentif', 'route_name' => 'insentif.laporan-buku-besar'],
@@ -140,7 +141,7 @@ return [
             'items' => [
                 ['label' => 'Lap. Anak Diatas 21', 'route_name' => 'pegawai.laporan-anak'],
                 ['label' => 'Lap. Cuti Pegawai', 'route_name' => 'cuti.index'],
-                ['label' => 'Lap. Sanksi Pegawai', 'route_name' => 'sanksi.laporan'],
+                ['label' => 'Lap. Sanksi Pegawai', 'route_name' => 'sanksi.laporan', 'roles' => ['1', '2']],
             ],
         ],
     ],
