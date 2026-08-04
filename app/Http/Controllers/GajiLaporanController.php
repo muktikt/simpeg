@@ -66,13 +66,29 @@ class GajiLaporanController extends Controller
                 return $row;
             });
 
+        $riwayatLembur = [];
+
         if ($userLogin['userlevel'] === '5') {
             $data = $data->where('nik', $userLogin['nik']);
+
+            // Ambill semua riwayat lembur milik pegawai ini
+            $riwayatLembur = collect(session('dummy_prestasi_gaji', []))
+                ->filter(fn ($row) => $row['jam_lembur'] > 0)
+                ->map(function ($row) {
+                    $p = $this->pegawaiById($row['pegawai_id']);
+                    $row['nik'] = $p['nik'] ?? '-';
+                    $row['nominal_lembur'] = $row['jam_lembur'] * PrestasiController::RATE_LEMBUR_PER_JAM;
+                    $row['bulan_nama'] = \Illuminate\Support\Carbon::parse($row['tanggal'])->translatedFormat('F Y');
+                    return $row;
+                })
+                ->where('nik', $userLogin['nik'])
+                ->sortByDesc('tanggal')
+                ->values();
         }
 
         $data = $data->sortBy('nama')->values();
 
-        return view('gaji-laporan.lembur', compact('data', 'bulan', 'tahun'));
+        return view('gaji-laporan.lembur', compact('data', 'bulan', 'tahun', 'riwayatLembur'));
     }
 
     public function slipGaji(Request $request)
@@ -81,14 +97,24 @@ class GajiLaporanController extends Controller
         $userLogin = session('simpeg_user');
 
         $data = $this->gajiTerbit($bulan, $tahun);
+        $riwayatGaji = [];
 
         if ($userLogin['userlevel'] === '5') {
             $data = $data->where('nik', $userLogin['nik']);
+
+            // Ambill 3-6 bulan riwayat terbit milik pegawai ini
+            $allGaji = collect(session('dummy_gaji_proses', []))
+                ->where('nik', $userLogin['nik'])
+                ->filter(fn ($row) => $row['status'] === 'terbit')
+                ->sortByDesc(fn ($row) => $row['tahun'] * 100 + $row['bulan'])
+                ->values();
+
+            $riwayatGaji = $allGaji;
         }
 
         $data = $data->sortBy('nama')->values();
 
-        return view('gaji-laporan.slip-gaji', compact('data', 'bulan', 'tahun'));
+        return view('gaji-laporan.slip-gaji', compact('data', 'bulan', 'tahun', 'riwayatGaji'));
     }
 
     public function bukuBesar(Request $request)

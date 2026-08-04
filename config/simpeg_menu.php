@@ -13,6 +13,12 @@ return [
     'single' => [
         ['label' => 'Beranda', 'icon' => 'home', 'route_name' => 'dashboard', 'roles' => ['1', '2', '7']],
         ['label' => 'Profil Saya', 'icon' => 'user', 'route_name' => 'profile.show'],
+        ['label' => 'Payroll', 'icon' => 'report', 'route_name' => 'gaji-laporan.slip-gaji', 'roles' => ['5']],
+        ['label' => 'THR', 'icon' => 'calendar', 'route_name' => 'thr.laporan-slip', 'roles' => ['5']],
+        ['label' => 'Tunjangan Pendidikan', 'icon' => 'calendar', 'route_name' => 'gaji-tigabelas.laporan-slip', 'roles' => ['5']],
+        ['label' => 'Insentif', 'icon' => 'report', 'route_name' => 'insentif.laporan-slip', 'roles' => ['5']],
+        ['label' => 'Lembur', 'icon' => 'report', 'route_name' => 'gaji-laporan.lembur', 'roles' => ['5']],
+        ['label' => 'Pengaduan', 'icon' => 'report', 'route_name' => 'pengaduan.index', 'roles' => ['5', '1']],
         ['label' => 'Approval', 'icon' => 'report', 'route_name' => 'approval.index', 'roles' => ['1', '7']],
     ],
 
@@ -102,26 +108,6 @@ return [
                 ['label' => 'Lap. Gapok / Golongan', 'route_name' => 'gaji-pokok.laporan', 'roles' => ['1', '2']],
                 ['label' => 'Lap. BPJSTK', 'route_name' => 'gaji-laporan.bpjstk', 'roles' => ['1', '2']],
                 ['label' => 'Lap. Tunj. Perumahan', 'route_name' => 'gaji-laporan.tunj-perumahan', 'roles' => ['1', '2']],
-            ],
-        ],
-        [
-            'label' => 'Pendapatan Saya',
-            'icon' => 'report',
-            'roles' => ['5'],
-            'items' => [
-                ['label' => 'Slip Gaji (Payroll)', 'route_name' => 'gaji-laporan.slip-gaji'],
-                ['label' => 'Slip THR', 'route_name' => 'thr.laporan-slip'],
-                ['label' => 'Slip Tunj. Pendidikan', 'route_name' => 'gaji-tigabelas.laporan-slip'],
-                ['label' => 'Slip Insentif', 'route_name' => 'insentif.laporan-slip'],
-                ['label' => 'Rincian Lembur', 'route_name' => 'gaji-laporan.lembur'],
-            ],
-        ],
-        [
-            'label' => 'Pengaduan',
-            'icon' => 'report',
-            'roles' => ['5', '1'],
-            'items' => [
-                ['label' => 'Pengaduan Pegawai', 'route_name' => 'pengaduan.index'],
             ],
         ],
         [

@@ -158,14 +158,21 @@ class ThrController extends Controller
         $userLogin = session('simpeg_user');
 
         $data = $this->thrTerbit($tahun);
+        $riwayatThr = [];
 
         if ($userLogin['userlevel'] === '5') {
             $data = $data->where('nik', $userLogin['nik']);
+
+            $riwayatThr = collect($this->all())
+                ->where('nik', $userLogin['nik'])
+                ->filter(fn ($row) => $row['status'] === 'terbit')
+                ->sortByDesc('tahun')
+                ->values();
         }
 
         $data = $data->sortBy('nama')->values();
 
-        return view('thr.laporan-slip', compact('data', 'tahun'));
+        return view('thr.laporan-slip', compact('data', 'tahun', 'riwayatThr'));
     }
 
     public function laporanBukuBesar(Request $request)

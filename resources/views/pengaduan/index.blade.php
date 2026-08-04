@@ -1,11 +1,11 @@
 @extends('layouts.app')
 
-@section('title', 'Pengaduan Pegawai')
+@section('title', 'Pengaduan')
 
 @section('content')
 <div class="page-head">
-    <div class="breadcrumb">Home / Pengaduan Pegawai</div>
-    <h1>Pengaduan Pegawai</h1>
+    <div class="breadcrumb">Home / Pengaduan</div>
+    <h1>Pengaduan</h1>
 </div>
 
 @if (session('success'))

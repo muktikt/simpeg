@@ -61,8 +61,17 @@ class InsentifController extends Controller
         $userLogin = session('simpeg_user');
 
         $data = $ctx['data'];
+        $riwayatInsentif = [];
+
         if ($userLogin['userlevel'] === '5') {
             $data = $data->where('nik', $userLogin['nik']);
+
+            // Buat data riwayat insentif dummy untuk pegawai login
+            $riwayatInsentif = [
+                ['judul' => 'Insentif Kinerja Triwulan II', 'periode' => 'Juni 2026', 'nominal' => 750000, 'icon' => '⭐'],
+                ['judul' => 'Insentif Kehadiran', 'periode' => 'Mei 2026 &middot; Nihil Telat', 'nominal' => 200000, 'icon' => '🔆'],
+                ['judul' => 'Insentif Kinerja Triwulan I', 'periode' => 'Maret 2026', 'nominal' => 600000, 'icon' => '☑️'],
+            ];
         }
 
         $data = $data->sortBy('nama')->values();
@@ -72,7 +81,7 @@ class InsentifController extends Controller
         $nominalKey = $this->nominalKey($sumber);
         $bulanList = AbsensiController::BULAN;
 
-        return view('insentif.laporan-slip', compact('data', 'sumber', 'tahun', 'bulan', 'nominalKey', 'bulanList'));
+        return view('insentif.laporan-slip', compact('data', 'sumber', 'tahun', 'bulan', 'nominalKey', 'bulanList', 'riwayatInsentif'));
     }
 
     public function laporanBukuBesar(Request $request)

@@ -161,14 +161,39 @@ class GajiTigabelasController extends Controller
         $userLogin = session('simpeg_user');
 
         $data = $this->gaji13Terbit($tahun);
+        $rincianAnak = [];
 
         if ($userLogin['userlevel'] === '5') {
             $data = $data->where('nik', $userLogin['nik']);
+
+            // Sample data rincian anak untuk tunjangan pendidikan (Sesuai Gambar 2)
+            $rincianAnak = [
+                [
+                    'nama' => 'Moch. Faisal Fahrezi',
+                    'inisial' => 'MF',
+                    'jenjang_singkat' => 'SMA/SMK/MA',
+                    'jenjang_detail' => 'SMA Kelas XII',
+                    'status' => 'Sudah Cair',
+                    'status_bg' => '#dcfce7',
+                    'status_color' => '#15803d',
+                    'nominal' => 1218400,
+                ],
+                [
+                    'nama' => 'M. Maliki Litunzira',
+                    'inisial' => 'ML',
+                    'jenjang_singkat' => 'SD/MI',
+                    'jenjang_detail' => 'SD Kelas VI',
+                    'status' => 'Menunggu Verifikasi',
+                    'status_bg' => '#fef3c7',
+                    'status_color' => '#b45309',
+                    'nominal' => 1000000,
+                ],
+            ];
         }
 
         $data = $data->sortBy('nama')->values();
 
-        return view('gaji-tigabelas.laporan-slip', compact('data', 'tahun'));
+        return view('gaji-tigabelas.laporan-slip', compact('data', 'tahun', 'rincianAnak'));
     }
 
     public function laporanBukuBesar(Request $request)
