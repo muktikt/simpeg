@@ -20,9 +20,15 @@ class GajiTigabelasController extends Controller
      *
      * Disamakan dengan sistem lama (proses_tigabelas_satuan.php dkk).
      * BEDA DENGAN THR:
-     * - Komponen pendapatan TIDAK ADA BPJS-TK, BPJS-Kesehatan, dan Lembur
-     *   (12 item, bukan 15 - karena Gaji 13 bukan gaji bulan kerja biasa)
-     * - Potongan dari Pendapatan CUMA "Pajak" (1 item, bukan 8)
+     * - Komponen pendapatan & potongan-dari-pendapatan SAMA PERSIS dengan
+     *   THR (15 item pendapatan, 8 item potongan-dari-pendapatan). Field
+     *   T.BPJS-TK, T.BPJS-Kes, Lembur, Pot. Dapenma, Pot. BPJS-TK,
+     *   Pot. BPJS-Kes, Pot. Perumahan, Pot. Korpri, Pot. T.Perusahaan,
+     *   Pot. Lain-lain di kode asli NILAINYA SELALU 0 (hardcode,
+     *   $tunjbpjstk=0, $nominal_lembur=0, dst - lihat proses_tigabelas_satuan.php)
+     *   tapi field-nya TETAP DITAMPILKAN di form sebagai bagian dari format
+     *   baku slip Gaji 13/Tunj. Pendidikan, jadi tetap dipertahankan di sini
+     *   sesuai keputusan agar format slip konsisten dengan sistem lama.
      * - Potongan Non-Pendapatan sama persis dengan THR (10 item)
      * - Kategori pegawai cuma 7 (TIDAK ADA "Kontrak", beda dari Gaji/THR
      *   yang punya 8 kategori - dicek dari daftar file proses_tigabelas_satuan_*.php)
@@ -45,15 +51,25 @@ class GajiTigabelasController extends Controller
         'tunjangan_jabatan' => 'Tunjangan Jabatan',
         'tunjangan_transport' => 'Tunjangan Transport',
         'tunjangan_pangan' => 'Tunjangan Pangan',
+        'tunjangan_bpjstk' => 'Tunjangan BPJS-TK',
         'tunjangan_perumahan' => 'Tunjangan Perumahan',
         'tunjangan_perusahaan' => 'Tunjangan Perusahaan',
         'tunjangan_airminum' => 'Tunjangan Air Minum',
+        'tunjangan_bpjskes' => 'Tunjangan BPJS Kesehatan',
         'tunjangan_komunikasi' => 'Tunjangan Komunikasi',
         'tunjangan_pajak' => 'Tunjangan Pajak',
+        'lembur' => 'Uang Lembur',
     ];
 
     public const POTONGAN_PENDAPATAN = [
+        'potongan_dapenma' => 'Potongan Dapenma',
+        'potongan_bpjstk' => 'Potongan BPJS-TK',
+        'potongan_bpjskes' => 'Potongan BPJS Kesehatan',
+        'potongan_perumahan' => 'Potongan Perumahan',
         'potongan_pajak' => 'Potongan Pajak (PPh 21)',
+        'potongan_korpri' => 'Potongan Korpri',
+        'potongan_tperusahaan' => 'Potongan T. Perusahaan',
+        'potongan_lain' => 'Potongan Lain-lain',
     ];
 
     public const POTONGAN_NON_PENDAPATAN = [
@@ -142,7 +158,15 @@ class GajiTigabelasController extends Controller
     public function laporanSlip(Request $request)
     {
         $tahun = (int) $request->get('tahun', now()->year);
-        $data = $this->gaji13Terbit($tahun)->sortBy('nama')->values();
+        $userLogin = session('simpeg_user');
+
+        $data = $this->gaji13Terbit($tahun);
+
+        if ($userLogin['userlevel'] === '5') {
+            $data = $data->where('nik', $userLogin['nik']);
+        }
+
+        $data = $data->sortBy('nama')->values();
 
         return view('gaji-tigabelas.laporan-slip', compact('data', 'tahun'));
     }

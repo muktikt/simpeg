@@ -58,11 +58,21 @@ class InsentifController extends Controller
     public function laporanSlip(Request $request)
     {
         $ctx = $this->ambilData($request);
-        $ctx['data'] = $ctx['data']->sortBy('nama')->values();
-        $ctx['nominalKey'] = $this->nominalKey($ctx['sumber']);
-        $ctx['bulanList'] = AbsensiController::BULAN;
+        $userLogin = session('simpeg_user');
 
-        return view('insentif.laporan-slip', $ctx);
+        $data = $ctx['data'];
+        if ($userLogin['userlevel'] === '5') {
+            $data = $data->where('nik', $userLogin['nik']);
+        }
+
+        $data = $data->sortBy('nama')->values();
+        $sumber = $ctx['sumber'];
+        $tahun = $ctx['tahun'];
+        $bulan = $ctx['bulan'];
+        $nominalKey = $this->nominalKey($sumber);
+        $bulanList = AbsensiController::BULAN;
+
+        return view('insentif.laporan-slip', compact('data', 'sumber', 'tahun', 'bulan', 'nominalKey', 'bulanList'));
     }
 
     public function laporanBukuBesar(Request $request)

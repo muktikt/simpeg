@@ -155,7 +155,15 @@ class ThrController extends Controller
     public function laporanSlip(Request $request)
     {
         $tahun = (int) $request->get('tahun', now()->year);
-        $data = $this->thrTerbit($tahun)->sortBy('nama')->values();
+        $userLogin = session('simpeg_user');
+
+        $data = $this->thrTerbit($tahun);
+
+        if ($userLogin['userlevel'] === '5') {
+            $data = $data->where('nik', $userLogin['nik']);
+        }
+
+        $data = $data->sortBy('nama')->values();
 
         return view('thr.laporan-slip', compact('data', 'tahun'));
     }

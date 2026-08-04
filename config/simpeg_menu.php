@@ -105,6 +105,26 @@ return [
             ],
         ],
         [
+            'label' => 'Pendapatan Saya',
+            'icon' => 'report',
+            'roles' => ['5'],
+            'items' => [
+                ['label' => 'Slip Gaji (Payroll)', 'route_name' => 'gaji-laporan.slip-gaji'],
+                ['label' => 'Slip THR', 'route_name' => 'thr.laporan-slip'],
+                ['label' => 'Slip Tunj. Pendidikan', 'route_name' => 'gaji-tigabelas.laporan-slip'],
+                ['label' => 'Slip Insentif', 'route_name' => 'insentif.laporan-slip'],
+                ['label' => 'Rincian Lembur', 'route_name' => 'gaji-laporan.lembur'],
+            ],
+        ],
+        [
+            'label' => 'Pengaduan',
+            'icon' => 'report',
+            'roles' => ['5', '1'],
+            'items' => [
+                ['label' => 'Pengaduan Pegawai', 'route_name' => 'pengaduan.index'],
+            ],
+        ],
+        [
             'label' => 'Laporan THR',
             'icon' => 'report',
             'roles' => ['1', '2', '7'],

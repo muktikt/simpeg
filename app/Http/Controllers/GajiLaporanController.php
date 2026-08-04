@@ -51,6 +51,7 @@ class GajiLaporanController extends Controller
     public function lembur(Request $request)
     {
         [$bulan, $tahun] = array_values($this->periodeInput($request));
+        $userLogin = session('simpeg_user');
 
         $data = collect(session('dummy_prestasi_gaji', []))
             ->filter(fn ($row) => \Illuminate\Support\Carbon::parse($row['tanggal'])->month === $bulan
@@ -63,9 +64,13 @@ class GajiLaporanController extends Controller
                 $row['nominal_lembur'] = $row['jam_lembur'] * PrestasiController::RATE_LEMBUR_PER_JAM;
 
                 return $row;
-            })
-            ->sortBy('nama')
-            ->values();
+            });
+
+        if ($userLogin['userlevel'] === '5') {
+            $data = $data->where('nik', $userLogin['nik']);
+        }
+
+        $data = $data->sortBy('nama')->values();
 
         return view('gaji-laporan.lembur', compact('data', 'bulan', 'tahun'));
     }
@@ -73,8 +78,15 @@ class GajiLaporanController extends Controller
     public function slipGaji(Request $request)
     {
         [$bulan, $tahun] = array_values($this->periodeInput($request));
+        $userLogin = session('simpeg_user');
 
-        $data = $this->gajiTerbit($bulan, $tahun)->sortBy('nama')->values();
+        $data = $this->gajiTerbit($bulan, $tahun);
+
+        if ($userLogin['userlevel'] === '5') {
+            $data = $data->where('nik', $userLogin['nik']);
+        }
+
+        $data = $data->sortBy('nama')->values();
 
         return view('gaji-laporan.slip-gaji', compact('data', 'bulan', 'tahun'));
     }

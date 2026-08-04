@@ -53,7 +53,64 @@ class ProfileController extends Controller
             $detailTypes[$type] = PegawaiDetailController::fieldConfig($type);
         }
 
+        // Simulasi data dokumen (Surat Kerja & Surat Diklat) jika belum ada
+        if (! isset($pegawai['surat_kerja'])) {
+            $pegawai['surat_kerja'] = [
+                'nomor' => 'SK/SDM/2024/001',
+                'judul' => 'Surat Keputusan Pengangkatan Pegawai Tetap',
+                'tgl_terbit' => '2024-01-15',
+                'file_name' => 'SK_Pengangkatan_Pegawai.pdf',
+                'file_url' => '#',
+            ];
+        }
+
+        if (! isset($pegawai['surat_diklat'])) {
+            $pegawai['surat_diklat'] = [
+                'nomor' => 'STP/SDM/2024/088',
+                'judul' => 'Sertifikat Diklat & Pelatihan Manajemen Kepegawaian',
+                'tgl_terbit' => '2024-05-20',
+                'file_name' => 'Sertifikat_Diklat_SDM.pdf',
+                'file_url' => '#',
+            ];
+        }
+
         return view('profile.show', compact('userLogin', 'pegawai', 'detailTypes'));
+    }
+
+    public function uploadDokumen(Request $request)
+    {
+        $validated = $request->validate([
+            'pegawai_id' => 'required|integer',
+            'jenis_dokumen' => 'required|in:surat_kerja,surat_diklat',
+            'nomor' => 'required|string|max:100',
+            'judul' => 'required|string|max:200',
+            'tgl_terbit' => 'required|date',
+            'file' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5000',
+        ]);
+
+        $allPegawai = session('dummy_pegawai', []);
+        $fileName = 'Dokumen_' . time() . '.pdf';
+        
+        if ($request->hasFile('file')) {
+            $fileName = $request->file('file')->getClientOriginalName();
+        }
+
+        $allPegawai = collect($allPegawai)->map(function ($p) use ($validated, $fileName) {
+            if ($p['id'] == $validated['pegawai_id']) {
+                $p[$validated['jenis_dokumen']] = [
+                    'nomor' => $validated['nomor'],
+                    'judul' => $validated['judul'],
+                    'tgl_terbit' => $validated['tgl_terbit'],
+                    'file_name' => $fileName,
+                    'file_url' => '#',
+                ];
+            }
+            return $p;
+        })->all();
+
+        session()->put('dummy_pegawai', $allPegawai);
+
+        return back()->with('success', 'Dokumen berhasil diunggah/diperbarui oleh Admin SDM.');
     }
 
     public function updatePassword(Request $request)
