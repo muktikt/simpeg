@@ -4,13 +4,18 @@
 
 @section('content')
 <div class="page-head">
-    <div class="breadcrumb">Home / Pendapatan Saya / Lembur</div>
-    <h1>Rincian Lembur</h1>
+    @if(session('simpeg_user.userlevel') === '5' || request('my'))
+        <div class="breadcrumb">Home / Pendapatan Saya / Lembur</div>
+        <h1>Rincian Lembur</h1>
+    @else
+        <div class="breadcrumb">Home / Laporan Penggajian / Lap. Lembur</div>
+        <h1>Laporan Lembur</h1>
+    @endif
 </div>
 
 @include('gaji-laporan.partials.filter-toolbar')
 
-@if (session('simpeg_user.userlevel') === '5')
+@if (session('simpeg_user.userlevel') === '5' || request('my'))
     @php
         $bulanNama = \App\Http\Controllers\AbsensiController::BULAN[$bulan] ?? 'Bulan Ini';
     @endphp

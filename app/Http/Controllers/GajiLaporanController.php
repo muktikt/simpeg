@@ -68,7 +68,7 @@ class GajiLaporanController extends Controller
 
         $riwayatLembur = [];
 
-        if ($userLogin['userlevel'] === '5') {
+        if ($userLogin['userlevel'] === '5' || $request->has('my')) {
             $data = $data->where('nik', $userLogin['nik']);
 
             // Ambill semua riwayat lembur milik pegawai ini
@@ -99,7 +99,7 @@ class GajiLaporanController extends Controller
         $data = $this->gajiTerbit($bulan, $tahun);
         $riwayatGaji = [];
 
-        if ($userLogin['userlevel'] === '5') {
+        if ($userLogin['userlevel'] === '5' || $request->has('my')) {
             $data = $data->where('nik', $userLogin['nik']);
 
             // Ambill 3-6 bulan riwayat terbit milik pegawai ini

@@ -160,7 +160,7 @@ class ThrController extends Controller
         $data = $this->thrTerbit($tahun);
         $riwayatThr = [];
 
-        if ($userLogin['userlevel'] === '5') {
+        if ($userLogin['userlevel'] === '5' || $request->has('my')) {
             $data = $data->where('nik', $userLogin['nik']);
 
             $riwayatThr = collect($this->all())

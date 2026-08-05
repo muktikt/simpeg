@@ -1,5 +1,6 @@
 <div class="toolbar">
     <form method="GET" action="{{ url()->current() }}" style="display:flex; gap:10px;">
+        @if(request('my'))<input type="hidden" name="my" value="1">@endif
         <select name="bulan" onchange="this.form.submit()" style="padding:9px 12px; border-radius:9px; border:1px solid var(--border); font-size:13px;">
             @foreach (\App\Http\Controllers\AbsensiController::BULAN as $val => $label)
                 <option value="{{ $val }}" @selected($bulan === $val)>{{ $label }}</option>

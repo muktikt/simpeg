@@ -63,7 +63,7 @@ class InsentifController extends Controller
         $data = $ctx['data'];
         $riwayatInsentif = [];
 
-        if ($userLogin['userlevel'] === '5') {
+        if ($userLogin['userlevel'] === '5' || $request->has('my')) {
             $data = $data->where('nik', $userLogin['nik']);
 
             // Buat data riwayat insentif dummy untuk pegawai login

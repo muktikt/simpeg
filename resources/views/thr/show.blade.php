@@ -71,7 +71,7 @@
 
 <div class="form-actions" style="max-width:100%;">
     @if ($thr['status'] !== 'terbit' && $thr['bisa_approve'])
-        <form action="{{ route('thr.terbitkan', $thr['id']) }}" method="POST" onsubmit="return confirm('Setujui THR ini ke tahap berikutnya?');">
+        <form action="{{ route('thr.terbitkan', $thr['id']) }}" method="POST" onsubmit="return confirmSubmit(event, 'Setujui THR ini ke tahap berikutnya?', 'Konfirmasi Persetujuan', 'warning', 'Ya, Setujui');">
             @csrf
             <button type="submit" class="btn btn-primary">Setujui ke Tahap Berikutnya</button>
         </form>

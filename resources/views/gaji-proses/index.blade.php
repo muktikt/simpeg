@@ -63,12 +63,12 @@
                             <a href="{{ route('gaji-proses.show', $g['id']) }}" class="btn btn-outline btn-sm">Lihat</a>
                             @if ($g['status'] !== 'terbit')
                                 @if ($g['bisa_approve'])
-                                    <form action="{{ route('gaji-proses.terbitkan', $g['id']) }}" method="POST" onsubmit="return confirm('Setujui gaji ini ke tahap berikutnya?');" style="margin:0;">
+                                    <form action="{{ route('gaji-proses.terbitkan', $g['id']) }}" method="POST" onsubmit="return confirmSubmit(event, 'Setujui gaji ini ke tahap berikutnya?', 'Konfirmasi Persetujuan', 'warning', 'Ya, Setujui');" style="margin:0;">
                                         @csrf
                                         <button type="submit" class="btn btn-primary btn-sm">Setujui</button>
                                     </form>
                                 @endif
-                                <form action="{{ route('gaji-proses.destroy', $g['id']) }}" method="POST" onsubmit="return confirm('Hapus draft ini?');" style="margin:0;">
+                                <form action="{{ route('gaji-proses.destroy', $g['id']) }}" method="POST" onsubmit="return confirmSubmit(event, 'Hapus draft ini?', 'Konfirmasi Hapus', 'danger', 'Ya, Hapus');" style="margin:0;">
                                     @csrf
                                     @method('DELETE')
                                     <button type="submit" class="btn btn-danger btn-sm">Hapus</button>

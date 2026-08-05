@@ -60,7 +60,7 @@
 
 <div class="form-actions" style="max-width:100%;">
     @if ($gaji['status'] !== 'terbit' && $gaji['bisa_approve'])
-        <form action="{{ route('gaji-proses.terbitkan', $gaji['id']) }}" method="POST" onsubmit="return confirm('Setujui gaji ini ke tahap berikutnya?');">
+        <form action="{{ route('gaji-proses.terbitkan', $gaji['id']) }}" method="POST" onsubmit="return confirmSubmit(event, 'Setujui gaji ini ke tahap berikutnya?', 'Konfirmasi Persetujuan', 'warning', 'Ya, Setujui');">
             @csrf
             <button type="submit" class="btn btn-primary">Setujui ke Tahap Berikutnya</button>
         </form>

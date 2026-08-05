@@ -62,13 +62,13 @@
                             <a href="{{ route('thr.show', $t['id']) }}" class="btn btn-outline btn-sm">Lihat</a>
                             @if ($t['status'] !== 'terbit')
                                 @if ($t['bisa_approve'])
-                                    <form action="{{ route('thr.terbitkan', $t['id']) }}" method="POST" onsubmit="return confirm('Setujui THR ini ke tahap berikutnya?');" style="margin:0;">
+                                    <form action="{{ route('thr.terbitkan', $t['id']) }}" method="POST" onsubmit="return confirmSubmit(event, 'Setujui THR ini ke tahap berikutnya?', 'Konfirmasi Persetujuan', 'warning', 'Ya, Setujui');" style="margin:0;">
                                         @csrf
                                         <button type="submit" class="btn btn-primary btn-sm">Setujui</button>
                                     </form>
                                 @endif
                                 @if ($bisaKelola)
-                                    <form action="{{ route('thr.destroy', $t['id']) }}" method="POST" onsubmit="return confirm('Hapus draft THR ini?');" style="margin:0;">
+                                    <form action="{{ route('thr.destroy', $t['id']) }}" method="POST" onsubmit="return confirmSubmit(event, 'Hapus draft THR ini?', 'Konfirmasi Hapus', 'danger', 'Ya, Hapus');" style="margin:0;">
                                         @csrf
                                         @method('DELETE')
                                         <button type="submit" class="btn btn-danger btn-sm">Hapus</button>

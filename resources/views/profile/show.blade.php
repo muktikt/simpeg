@@ -94,10 +94,120 @@
         </div>
     @elseif ($type === 'dok_surat')
         <div class="tab-panel {{ $type === $defaultTab ? 'active' : '' }}" data-panel="dok_surat">
+            <style>
+            .doc-card {
+                border: 1px solid #E2E8F0;
+                border-radius: 16px;
+                padding: 20px;
+                background: #ffffff;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+                transition: all 0.2s ease;
+                display: flex;
+                flex-direction: column;
+                justify-content: space-between;
+            }
+            .doc-card:hover {
+                border-color: #CBD5E1;
+                box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+                transform: translateY(-2px);
+            }
+            .doc-card-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 14px;
+            }
+            .doc-badge {
+                font-size: 12px;
+                font-weight: 600;
+                padding: 5px 12px;
+                border-radius: 20px;
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+            }
+            .doc-badge-sk {
+                background: #ECFDF5;
+                color: #047857;
+                border: 1px solid #A7F3D0;
+            }
+            .doc-badge-diklat {
+                background: #F5F3FF;
+                color: #6D28D9;
+                border: 1px solid #DDD6FE;
+            }
+            .doc-date {
+                font-size: 12px;
+                color: #64748B;
+                display: flex;
+                align-items: center;
+                gap: 5px;
+            }
+            .doc-card-title {
+                font-family: 'Space Grotesk', sans-serif;
+                font-size: 16px;
+                font-weight: 700;
+                color: #0F2A3D;
+                margin-bottom: 6px;
+                line-height: 1.4;
+            }
+            .doc-card-sub {
+                font-size: 13px;
+                color: #64748B;
+                margin-bottom: 20px;
+            }
+            .doc-card-actions {
+                display: flex;
+                gap: 10px;
+                align-items: center;
+            }
+            .btn-doc-view {
+                padding: 9px 16px;
+                background: #F8FAFC;
+                color: #334155;
+                border: 1px solid #CBD5E1;
+                border-radius: 10px;
+                font-family: 'Inter', sans-serif;
+                font-size: 13px;
+                font-weight: 600;
+                cursor: pointer;
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                transition: all 0.2s ease;
+            }
+            .btn-doc-view:hover {
+                background: #F1F5F9;
+                border-color: #94A3B8;
+                color: #0F172A;
+            }
+            .btn-doc-download {
+                padding: 9px 18px;
+                background: #0284C7;
+                color: #ffffff;
+                border: none;
+                border-radius: 10px;
+                font-family: 'Inter', sans-serif;
+                font-size: 13px;
+                font-weight: 600;
+                text-decoration: none;
+                cursor: pointer;
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                transition: all 0.2s ease;
+                box-shadow: 0 2px 8px rgba(2, 132, 199, 0.25);
+            }
+            .btn-doc-download:hover {
+                background: #0369A1;
+                box-shadow: 0 4px 12px rgba(2, 132, 199, 0.35);
+                color: #ffffff;
+            }
+            </style>
             <div class="ribbon-card" style="margin-top:8px;">
-                <div class="ribbon-head" style="margin-bottom:16px;">
+                <div class="ribbon-head" style="margin-bottom:20px;">
                     <div>
-                        <h2 style="font-size:17px;">Dokumen Resmi Pegawai (SDM)</h2>
+                        <h2 style="font-size:18px; color:#0F2A3D;">Dokumen Resmi Pegawai (SDM)</h2>
                         <p style="font-size:13px; color:var(--text-muted); margin-top:4px;">Surat Kerja & Surat Diklat resmi yang diterbitkan dan diunggah oleh SDM.</p>
                     </div>
                     @if (session('simpeg_user.userlevel') === '1')
@@ -105,34 +215,62 @@
                     @endif
                 </div>
 
-                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap:20px;">
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap:20px;">
                     <!-- Card 1: Surat Kerja -->
-                    <div style="border:1px solid #e2e8f0; border-radius:8px; padding:16px; background:#fff;">
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-                            <span class="badge badge-PT" style="font-size:12px;">Surat Kerja (SK)</span>
-                            <span style="font-size:12px; color:var(--text-muted);">{{ $pegawai['surat_kerja']['tgl_terbit'] ?? '-' }}</span>
+                    <div class="doc-card">
+                        <div>
+                            <div class="doc-card-header">
+                                <span class="doc-badge doc-badge-sk">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                                    Surat Kerja (SK)
+                                </span>
+                                <span class="doc-date">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                                    {{ $pegawai['surat_kerja']['tgl_terbit'] ?? '-' }}
+                                </span>
+                            </div>
+                            <h3 class="doc-card-title">{{ $pegawai['surat_kerja']['judul'] ?? 'Surat Kerja / SK Pegawai' }}</h3>
+                            <p class="doc-card-sub">No: {{ $pegawai['surat_kerja']['nomor'] ?? '-' }}</p>
                         </div>
-                        <h3 style="font-size:15px; font-weight:600; margin-bottom:6px;">{{ $pegawai['surat_kerja']['judul'] ?? 'Surat Kerja / SK Pegawai' }}</h3>
-                        <p style="font-size:13px; color:var(--text-muted); margin-bottom:14px;">No: {{ $pegawai['surat_kerja']['nomor'] ?? '-' }}</p>
                         
-                        <div style="display:flex; gap:8px;">
-                            <button type="button" class="btn-action btn-edit" style="padding:6px 12px;" onclick="viewFileModal('{{ $pegawai['surat_kerja']['judul'] ?? 'Surat Kerja' }}', '{{ $pegawai['surat_kerja']['file_name'] ?? 'SK.pdf' }}')">📄 View File</button>
-                            <a href="#" class="btn-action" style="padding:6px 12px; background:#f1f5f9; color:#475569; text-decoration:none;" onclick="alert('Mengunduh file {{ $pegawai['surat_kerja']['file_name'] ?? 'SK.pdf' }}'); return false;">⬇ Download</a>
+                        <div class="doc-card-actions">
+                            <button type="button" class="btn-doc-view" onclick="viewFileModal('{{ $pegawai['surat_kerja']['judul'] ?? 'Surat Kerja' }}', '{{ $pegawai['surat_kerja']['file_name'] ?? 'SK.pdf' }}')">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                View File
+                            </button>
+                            <a href="#" class="btn-doc-download" onclick="showCustomAlert('Mengunduh file {{ $pegawai['surat_kerja']['file_name'] ?? 'SK.pdf' }}', 'Mengunduh File', 'download'); return false;">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                                Download
+                            </a>
                         </div>
                     </div>
 
                     <!-- Card 2: Surat Diklat -->
-                    <div style="border:1px solid #e2e8f0; border-radius:8px; padding:16px; background:#fff;">
-                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-                            <span class="badge badge-DI" style="font-size:12px;">Surat Diklat / Pelatihan</span>
-                            <span style="font-size:12px; color:var(--text-muted);">{{ $pegawai['surat_diklat']['tgl_terbit'] ?? '-' }}</span>
+                    <div class="doc-card">
+                        <div>
+                            <div class="doc-card-header">
+                                <span class="doc-badge doc-badge-diklat">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
+                                    Surat Diklat / Pelatihan
+                                </span>
+                                <span class="doc-date">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                                    {{ $pegawai['surat_diklat']['tgl_terbit'] ?? '-' }}
+                                </span>
+                            </div>
+                            <h3 class="doc-card-title">{{ $pegawai['surat_diklat']['judul'] ?? 'Sertifikat Diklat & Pelatihan' }}</h3>
+                            <p class="doc-card-sub">No: {{ $pegawai['surat_diklat']['nomor'] ?? '-' }}</p>
                         </div>
-                        <h3 style="font-size:15px; font-weight:600; margin-bottom:6px;">{{ $pegawai['surat_diklat']['judul'] ?? 'Sertifikat Diklat & Pelatihan' }}</h3>
-                        <p style="font-size:13px; color:var(--text-muted); margin-bottom:14px;">No: {{ $pegawai['surat_diklat']['nomor'] ?? '-' }}</p>
                         
-                        <div style="display:flex; gap:8px;">
-                            <button type="button" class="btn-action btn-edit" style="padding:6px 12px;" onclick="viewFileModal('{{ $pegawai['surat_diklat']['judul'] ?? 'Surat Diklat' }}', '{{ $pegawai['surat_diklat']['file_name'] ?? 'Diklat.pdf' }}')">📄 View File</button>
-                            <a href="#" class="btn-action" style="padding:6px 12px; background:#f1f5f9; color:#475569; text-decoration:none;" onclick="alert('Mengunduh file {{ $pegawai['surat_diklat']['file_name'] ?? 'Diklat.pdf' }}'); return false;">⬇ Download</a>
+                        <div class="doc-card-actions">
+                            <button type="button" class="btn-doc-view" onclick="viewFileModal('{{ $pegawai['surat_diklat']['judul'] ?? 'Surat Diklat' }}', '{{ $pegawai['surat_diklat']['file_name'] ?? 'Diklat.pdf' }}')">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                View File
+                            </button>
+                            <a href="#" class="btn-doc-download" onclick="showCustomAlert('Mengunduh file {{ $pegawai['surat_diklat']['file_name'] ?? 'Diklat.pdf' }}', 'Mengunduh File', 'download'); return false;">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                                Download
+                            </a>
                         </div>
                     </div>
                 </div>

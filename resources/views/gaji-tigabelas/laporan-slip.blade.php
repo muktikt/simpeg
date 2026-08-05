@@ -4,12 +4,18 @@
 
 @section('content')
 <div class="page-head">
-    <div class="breadcrumb">Home / Pendapatan Saya / Tunjangan Pendidikan</div>
-    <h1>Tunjangan Pendidikan</h1>
+    @if(session('simpeg_user.userlevel') === '5' || request('my'))
+        <div class="breadcrumb">Home / Pendapatan Saya / Tunjangan Pendidikan</div>
+        <h1>Tunjangan Pendidikan</h1>
+    @else
+        <div class="breadcrumb">Home / Laporan Tunj. Pendidikan / Cetak Slip Tunj. Pendidikan</div>
+        <h1>Cetak Slip Tunjangan Pendidikan</h1>
+    @endif
 </div>
 
 <div class="toolbar">
     <form method="GET" action="{{ route('gaji-tigabelas.laporan-slip') }}" style="display:flex; gap:10px;">
+        @if(request('my'))<input type="hidden" name="my" value="1">@endif
         <select name="tahun" onchange="this.form.submit()" style="padding:9px 12px; border-radius:9px; border:1px solid var(--border); font-size:13px;">
             @for ($y = now()->year; $y >= now()->year - 3; $y--)
                 <option value="{{ $y }}" @selected($tahun === $y)>{{ $y }}</option>
@@ -18,7 +24,7 @@
     </form>
 </div>
 
-@if (session('simpeg_user.userlevel') === '5')
+@if (session('simpeg_user.userlevel') === '5' || request('my'))
     @php
         $item = $data->first();
         $totalNominal = $item ? ($item['gaji13_diterima'] ?? 2218400) : 2218400;

@@ -64,7 +64,7 @@
                         <td>
                             <div class="row-actions">
                                 <a href="{{ route('absensi.edit', $a['id']) }}" class="btn btn-outline btn-sm">Edit</a>
-                                <form action="{{ route('absensi.destroy', $a['id']) }}" method="POST" onsubmit="return confirm('Hapus data absensi ini?');" style="margin:0;">
+                                <form action="{{ route('absensi.destroy', $a['id']) }}" method="POST" onsubmit="return confirmSubmit(event, 'Hapus data absensi ini?', 'Konfirmasi Hapus', 'danger', 'Ya, Hapus');" style="margin:0;">
                                     @csrf
                                     @method('DELETE')
                                     <button type="submit" class="btn btn-danger btn-sm">Hapus</button>

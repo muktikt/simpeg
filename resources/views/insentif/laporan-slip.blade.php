@@ -4,12 +4,18 @@
 
 @section('content')
 <div class="page-head">
-    <div class="breadcrumb">Home / Pendapatan Saya / Insentif</div>
-    <h1>Insentif Pegawai</h1>
+    @if(session('simpeg_user.userlevel') === '5' || request('my'))
+        <div class="breadcrumb">Home / Pendapatan Saya / Insentif</div>
+        <h1>Insentif Pegawai</h1>
+    @else
+        <div class="breadcrumb">Home / Laporan Insentif / Cetak Slip Insentif</div>
+        <h1>Cetak Slip Insentif</h1>
+    @endif
 </div>
 
 <div class="toolbar">
     <form method="GET" action="{{ route('insentif.laporan-slip') }}" style="display:flex; gap:10px; flex-wrap:wrap;">
+        @if(request('my'))<input type="hidden" name="my" value="1">@endif
         <select name="sumber" onchange="this.form.submit()" style="padding:9px 12px; border-radius:9px; border:1px solid var(--border); font-size:13px;">
             <option value="gaji13" @selected($sumber === 'gaji13')>Dari Gaji 13</option>
             <option value="gaji_bulanan" @selected($sumber === 'gaji_bulanan')>Dari Gaji Bulanan (Permen)</option>
@@ -29,7 +35,7 @@
     </form>
 </div>
 
-@if (session('simpeg_user.userlevel') === '5')
+@if (session('simpeg_user.userlevel') === '5' || request('my'))
     @php
         $item = $data->first();
         $insentifNominal = $item ? ($item[$nominalKey] ?? 750000) : 750000;

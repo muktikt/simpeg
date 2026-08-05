@@ -154,44 +154,165 @@
     </div>
 </div>
 
-<!-- Custom Logout Modal -->
-<div id="logout-modal" class="modal-overlay">
+<!-- Global Custom Modal -->
+<div id="global-custom-modal" class="modal-overlay">
     <div class="modal-card">
-        <div class="modal-icon">
+        <div id="global-modal-icon" class="modal-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24">
                 <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
                 <polyline points="16 17 21 12 16 7"></polyline>
                 <line x1="21" y1="12" x2="9" y2="12"></line>
             </svg>
         </div>
-        <h3 class="modal-title">Keluar Aplikasi</h3>
-        <p class="modal-text">Apakah Anda yakin ingin mengakhiri sesi ini dan keluar dari sistem SIMPEG?</p>
-        <div class="modal-actions">
-            <button type="button" class="btn-cancel" onclick="closeLogoutModal()">Batal</button>
-            <button type="button" class="btn-confirm" onclick="submitLogout()">Ya, Keluar</button>
+        <h3 id="global-modal-title" class="modal-title">Konfirmasi</h3>
+        <p id="global-modal-text" class="modal-text">Apakah Anda yakin?</p>
+        <div id="global-modal-actions" class="modal-actions">
+            <button type="button" id="global-modal-cancel" class="btn-cancel" onclick="closeCustomModal()">Batal</button>
+            <button type="button" id="global-modal-confirm" class="btn-confirm">Ya, Lanjutkan</button>
         </div>
     </div>
 </div>
 
 <script>
-function openLogoutModal() {
-    const modal = document.getElementById('logout-modal');
+let customModalConfirmCallback = null;
+
+function showCustomModal({ title, text, type = 'warning', confirmText = 'Ya, Lanjutkan', cancelText = 'Batal', showCancel = true, onConfirm = null }) {
+    const modal = document.getElementById('global-custom-modal');
+    const iconContainer = document.getElementById('global-modal-icon');
+    const titleEl = document.getElementById('global-modal-title');
+    const textEl = document.getElementById('global-modal-text');
+    const cancelBtn = document.getElementById('global-modal-cancel');
+    const confirmBtn = document.getElementById('global-modal-confirm');
+
+    titleEl.textContent = title || 'Informasi';
+    textEl.textContent = text || '';
+
+    // Style icon container
+    iconContainer.className = 'modal-icon';
+    let iconSvg = '';
+
+    if (type === 'download' || type === 'info') {
+        iconContainer.style.background = '#E0F2FE';
+        iconContainer.style.color = '#0284C7';
+        iconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+        </svg>`;
+    } else if (type === 'danger' || type === 'delete') {
+        iconContainer.style.background = '#FEE2E2';
+        iconContainer.style.color = '#DC2626';
+        iconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24">
+            <polyline points="3 6 5 6 21 6"></polyline>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            <line x1="10" y1="11" x2="10" y2="17"></line>
+            <line x1="14" y1="11" x2="14" y2="17"></line>
+        </svg>`;
+    } else if (type === 'logout') {
+        iconContainer.style.background = '#FEE2E2';
+        iconContainer.style.color = '#DC2626';
+        iconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+            <polyline points="16 17 21 12 16 7"></polyline>
+            <line x1="21" y1="12" x2="9" y2="12"></line>
+        </svg>`;
+    } else if (type === 'success') {
+        iconContainer.style.background = '#DCFCE7';
+        iconContainer.style.color = '#16A34A';
+        iconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+            <polyline points="22 4 12 14.01 9 11.01"></polyline>
+        </svg>`;
+    } else { // warning / default
+        iconContainer.style.background = '#FEF3C7';
+        iconContainer.style.color = '#D97706';
+        iconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+            <line x1="12" y1="9" x2="12" y2="13"></line>
+            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+        </svg>`;
+    }
+
+    iconContainer.innerHTML = iconSvg;
+
+    if (showCancel) {
+        cancelBtn.style.display = 'block';
+        cancelBtn.textContent = cancelText;
+    } else {
+        cancelBtn.style.display = 'none';
+    }
+
+    confirmBtn.textContent = confirmText;
+    if (type === 'danger' || type === 'delete' || type === 'logout') {
+        confirmBtn.style.background = '#D85A30';
+    } else if (type === 'download' || type === 'info') {
+        confirmBtn.style.background = '#0284C7';
+    } else {
+        confirmBtn.style.background = '#D85A30';
+    }
+
+    customModalConfirmCallback = onConfirm;
     modal.classList.add('active');
 }
 
-function closeLogoutModal() {
-    const modal = document.getElementById('logout-modal');
-    modal.classList.remove('active');
+function closeCustomModal() {
+    const modal = document.getElementById('global-custom-modal');
+    if (modal) modal.classList.remove('active');
+    customModalConfirmCallback = null;
 }
 
-function submitLogout() {
-    document.getElementById('logout-form').submit();
+function openLogoutModal() {
+    showCustomModal({
+        title: 'Keluar Aplikasi',
+        text: 'Apakah Anda yakin ingin mengakhiri sesi ini dan keluar dari sistem SIMPEG?',
+        type: 'logout',
+        confirmText: 'Ya, Keluar',
+        cancelText: 'Batal',
+        showCancel: true,
+        onConfirm: () => {
+            document.getElementById('logout-form').submit();
+        }
+    });
 }
 
-// Close modal when clicking outside the card
-document.getElementById('logout-modal').addEventListener('click', function(event) {
+function confirmSubmit(event, message, title = 'Konfirmasi', type = 'warning', confirmText = 'Ya, Lanjutkan') {
+    event.preventDefault();
+    const form = event.target.closest('form') || event.target;
+    showCustomModal({
+        title: title,
+        text: message,
+        type: type,
+        confirmText: confirmText,
+        cancelText: 'Batal',
+        showCancel: true,
+        onConfirm: () => {
+            form.submit();
+        }
+    });
+    return false;
+}
+
+function showCustomAlert(message, title = 'Informasi', type = 'info') {
+    showCustomModal({
+        title: title,
+        text: message,
+        type: type,
+        confirmText: 'OK',
+        showCancel: false
+    });
+}
+
+document.getElementById('global-modal-confirm').addEventListener('click', function() {
+    const callback = customModalConfirmCallback;
+    closeCustomModal();
+    if (typeof callback === 'function') {
+        callback();
+    }
+});
+
+document.getElementById('global-custom-modal').addEventListener('click', function(event) {
     if (event.target === this) {
-        closeLogoutModal();
+        closeCustomModal();
     }
 });
 </script>

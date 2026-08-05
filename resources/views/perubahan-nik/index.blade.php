@@ -13,7 +13,7 @@
 </p>
 
 <div class="form-card">
-    <form method="POST" action="{{ route('perubahan-nik.update') }}" onsubmit="return confirm('Yakin mau ganti NIK pegawai ini? Perubahan akan diterapkan ke semua riwayat terkait.');">
+    <form method="POST" action="{{ route('perubahan-nik.update') }}" onsubmit="return confirmSubmit(event, 'Yakin mau ganti NIK pegawai ini? Perubahan akan diterapkan ke semua riwayat terkait.', 'Ubah NIK Pegawai', 'warning', 'Ya, Ubah');">
         @csrf
         <div class="form-grid">
             <div class="form-group span-2">

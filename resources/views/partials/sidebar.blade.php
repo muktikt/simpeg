@@ -13,33 +13,38 @@
     ];
 
     $slugify = fn ($label) => \Illuminate\Support\Str::slug($label);
-
     $canSee = fn ($group) => empty($group['roles']) || in_array($myRole, $group['roles'], true);
 @endphp
 
 <aside class="sidebar">
     <div class="sidebar-brand">
-        <div class="brand-mark">SP</div>
+        <div class="brand-mark" style="background:#ffffff; border-radius:10px; width:38px; height:38px; padding:3px; display:flex; align-items:center; justify-content:center; overflow:hidden; flex-shrink:0;">
+            <img src="{{ asset('logo-pdam.png') }}" alt="Logo PDAM" style="width:100%; height:100%; object-fit:contain;">
+        </div>
         <div>
             <div class="brand-text-name">SIMPEG</div>
-            <div class="brand-text-sub">v2.0</div>
+            <div class="brand-text-sub">PDAM Tirta Daya</div>
         </div>
     </div>
     <nav class="nav-scroll">
 
         @foreach ($menu['single'] as $item)
             @continue(! $canSee($item))
-            <a href="{{ $item['route_name'] ? route($item['route_name']) : route('placeholder', $slugify($item['label'])) }}"
-               class="nav-link {{ request()->routeIs($item['route_name']) ? 'active' : '' }}">
+            @php
+                $href = $item['route_name'] ? route($item['route_name']) : route('placeholder', $slugify($item['label']));
+                if (!empty($item['personal'])) $href .= (str_contains($href, '?') ? '&' : '?') . 'my=1';
+            @endphp
+            <a href="{{ $href }}"
+               class="nav-link {{ request()->routeIs($item['route_name']) && (!empty($item['personal']) ? request('my') : true) ? 'active' : '' }}">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">{!! $icons[$item['icon']] !!}</svg>
                 {{ $item['label'] }}
             </a>
         @endforeach
 
-        @foreach ($menu['groups'] as $group)
+        @foreach ($menu['groups'] as $groupIdx => $group)
             @continue(! $canSee($group))
-            <div class="nav-group">
-                <button class="nav-group-btn" onclick="toggleGroup(this)">
+            <div class="nav-group" data-group-id="grp-{{ $groupIdx }}">
+                <button type="button" class="nav-group-btn" onclick="toggleGroup(this)">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="16" height="16">{!! $icons[$group['icon']] !!}</svg>
                     {{ $group['label'] }}
                     <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
@@ -57,3 +62,53 @@
 
     </nav>
 </aside>
+
+<script>
+// Sidebar dropdown persistence + scroll position restore
+(function() {
+    var KEY = 'simpeg_sidebar_open';
+    var SCROLL_KEY = 'simpeg_sidebar_scroll';
+
+    function getOpenIds() {
+        try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch(e) { return []; }
+    }
+
+    function saveOpenIds() {
+        var ids = [];
+        document.querySelectorAll('.nav-group.open').forEach(function(g) {
+            if (g.dataset.groupId) ids.push(g.dataset.groupId);
+        });
+        try { localStorage.setItem(KEY, JSON.stringify(ids)); } catch(e) {}
+    }
+
+    // Restore saved open states
+    var openIds = getOpenIds();
+    document.querySelectorAll('.nav-group[data-group-id]').forEach(function(g) {
+        if (openIds.indexOf(g.dataset.groupId) !== -1) {
+            g.classList.add('open');
+        }
+    });
+
+    // Restore sidebar scroll position
+    var navScroll = document.querySelector('.nav-scroll');
+    if (navScroll) {
+        try {
+            var savedScroll = parseInt(localStorage.getItem(SCROLL_KEY) || '0', 10);
+            if (savedScroll > 0) navScroll.scrollTop = savedScroll;
+        } catch(e) {}
+
+        // Save scroll position before navigating away
+        window.addEventListener('beforeunload', function() {
+            try { localStorage.setItem(SCROLL_KEY, navScroll.scrollTop); } catch(e) {}
+        });
+    }
+
+    // Toggle + persist
+    window.toggleGroup = function(btn) {
+        var group = btn.closest('.nav-group');
+        if (!group) return;
+        group.classList.toggle('open');
+        saveOpenIds();
+    };
+})();
+</script>

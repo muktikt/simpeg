@@ -35,7 +35,7 @@
                     <td>
                         <div class="row-actions">
                             <a href="{{ route('user-akses.edit', $u['id']) }}" class="btn btn-outline btn-sm">Edit</a>
-                            <form action="{{ route('user-akses.destroy', $u['id']) }}" method="POST" onsubmit="return confirm('Hapus akun ini? Pengguna tidak akan bisa login lagi.');" style="margin:0;">
+                            <form action="{{ route('user-akses.destroy', $u['id']) }}" method="POST" onsubmit="return confirmSubmit(event, 'Hapus akun ini? Pengguna tidak akan bisa login lagi.', 'Hapus Akun', 'danger', 'Ya, Hapus');" style="margin:0;">
                                 @csrf
                                 @method('DELETE')
                                 <button type="submit" class="btn btn-danger btn-sm">Hapus</button>

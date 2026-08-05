@@ -163,7 +163,7 @@ class GajiTigabelasController extends Controller
         $data = $this->gaji13Terbit($tahun);
         $rincianAnak = [];
 
-        if ($userLogin['userlevel'] === '5') {
+        if ($userLogin['userlevel'] === '5' || $request->has('my')) {
             $data = $data->where('nik', $userLogin['nik']);
 
             // Sample data rincian anak untuk tunjangan pendidikan (Sesuai Gambar 2)

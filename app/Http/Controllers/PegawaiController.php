@@ -99,7 +99,28 @@ class PegawaiController extends Controller
 
     protected function find(int $id): ?array
     {
-        return collect($this->all())->firstWhere('id', $id);
+        $pegawai = collect($this->all())->firstWhere('id', $id);
+        if ($pegawai) {
+            if (! isset($pegawai['surat_kerja'])) {
+                $pegawai['surat_kerja'] = [
+                    'nomor' => 'SK/SDM/2024/001',
+                    'judul' => 'Surat Keputusan Pengangkatan Pegawai Tetap',
+                    'tgl_terbit' => '2024-01-15',
+                    'file_name' => 'SK_Pengangkatan_Pegawai.pdf',
+                    'file_url' => '#',
+                ];
+            }
+            if (! isset($pegawai['surat_diklat'])) {
+                $pegawai['surat_diklat'] = [
+                    'nomor' => 'STP/SDM/2024/088',
+                    'judul' => 'Sertifikat Diklat & Pelatihan Manajemen Kepegawaian',
+                    'tgl_terbit' => '2024-05-20',
+                    'file_name' => 'Sertifikat_Diklat_SDM.pdf',
+                    'file_url' => '#',
+                ];
+            }
+        }
+        return $pegawai;
     }
 
     public function index(Request $request)

@@ -4,14 +4,19 @@
 
 @section('content')
 <div class="page-head">
-    <div class="breadcrumb">Home / Pendapatan Saya / Slip Gaji</div>
-    <h1>Slip Gaji (Payroll)</h1>
+    @if(session('simpeg_user.userlevel') === '5' || request('my'))
+        <div class="breadcrumb">Home / Pendapatan Saya / Slip Gaji</div>
+        <h1>Slip Gaji (Payroll)</h1>
+    @else
+        <div class="breadcrumb">Home / Laporan Penggajian / Lap. Slip Gaji</div>
+        <h1>Laporan Slip Gaji</h1>
+    @endif
 </div>
 
 <!-- Toolbar Filter Bulan & Tahun (Tetap Ada untuk Lihat Periode Sebelum/Sesudahnya) -->
 @include('gaji-laporan.partials.filter-toolbar')
 
-@if (session('simpeg_user.userlevel') === '5')
+@if (session('simpeg_user.userlevel') === '5' || request('my'))
     @php
         $item = $data->first();
         $bulanNama = \App\Http\Controllers\AbsensiController::BULAN[$bulan] ?? 'Bulan Ini';
