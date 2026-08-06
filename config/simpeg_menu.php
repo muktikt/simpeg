@@ -89,7 +89,38 @@ return [
             'roles' => ['1', '2', '7'],
             'items' => [
                 ['label' => 'Data Pegawai All', 'route_name' => 'pegawai.index'],
-                ['label' => 'Data Per Unit Kerja', 'route_name' => null],
+                ['label' => 'Data Per Unit Kerja', 'route_name' => 'pegawai.per-unit-kerja'],
+            ],
+        ],
+        [
+            'label' => 'Set Potongan',
+            'icon' => 'wrench',
+            'roles' => ['2'],
+            'items' => [
+                ['label' => 'Potongan Gaji', 'route_name' => 'potongan-keu.index', 'params' => ['tipe' => 'gaji']],
+                ['label' => 'Potongan THR', 'route_name' => 'potongan-keu.index', 'params' => ['tipe' => 'thr']],
+                ['label' => 'Potongan Gaji 13', 'route_name' => 'potongan-keu.index', 'params' => ['tipe' => 'gaji13']],
+                ['label' => 'Cek NIK Bulan Lalu', 'route_name' => 'cek-nik.bulan-lalu'],
+                ['label' => 'Cek NIK Bulan Ini', 'route_name' => 'cek-nik.bulan-ini'],
+                ['label' => 'Hapus Kesalahan NIK', 'route_name' => 'cek-nik.hapus'],
+            ],
+        ],
+        [
+            'label' => 'SET Rekening BJB',
+            'icon' => 'shield',
+            'roles' => ['2'],
+            'items' => [
+                ['label' => 'SET Rekening BJB', 'route_name' => 'rekening-bjb.index'],
+            ],
+        ],
+        [
+            'label' => 'Proses Terbit Potongan',
+            'icon' => 'wrench',
+            'roles' => ['2'],
+            'items' => [
+                ['label' => 'Potongan Gaji', 'route_name' => 'potongan-keu.index', 'params' => ['tipe' => 'gaji']],
+                ['label' => 'Potongan THR', 'route_name' => 'potongan-keu.index', 'params' => ['tipe' => 'thr']],
+                ['label' => 'Potongan Gaji 13', 'route_name' => 'potongan-keu.index', 'params' => ['tipe' => 'gaji13']],
             ],
         ],
         [
@@ -97,6 +128,10 @@ return [
             'icon' => 'report',
             'roles' => ['1', '2', '7'],
             'items' => [
+                ['label' => 'Lap. Potongan Keu', 'route_name' => 'laporan-potongan.potongan-keu', 'roles' => ['2']],
+                ['label' => 'Lap. Potongan Keu Minus', 'route_name' => 'laporan-potongan.potongan-keu-minus', 'roles' => ['2']],
+                ['label' => 'Lap. Potongan Keu Non-Minus', 'route_name' => 'laporan-potongan.potongan-keu-non-minus', 'roles' => ['2']],
+                ['label' => 'Lap. Potongan BPJS', 'route_name' => 'laporan-potongan.potongan-bpjs', 'roles' => ['2']],
                 ['label' => 'Lap. Absensi', 'route_name' => 'absensi.laporan', 'roles' => ['1', '2']],
                 ['label' => 'Lap. Prestasi', 'route_name' => 'prestasi.laporan', 'roles' => ['1', '2']],
                 ['label' => 'Lap. Lembur', 'route_name' => 'gaji-laporan.lembur', 'roles' => ['1', '2']],
@@ -115,9 +150,12 @@ return [
             'icon' => 'report',
             'roles' => ['1', '2', '7'],
             'items' => [
+                ['label' => 'Lap. Potongan Keu THR', 'route_name' => 'laporan-potongan.potongan-thr', 'roles' => ['2']],
                 ['label' => 'Cetak Slip THR', 'route_name' => 'thr.laporan-slip'],
                 ['label' => 'Lap. Buku Besar THR', 'route_name' => 'thr.laporan-buku-besar'],
                 ['label' => 'Lap. Buku Besar Per Sub', 'route_name' => 'thr.laporan-buku-besar-per-sub'],
+                ['label' => 'Lap. Payroll THR', 'route_name' => 'laporan-potongan.payroll-thr', 'roles' => ['2']],
+                ['label' => 'Lap. Pajak THR', 'route_name' => 'laporan-potongan.pajak-thr', 'roles' => ['2']],
             ],
         ],
         [
@@ -128,6 +166,8 @@ return [
                 ['label' => 'Cetak Slip Tunj. Pendidikan', 'route_name' => 'gaji-tigabelas.laporan-slip'],
                 ['label' => 'Lap. Buku Besar Tunj. Pendidikan', 'route_name' => 'gaji-tigabelas.laporan-buku-besar'],
                 ['label' => 'Lap. Buku Besar Per Sub', 'route_name' => 'gaji-tigabelas.laporan-buku-besar-per-sub'],
+                ['label' => 'Lap. Payroll Gaji 13', 'route_name' => 'laporan-potongan.payroll-gaji13', 'roles' => ['2']],
+                ['label' => 'Lap. Pajak Gaji 13', 'route_name' => 'laporan-potongan.pajak-gaji13', 'roles' => ['2']],
             ],
         ],
         [

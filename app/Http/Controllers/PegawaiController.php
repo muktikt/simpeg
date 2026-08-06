@@ -287,6 +287,43 @@ class PegawaiController extends Controller
         return view('pegawai.laporan-anak', compact('data'));
     }
 
+    /**
+     * Data Pegawai Per Unit Kerja — dropdown pilih unit kerja, tampilkan daftar pegawai.
+     * Disamakan dengan daftar_pegawai_unit_kerja.php di sistem lama.
+     */
+    public function perUnitKerja(Request $request)
+    {
+        $pegawai = collect($this->all());
+
+        // Ambil daftar unit kerja unik
+        $unitKerjaList = $pegawai->pluck('unit_kerja')->unique()->sort()->values();
+
+        $selected = $request->unit_kerja;
+        $filtered = collect();
+
+        if ($selected) {
+            $filtered = $pegawai->where('unit_kerja', $selected)
+                ->where('status_peg', '!=', 'PN')
+                ->map(function ($p) {
+                    $statusMap = ['CP' => 'Capeg', 'PH' => 'Honorer', 'PK' => 'Kontrak', 'DI' => 'Direksi', 'TK' => 'Tenaga Kontrak'];
+                    $p['status_label'] = $statusMap[$p['status_peg']] ?? 'Tetap';
+
+                    if (! empty($p['tgl_masuk'])) {
+                        $masuk = \Illuminate\Support\Carbon::parse($p['tgl_masuk']);
+                        $diff = $masuk->diff(now());
+                        $p['masa_kerja'] = $diff->y . ' Thn, ' . $diff->m . ' Bln';
+                    } else {
+                        $p['masa_kerja'] = '-';
+                    }
+                    return $p;
+                })
+                ->sortBy('jabatan')
+                ->values();
+        }
+
+        return view('pegawai.per-unit-kerja', compact('unitKerjaList', 'selected', 'filtered'));
+    }
+
     protected function validateData(Request $request, ?int $ignoreId = null): array
     {
         return $request->validate([

@@ -52,7 +52,11 @@
                 <div class="nav-group-items">
                     @foreach ($group['items'] as $item)
                         @continue(! $canSee($item))
-                        <a href="{{ $item['route_name'] ? route($item['route_name']) : route('placeholder', $slugify($item['label'])) }}">
+                        @php
+                            $params = $item['params'] ?? [];
+                            $href = $item['route_name'] ? route($item['route_name'], $params) : route('placeholder', $slugify($item['label']));
+                        @endphp
+                        <a href="{{ $href }}">
                             {{ $item['label'] }}
                         </a>
                     @endforeach

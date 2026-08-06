@@ -22,6 +22,10 @@ use App\Http\Controllers\DapenmaController;
 use App\Http\Controllers\ApprovalController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\GajiLaporanController;
+use App\Http\Controllers\PotonganKeuController;
+use App\Http\Controllers\RekeningBjbController;
+use App\Http\Controllers\CekNikController;
+use App\Http\Controllers\LaporanPotonganController;
 
 Route::get('/', [LoginController::class, 'showLoginForm'])->name('login');
 Route::post('/login', [LoginController::class, 'login'])->name('login.attempt');
@@ -40,6 +44,7 @@ Route::middleware(['simpeg.auth'])->group(function () {
         Route::middleware(['simpeg.auth:1,2,7'])->group(function () {
             Route::get('/', [PegawaiController::class, 'index'])->name('index');
             Route::get('/laporan-anak', [PegawaiController::class, 'laporanAnakDiatas21'])->name('laporan-anak');
+            Route::get('/per-unit-kerja', [PegawaiController::class, 'perUnitKerja'])->name('per-unit-kerja');
         });
 
         Route::get('/{id}', [PegawaiController::class, 'show'])->whereNumber('id')->name('show');
@@ -270,6 +275,57 @@ Route::middleware(['simpeg.auth'])->group(function () {
             Route::get('/tunj-perumahan', [GajiLaporanController::class, 'tunjPerumahan'])->name('tunj-perumahan');
         });
     });
+
+    // ══════════════════════════════════════════════════════════════
+    // MODUL KEUANGAN — Potongan, Rekening BJB, Cek NIK, Laporan
+    // Hak akses: Role 2 (Keuangan) — sesuai menu_incl_keu.php lama
+    // ══════════════════════════════════════════════════════════════
+
+    // Potongan Keuangan (Gaji / THR / Gaji 13) - CRUD + terbitkan + belum-masuk
+    Route::prefix('potongan-keu')->name('potongan-keu.')->middleware(['simpeg.auth:2'])->group(function () {
+        Route::get('/{tipe}', [PotonganKeuController::class, 'index'])->name('index')->where('tipe', 'gaji|thr|gaji13');
+        Route::get('/{tipe}/create', [PotonganKeuController::class, 'create'])->name('create')->where('tipe', 'gaji|thr|gaji13');
+        Route::post('/{tipe}', [PotonganKeuController::class, 'store'])->name('store')->where('tipe', 'gaji|thr|gaji13');
+        Route::get('/{tipe}/{id}/edit', [PotonganKeuController::class, 'edit'])->name('edit')->where('tipe', 'gaji|thr|gaji13')->whereNumber('id');
+        Route::put('/{tipe}/{id}', [PotonganKeuController::class, 'update'])->name('update')->where('tipe', 'gaji|thr|gaji13')->whereNumber('id');
+        Route::delete('/{tipe}/{id}', [PotonganKeuController::class, 'destroy'])->name('destroy')->where('tipe', 'gaji|thr|gaji13')->whereNumber('id');
+        Route::post('/{tipe}/terbitkan', [PotonganKeuController::class, 'terbitkan'])->name('terbitkan')->where('tipe', 'gaji|thr|gaji13');
+        Route::get('/{tipe}/belum-masuk', [PotonganKeuController::class, 'belumMasuk'])->name('belum-masuk')->where('tipe', 'gaji|thr|gaji13');
+    });
+
+    // Rekening BJB - CRUD
+    Route::prefix('rekening-bjb')->name('rekening-bjb.')->middleware(['simpeg.auth:2'])->group(function () {
+        Route::get('/', [RekeningBjbController::class, 'index'])->name('index');
+        Route::get('/create', [RekeningBjbController::class, 'create'])->name('create');
+        Route::post('/', [RekeningBjbController::class, 'store'])->name('store');
+        Route::get('/{id}/edit', [RekeningBjbController::class, 'edit'])->whereNumber('id')->name('edit');
+        Route::put('/{id}', [RekeningBjbController::class, 'update'])->whereNumber('id')->name('update');
+        Route::delete('/{id}', [RekeningBjbController::class, 'destroy'])->whereNumber('id')->name('destroy');
+        Route::get('/belum-masuk', [RekeningBjbController::class, 'belumMasuk'])->name('belum-masuk');
+    });
+
+    // Cek NIK & Hapus Kesalahan NIK
+    Route::prefix('cek-nik')->name('cek-nik.')->middleware(['simpeg.auth:2'])->group(function () {
+        Route::get('/bulan-lalu', [CekNikController::class, 'bulanLalu'])->name('bulan-lalu');
+        Route::get('/bulan-ini', [CekNikController::class, 'bulanIni'])->name('bulan-ini');
+        Route::get('/hapus', [CekNikController::class, 'hapusForm'])->name('hapus');
+        Route::post('/hapus', [CekNikController::class, 'hapusProses'])->name('hapus.proses');
+    });
+
+    // Laporan Potongan Keuangan
+    Route::prefix('laporan-potongan')->name('laporan-potongan.')->middleware(['simpeg.auth:2'])->group(function () {
+        Route::get('/potongan-keu', [LaporanPotonganController::class, 'potonganKeu'])->name('potongan-keu');
+        Route::get('/potongan-keu-minus', [LaporanPotonganController::class, 'potonganKeuMinus'])->name('potongan-keu-minus');
+        Route::get('/potongan-keu-non-minus', [LaporanPotonganController::class, 'potonganKeuNonMinus'])->name('potongan-keu-non-minus');
+        Route::get('/potongan-bpjs', [LaporanPotonganController::class, 'potonganBpjs'])->name('potongan-bpjs');
+        Route::get('/potongan-thr', [LaporanPotonganController::class, 'potonganThr'])->name('potongan-thr');
+        Route::get('/payroll-thr', [LaporanPotonganController::class, 'payrollThr'])->name('payroll-thr');
+        Route::get('/pajak-thr', [LaporanPotonganController::class, 'pajakThr'])->name('pajak-thr');
+        Route::get('/payroll-gaji13', [LaporanPotonganController::class, 'payrollGaji13'])->name('payroll-gaji13');
+        Route::get('/pajak-gaji13', [LaporanPotonganController::class, 'pajakGaji13'])->name('pajak-gaji13');
+    });
+
+    // ══════════════════════════════════════════════════════════════
 
     // Approval - dashboard kotak masuk, menggabungkan item pending dari
     // Gaji Proses/THR/Gaji13 yang menunggu approval user yang login.
