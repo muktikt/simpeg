@@ -12,12 +12,12 @@ return [
 
     'single' => [
         ['label' => 'Beranda', 'icon' => 'home', 'route_name' => 'dashboard', 'roles' => ['1', '2', '7']],
-        ['label' => 'Profil Saya', 'icon' => 'user', 'route_name' => 'profile.show'],
-        ['label' => 'Payroll', 'icon' => 'report', 'route_name' => 'gaji-laporan.slip-gaji', 'personal' => true],
-        ['label' => 'THR', 'icon' => 'calendar', 'route_name' => 'thr.laporan-slip', 'personal' => true],
-        ['label' => 'Tunjangan Pendidikan', 'icon' => 'calendar', 'route_name' => 'gaji-tigabelas.laporan-slip', 'personal' => true],
-        ['label' => 'Insentif', 'icon' => 'report', 'route_name' => 'insentif.laporan-slip', 'personal' => true],
-        ['label' => 'Lembur', 'icon' => 'report', 'route_name' => 'gaji-laporan.lembur', 'personal' => true],
+        ['label' => 'Profil Saya', 'icon' => 'user', 'route_name' => 'profile.show', 'roles' => ['5']],
+        ['label' => 'Payroll', 'icon' => 'report', 'route_name' => 'gaji-laporan.slip-gaji', 'personal' => true, 'roles' => ['5']],
+        ['label' => 'THR', 'icon' => 'calendar', 'route_name' => 'thr.laporan-slip', 'personal' => true, 'roles' => ['5']],
+        ['label' => 'Tunjangan Pendidikan', 'icon' => 'calendar', 'route_name' => 'gaji-tigabelas.laporan-slip', 'personal' => true, 'roles' => ['5']],
+        ['label' => 'Insentif', 'icon' => 'report', 'route_name' => 'insentif.laporan-slip', 'personal' => true, 'roles' => ['5']],
+        ['label' => 'Lembur', 'icon' => 'report', 'route_name' => 'gaji-laporan.lembur', 'personal' => true, 'roles' => ['5']],
         ['label' => 'Pengaduan', 'icon' => 'report', 'route_name' => 'pengaduan.index', 'roles' => ['5', '1']],
         ['label' => 'Approval', 'icon' => 'report', 'route_name' => 'approval.index', 'roles' => ['1', '7']],
     ],

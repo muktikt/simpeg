@@ -119,19 +119,35 @@
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
                 </div>
                 <div class="profile">
-                    <a href="{{ route('profile.show') }}" style="display:flex; align-items:center; gap:10px; text-decoration:none; color:inherit;">
-                        <div class="avatar">
-                            @php
-                                $namaUser = session('simpeg_user.nama_peg', 'Pengguna');
-                                $inisial = collect(explode(' ', $namaUser))->map(fn($w) => mb_substr($w, 0, 1))->take(2)->implode('');
-                            @endphp
-                            {{ strtoupper($inisial) }}
+                    @if (session('simpeg_user.userlevel') === '5')
+                        <a href="{{ route('profile.show') }}" style="display:flex; align-items:center; gap:10px; text-decoration:none; color:inherit;">
+                            <div class="avatar">
+                                @php
+                                    $namaUser = session('simpeg_user.nama_peg', 'Pengguna');
+                                    $inisial = collect(explode(' ', $namaUser))->map(fn($w) => mb_substr($w, 0, 1))->take(2)->implode('');
+                                @endphp
+                                {{ strtoupper($inisial) }}
+                            </div>
+                            <div>
+                                <div class="profile-name">{{ $namaUser }}</div>
+                                <div class="profile-role">{{ session('simpeg_user.jabatan', '-') }}</div>
+                            </div>
+                        </a>
+                    @else
+                        <div style="display:flex; align-items:center; gap:10px; color:inherit;">
+                            <div class="avatar">
+                                @php
+                                    $namaUser = session('simpeg_user.nama_peg', 'Pengguna');
+                                    $inisial = collect(explode(' ', $namaUser))->map(fn($w) => mb_substr($w, 0, 1))->take(2)->implode('');
+                                @endphp
+                                {{ strtoupper($inisial) }}
+                            </div>
+                            <div>
+                                <div class="profile-name">{{ $namaUser }}</div>
+                                <div class="profile-role">{{ session('simpeg_user.jabatan', '-') }}</div>
+                            </div>
                         </div>
-                        <div>
-                            <div class="profile-name">{{ $namaUser }}</div>
-                            <div class="profile-role">{{ session('simpeg_user.jabatan', '-') }}</div>
-                        </div>
-                    </a>
+                    @endif
                     <form action="{{ route('logout') }}" method="POST" class="logout-form" id="logout-form">
                         @csrf
                         <button type="button" class="logout-btn" title="Keluar" onclick="openLogoutModal()">

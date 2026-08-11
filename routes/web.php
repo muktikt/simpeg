@@ -363,8 +363,8 @@ Route::middleware(['simpeg.auth'])->group(function () {
         return back()->with('success', 'Pengaduan berhasil dikirim.');
     })->name('pengaduan.store');
 
-    // Profile - semua role yang login, cuma bisa lihat & ubah data sendiri.
-    Route::prefix('profile')->name('profile.')->group(function () {
+    // Profile - Khusus role Pegawai (role 5) di web. Admin & Keuangan mengelola data via Data Pegawai.
+    Route::prefix('profile')->name('profile.')->middleware(['simpeg.auth:5'])->group(function () {
         Route::get('/', [ProfileController::class, 'show'])->name('show');
         Route::put('/password', [ProfileController::class, 'updatePassword'])->name('update-password');
         Route::post('/dokumen', [ProfileController::class, 'uploadDokumen'])->name('upload-dokumen');
