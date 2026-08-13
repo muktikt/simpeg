@@ -22,7 +22,7 @@ class PegawaiController extends Controller
         return [
             [
                 'id' => 1,
-                'nik' => '1711254',
+                'nik' => '2000000001',
                 'nama' => 'Mukti Kurniawan',
                 'jabatan' => 'Staf SDM',
                 'unit_kerja' => 'Kantor Pusat',
@@ -42,7 +42,7 @@ class PegawaiController extends Controller
             ],
             [
                 'id' => 2,
-                'nik' => '1800001',
+                'nik' => '2000000002',
                 'nama' => 'Dewi Anggraini',
                 'jabatan' => 'Staf Keuangan',
                 'unit_kerja' => 'Divisi Keuangan',
@@ -56,22 +56,7 @@ class PegawaiController extends Controller
                 'pendidikan' => [['id' => 1, 'jenjang' => 'D3', 'jurusan' => 'Akuntansi', 'institusi' => 'Politeknik B', 'tahun_lulus' => '2017']],
                 'prestasi' => [],
             ],
-            [
-                'id' => 3,
-                'nik' => '1800003',
-                'nama' => 'Nur Hidayah',
-                'jabatan' => 'Petugas Lapangan',
-                'unit_kerja' => 'Unit Distribusi',
-                'status_peg' => 'CP',
-                'tgl_masuk' => '2022-08-15',
-                'telp' => '081211122233',
-                'alamat' => 'Jl. Melati No. 5, Kota C',
-                'keluarga' => [],
-                'golongan' => [],
-                'jabatan_riwayat' => [],
-                'pendidikan' => [['id' => 1, 'jenjang' => 'SMA/SMK', 'jurusan' => 'IPA', 'institusi' => 'SMA C', 'tahun_lulus' => '2021']],
-                'prestasi' => [],
-            ],
+
             [
                 'id' => 4,
                 'nik' => '3000000003',
@@ -106,8 +91,8 @@ class PegawaiController extends Controller
             ],
             [
                 'id' => 6,
-                'nik' => '4000000004',
-                'nama' => 'Bambang Wijaya',
+                'nik' => '4000000006',
+                'nama' => 'Agus Setiawan',
                 'jabatan' => 'Kepala Divisi Teknik',
                 'unit_kerja' => 'Kantor Pusat',
                 'status_peg' => 'PT',
@@ -187,13 +172,29 @@ class PegawaiController extends Controller
             [
                 'id' => 11,
                 'nik' => '5000000002',
-                'nama' => 'Rina Amelia',
-                'jabatan' => 'Staf SDM',
+                'nama' => 'Victoria Usang',
+                'jabatan' => 'Direktur Umum',
                 'unit_kerja' => 'Kantor Pusat',
-                'status_peg' => 'PT',
+                'status_peg' => 'DI',
                 'tgl_masuk' => '2019-07-01',
                 'telp' => '081255443322',
                 'alamat' => 'Jl. Ahmad Yani No. 50, Indramayu',
+                'keluarga' => [],
+                'golongan' => [],
+                'jabatan_riwayat' => [],
+                'pendidikan' => [],
+                'prestasi' => [],
+            ],
+            [
+                'id' => 12,
+                'nik' => '4000000005',
+                'nama' => 'Nur Aisyah Lestari',
+                'jabatan' => 'Staf Administrasi',
+                'unit_kerja' => 'Kantor Pusat',
+                'status_peg' => 'PT',
+                'tgl_masuk' => '2020-01-01',
+                'telp' => '081233445566',
+                'alamat' => 'Jl. Sudirman No. 10, Indramayu',
                 'keluarga' => [],
                 'golongan' => [],
                 'jabatan_riwayat' => [],
@@ -206,33 +207,71 @@ class PegawaiController extends Controller
     protected function seedIfEmpty(): void
     {
         $defaults = $this->getDefaultPegawaiList();
+        $defaultNiks = array_column($defaults, 'nik');
 
         if (! session()->has('dummy_pegawai')) {
             session()->put('dummy_pegawai', $defaults);
         } else {
             $existing = session('dummy_pegawai', []);
-            $existingNiks = array_column($existing, 'nik');
-            $updated = false;
+            $obsoleteNiks = ['4000000004', '1800004', '1800005', '1800003', '1711254', '1800001'];
+            
+            // Remove obsolete NIKs from session
+            $filtered = array_values(array_filter($existing, function ($item) use ($obsoleteNiks) {
+                return ! in_array($item['nik'] ?? '', $obsoleteNiks, true);
+            }));
+
+            $existingNiks = array_column($filtered, 'nik');
+            $updated = count($filtered) !== count($existing);
 
             foreach ($defaults as $def) {
                 if (! in_array($def['nik'], $existingNiks, true)) {
-                    $existing[] = $def;
+                    $filtered[] = $def;
                     $updated = true;
                 }
             }
 
             if ($updated) {
-                session()->put('dummy_pegawai', $existing);
+                session()->put('dummy_pegawai', $filtered);
             }
         }
-    }
     }
 
     protected function all(): array
     {
         $this->seedIfEmpty();
+        $sessionPegawai = session('dummy_pegawai', []);
 
-        return session('dummy_pegawai', []);
+        try {
+            $supabasePegawai = \App\Services\SupabaseService::get('pegawai');
+            if ($supabasePegawai) {
+                $sessionNiks = array_column($sessionPegawai, 'nik');
+                foreach ($supabasePegawai as $sp) {
+                    $nik = $sp['nik'] ?? null;
+                    if ($nik && ! in_array($nik, $sessionNiks, true)) {
+                        $sessionPegawai[] = [
+                            'id' => count($sessionPegawai) + 1,
+                            'nik' => (string) $nik,
+                            'nama' => $sp['name'] ?? ($sp['nama'] ?? 'Pegawai'),
+                            'jabatan' => $sp['jabatan'] ?? 'Staf',
+                            'unit_kerja' => $sp['unit_kerja'] ?? 'Kantor Pusat',
+                            'status_peg' => 'PT',
+                            'tgl_masuk' => date('Y-m-d'),
+                            'telp' => '-',
+                            'alamat' => '-',
+                            'keluarga' => [],
+                            'golongan' => [],
+                            'jabatan_riwayat' => [],
+                            'pendidikan' => [],
+                            'prestasi' => [],
+                        ];
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            // Fallback to session
+        }
+
+        return $sessionPegawai;
     }
 
     protected function save(array $data): void

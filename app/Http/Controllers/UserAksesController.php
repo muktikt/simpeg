@@ -28,35 +28,41 @@ class UserAksesController extends Controller
         $allPegawai = session('dummy_pegawai', []);
 
         $defaultRoles = [
-            '1711254' => '1', // Mukti - Admin
+            '2000000001' => '1', // Mukti - Admin
             '6000000001' => '1', // Rina - Admin (SDM)
-            '5000000002' => '1', // Rina - Admin (SDM)
-            '1800001' => '2', // Dewi - Keuangan
-            '1800003' => '5', // Nur - Pegawai
-            '1800004' => '7', // Bambang - Direksi
+            '2000000002' => '2', // Dewi - Keuangan
             '5000000001' => '7', // Dedi Supriadi - Direksi (DIRUT)
+            '5000000002' => '7', // Victoria Usang - Direksi
         ];
 
         $defaultPasswords = [
             '3000000003' => 'pegawai123',
             '4000000001' => 'kadivadmin123',
-            '4000000004' => 'kadivteknik123',
+            '4000000006' => 'kadivteknik123',
             '4000000002' => 'kspi123',
             '4000000003' => 'tpdpk123',
             '5000000001' => 'dirut123',
+            '5000000002' => 'direksi123',
             '6000000001' => 'sdm123',
-            '5000000002' => 'sdm123',
+            '4000000005' => 'pegawai123',
         ];
 
         $existing = session('dummy_userakses', []);
-        $existingNiks = array_column($existing, 'username');
-        $maxId = $existing ? max(array_column($existing, 'id')) : 0;
+        $obsoleteNiks = ['4000000004', '1800004', '1800005', '1800003', '1711254', '1800001'];
 
-        $updated = false;
+        // Remove obsolete NIKs from userakses session
+        $filtered = array_values(array_filter($existing, function ($item) use ($obsoleteNiks) {
+            return ! in_array($item['username'] ?? '', $obsoleteNiks, true);
+        }));
+
+        $existingNiks = array_column($filtered, 'username');
+        $maxId = $filtered ? max(array_column($filtered, 'id')) : 0;
+        $updated = count($filtered) !== count($existing);
+
         foreach ($allPegawai as $p) {
             if (! in_array($p['nik'], $existingNiks, true)) {
                 $maxId++;
-                $existing[] = [
+                $filtered[] = [
                     'id' => $maxId,
                     'username' => $p['nik'],
                     'password' => $defaultPasswords[$p['nik']] ?? 'password',
@@ -68,7 +74,7 @@ class UserAksesController extends Controller
         }
 
         if ($updated || ! session()->has('dummy_userakses')) {
-            session()->put('dummy_userakses', $existing);
+            session()->put('dummy_userakses', $filtered);
         }
     }
 

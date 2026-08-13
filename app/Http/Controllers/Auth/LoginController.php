@@ -13,68 +13,42 @@ class LoginController extends Controller
      *
      * userlevel (lihat config/simpeg_roles.php): 1=Admin, 2=Keuangan, 5=Pegawai, 7=Direksi
      */
-    protected array $dummyUsers = [
-        '1711254' => [
-            'nik' => '1711254',
-            'password' => 'password',
-            'nama_peg' => 'Mukti Kurniawan',
-            'jabatan' => 'Staf SDM',
-            'userlevel' => '1', // Admin
-        ],
-        '1800001' => [
-            'nik' => '1800001',
-            'password' => 'password',
-            'nama_peg' => 'Dewi Anggraini',
-            'jabatan' => 'Staf Keuangan',
-            'userlevel' => '2', // Keuangan
-        ],
-        '1800003' => [
-            'nik' => '1800003',
-            'password' => 'password',
-            'nama_peg' => 'Nur Hidayah',
-            'jabatan' => 'Pegawai',
-            'userlevel' => '5', // Pegawai
-        ],
-        '1800004' => [
-            'nik' => '1800004',
-            'password' => 'password',
-            'nama_peg' => 'Bambang Wijaya',
-            'jabatan' => 'Direktur Utama',
-            'userlevel' => '7', // Direksi
-        ],
-        '1800005' => [
-            'nik' => '1800005',
-            'password' => 'password',
-            'nama_peg' => 'Hendra Kusuma',
-            'jabatan' => 'Direktur Umum',
-            'userlevel' => '7', // Direksi
-        ],
-    ];
+    /**
+     * Data user diambil secara dinamis dari UserAkses & Pegawai yang terhubung ke Supabase.
+     */
+    protected array $dummyUsers = [];
 
     protected function getAllowedWebUsers(): array
     {
-        $userAksesList = session('dummy_userakses');
-
-        if (! $userAksesList) {
-            return $this->dummyUsers;
-        }
-
-        $allPegawai = session('dummy_pegawai', []);
+        $userAksesController = app(\App\Http\Controllers\UserAksesController::class);
+        $userAksesList = $userAksesController->index()->getData()['users'] ?? session('dummy_userakses', []);
+        $allPegawai = app(\App\Http\Controllers\PegawaiController::class)->index(request())->getData()['pegawai'] ?? session('dummy_pegawai', []);
 
         $result = [];
-        foreach ($userAksesList as $ua) {
-            $nik = $ua['username'];
-            $peg = collect($allPegawai)->firstWhere('nik', $nik);
-            $result[$nik] = [
-                'nik' => $nik,
-                'password' => $ua['password'],
-                'nama_peg' => $ua['nama'] ?? ($peg['nama'] ?? 'Pegawai'),
-                'jabatan' => $peg['jabatan'] ?? 'Pegawai',
-                'userlevel' => (string) $ua['userlevel'],
-            ];
+        if (is_iterable($userAksesList)) {
+            foreach ($userAksesList as $ua) {
+                $nik = is_array($ua) ? ($ua['username'] ?? '') : ($ua->username ?? '');
+                if (! $nik) continue;
+
+                $pass = is_array($ua) ? ($ua['password'] ?? 'password') : ($ua->password ?? 'password');
+                $nama = is_array($ua) ? ($ua['nama'] ?? '') : ($ua->nama ?? '');
+                $level = is_array($ua) ? ($ua['userlevel'] ?? '5') : ($ua->userlevel ?? '5');
+
+                $peg = collect($allPegawai)->firstWhere('nik', $nik);
+                $pegNama = is_array($peg) ? ($peg['nama'] ?? '') : ($peg->nama ?? '');
+                $pegJabatan = is_array($peg) ? ($peg['jabatan'] ?? '') : ($peg->jabatan ?? '');
+
+                $result[$nik] = [
+                    'nik' => $nik,
+                    'password' => $pass,
+                    'nama_peg' => $nama ?: ($pegNama ?: 'Pegawai'),
+                    'jabatan' => $pegJabatan ?: 'Pegawai',
+                    'userlevel' => (string) $level,
+                ];
+            }
         }
 
-        return $result ?: $this->dummyUsers;
+        return $result;
     }
 
     /**
