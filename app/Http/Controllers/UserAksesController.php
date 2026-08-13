@@ -21,13 +21,71 @@ class UserAksesController extends Controller
      */
     protected function seedIfEmpty(): void
     {
+        if (! session()->has('dummy_pegawai')) {
+            app(PegawaiController::class)->index(request());
+        }
+
+        $allPegawai = session('dummy_pegawai', []);
+
         if (! session()->has('dummy_userakses')) {
-            session()->put('dummy_userakses', [
-                ['id' => 1, 'username' => '1711254', 'password' => 'password', 'nama' => 'Mukti Kurniawan', 'userlevel' => '1'],
-                ['id' => 2, 'username' => '1800001', 'password' => 'password', 'nama' => 'Dewi Anggraini', 'userlevel' => '2'],
-                ['id' => 3, 'username' => '1800003', 'password' => 'password', 'nama' => 'Nur Hidayah', 'userlevel' => '5'],
-                ['id' => 4, 'username' => '1800004', 'password' => 'password', 'nama' => 'Bambang Wijaya', 'userlevel' => '7'],
-            ]);
+            $defaultRoles = [
+                '1711254' => '1', // Mukti - Admin
+                '6000000001' => '1', // Rina - Admin (SDM)
+                '5000000002' => '1', // Rina - Admin (SDM)
+                '1800001' => '2', // Dewi - Keuangan
+                '1800003' => '5', // Nur - Pegawai
+                '1800004' => '7', // Bambang - Direksi
+                '5000000001' => '7', // Dedi Supriadi - Direksi (DIRUT)
+            ];
+
+            $defaultPasswords = [
+                '3000000003' => 'pegawai123',
+                '4000000001' => 'kadivadmin123',
+                '4000000004' => 'kadivteknik123',
+                '4000000002' => 'kspi123',
+                '4000000003' => 'tpdpk123',
+                '5000000001' => 'dirut123',
+                '6000000001' => 'sdm123',
+                '5000000002' => 'sdm123',
+            ];
+
+            $userAkses = [];
+            $id = 1;
+            foreach ($allPegawai as $p) {
+                $userAkses[] = [
+                    'id' => $id++,
+                    'username' => $p['nik'],
+                    'password' => $defaultPasswords[$p['nik']] ?? 'password',
+                    'nama' => $p['nama'],
+                    'userlevel' => $defaultRoles[$p['nik']] ?? '5',
+                ];
+            }
+
+            session()->put('dummy_userakses', $userAkses);
+        } else {
+            // Ensure any new pegawai not yet in dummy_userakses is synced
+            $existing = session('dummy_userakses', []);
+            $existingNiks = array_column($existing, 'username');
+            $maxId = $existing ? max(array_column($existing, 'id')) : 0;
+
+            $updated = false;
+            foreach ($allPegawai as $p) {
+                if (! in_array($p['nik'], $existingNiks, true)) {
+                    $maxId++;
+                    $existing[] = [
+                        'id' => $maxId,
+                        'username' => $p['nik'],
+                        'password' => 'password',
+                        'nama' => $p['nama'],
+                        'userlevel' => '5',
+                    ];
+                    $updated = true;
+                }
+            }
+
+            if ($updated) {
+                session()->put('dummy_userakses', $existing);
+            }
         }
     }
 
