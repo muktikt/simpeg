@@ -97,6 +97,20 @@ class ApiPegawaiController extends Controller
             ], 401);
         }
 
+        $roleKode = 'PEGAWAI';
+        $jabatanLower = strtolower($user['jabatan']);
+        if ($user['userlevel'] === '1' || str_contains($jabatanLower, 'sdm')) {
+            $roleKode = 'SDM';
+        } elseif ($user['userlevel'] === '7' || str_contains($jabatanLower, 'direktur') || str_contains($jabatanLower, 'direksi')) {
+            $roleKode = 'DIRUT';
+        } elseif (str_contains($jabatanLower, 'kadiv') || str_contains($jabatanLower, 'kepala divisi')) {
+            $roleKode = 'KADIV';
+        } elseif (str_contains($jabatanLower, 'kspi')) {
+            $roleKode = 'KSPI';
+        } elseif (str_contains($jabatanLower, 'tpdpk')) {
+            $roleKode = 'TPDPK';
+        }
+
         $token = base64_encode($user['nik'] . ':' . time());
 
         return response()->json([
@@ -108,6 +122,7 @@ class ApiPegawaiController extends Controller
                     'nama' => $user['nama_peg'],
                     'jabatan' => $user['jabatan'],
                     'userlevel' => $user['userlevel'],
+                    'role' => $roleKode,
                 ],
                 'token' => $token,
             ]
