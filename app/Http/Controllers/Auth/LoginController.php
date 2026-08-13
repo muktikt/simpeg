@@ -51,6 +51,32 @@ class LoginController extends Controller
         ],
     ];
 
+    protected function getAllowedWebUsers(): array
+    {
+        $userAksesList = session('dummy_userakses');
+
+        if (! $userAksesList) {
+            return $this->dummyUsers;
+        }
+
+        $allPegawai = session('dummy_pegawai', []);
+
+        $result = [];
+        foreach ($userAksesList as $ua) {
+            $nik = $ua['username'];
+            $peg = collect($allPegawai)->firstWhere('nik', $nik);
+            $result[$nik] = [
+                'nik' => $nik,
+                'password' => $ua['password'],
+                'nama_peg' => $ua['nama'] ?? ($peg['nama'] ?? 'Pegawai'),
+                'jabatan' => $peg['jabatan'] ?? 'Pegawai',
+                'userlevel' => (string) $ua['userlevel'],
+            ];
+        }
+
+        return $result ?: $this->dummyUsers;
+    }
+
     /**
      * Pegawai (userlevel 5) tidak diarahkan ke dashboard perusahaan -
      * mengikuti sistem lama (menu_incl_pdam.php) yang landing page-nya
@@ -77,13 +103,22 @@ class LoginController extends Controller
             'password' => 'required|string',
         ]);
 
-        $user = $this->dummyUsers[$request->nik] ?? null;
+        $allowedUsers = $this->getAllowedWebUsers();
+        $user = $allowedUsers[$request->nik] ?? null;
 
         if ($user && $request->password === $user['password']) {
             $request->session()->regenerate();
             $request->session()->put('simpeg_user', $user);
 
             return redirect()->route($this->redirectRouteFor($user));
+        }
+
+        $allPegawai = session('dummy_pegawai', []);
+        $isPegawai = collect($allPegawai)->contains('nik', $request->nik);
+        if ($isPegawai && ! $user) {
+            return back()
+                ->withErrors(['nik' => 'NIK Anda terdaftar sebagai pegawai, tetapi belum diberi hak akses ke Web SIMPEG. Silakan hubungi Administrator.'])
+                ->onlyInput('nik');
         }
 
         return back()

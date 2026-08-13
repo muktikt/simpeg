@@ -8,25 +8,59 @@ use App\Http\Controllers\PegawaiController;
 
 class ApiPegawaiController extends Controller
 {
-    protected array $dummyUsers = [
-        '1711254' => [
-            'nik' => '1711254',
-            'password' => 'password',
-            'nama_peg' => 'Mukti Kurniawan',
-            'jabatan' => 'Staf SDM',
-            'userlevel' => '1',
-        ],
-        '1800003' => [
-            'nik' => '1800003',
-            'password' => 'password',
-            'nama_peg' => 'Nur Hidayah',
-            'jabatan' => 'Pegawai',
-            'userlevel' => '5',
-        ],
-    ];
+    protected function getAllPegawai(): array
+    {
+        if (! session()->has('dummy_pegawai')) {
+            app(PegawaiController::class)->index(request());
+        }
+
+        return session('dummy_pegawai', []);
+    }
+
+    protected function getAllUserAkses(): array
+    {
+        if (! session()->has('dummy_userakses')) {
+            app(\App\Http\Controllers\UserAksesController::class)->index();
+        }
+
+        return session('dummy_userakses', []);
+    }
+
+    protected function getPegawaiByRequest(Request $request): array
+    {
+        $nik = $request->header('X-NIK') ?? $request->query('nik');
+        $allPegawai = $this->getAllPegawai();
+
+        if ($nik) {
+            $found = collect($allPegawai)->firstWhere('nik', $nik);
+            if ($found) {
+                return $found;
+            }
+        }
+
+        $allUserAkses = $this->getAllUserAkses();
+        if ($nik) {
+            $ua = collect($allUserAkses)->firstWhere('username', $nik);
+            if ($ua) {
+                return [
+                    'nik' => $nik,
+                    'nama' => $ua['nama'],
+                    'jabatan' => 'Staf SIMPEG',
+                    'unit_kerja' => 'PDAM Tirta Darma Ayu',
+                ];
+            }
+        }
+
+        return $allPegawai[0] ?? [
+            'nik' => '1800001',
+            'nama' => 'Dewi Anggraini',
+            'jabatan' => 'Staf Keuangan',
+            'unit_kerja' => 'Divisi Keuangan',
+        ];
+    }
 
     /**
-     * Auth - Login
+     * Auth - Login (Dapat dilakukan oleh SEMUA Pegawai untuk Mobile App)
      */
     public function login(Request $request)
     {
@@ -35,9 +69,28 @@ class ApiPegawaiController extends Controller
             'password' => 'required|string',
         ]);
 
-        $user = $this->dummyUsers[$request->nik] ?? null;
+        $nik = trim($request->nik);
+        $allPegawai = $this->getAllPegawai();
+        $allUserAkses = $this->getAllUserAkses();
 
-        if (!$user || $request->password !== $user['password']) {
+        $userAkses = collect($allUserAkses)->firstWhere('username', $nik);
+        $pegawai = collect($allPegawai)->firstWhere('nik', $nik);
+
+        $user = null;
+        if ($userAkses || $pegawai) {
+            $expectedPass = $userAkses['password'] ?? 'password';
+            $user = [
+                'nik' => $nik,
+                'password' => $expectedPass,
+                'nama_peg' => $pegawai['nama'] ?? ($userAkses['nama'] ?? 'Pegawai'),
+                'jabatan' => $pegawai['jabatan'] ?? 'Pegawai',
+                'userlevel' => (string) ($userAkses['userlevel'] ?? '5'), // Pegawai (default)
+            ];
+        } elseif (isset($this->dummyUsers[$nik])) {
+            $user = $this->dummyUsers[$nik];
+        }
+
+        if (! $user || $request->password !== $user['password']) {
             return response()->json([
                 'success' => false,
                 'message' => 'NIK atau kata sandi salah.',
@@ -83,21 +136,7 @@ class ApiPegawaiController extends Controller
      */
     public function profile(Request $request)
     {
-        $nik = $request->header('X-NIK') ?? $request->query('nik', '1800003');
-
-        if (!session()->has('dummy_pegawai')) {
-            app(PegawaiController::class)->index(request());
-        }
-
-        $allPegawai = session('dummy_pegawai', []);
-        $pegawai = collect($allPegawai)->firstWhere('nik', $nik);
-
-        if (!$pegawai) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Data pegawai tidak ditemukan.',
-            ], 404);
-        }
+        $pegawai = $this->getPegawaiByRequest($request);
 
         return response()->json([
             'success' => true,
@@ -111,16 +150,16 @@ class ApiPegawaiController extends Controller
      */
     public function slipGaji(Request $request)
     {
-        $nik = $request->header('X-NIK') ?? $request->query('nik', '1800003');
+        $pegawai = $this->getPegawaiByRequest($request);
 
         return response()->json([
             'success' => true,
             'message' => 'Data slip gaji berhasil diambil',
             'data' => [
                 'periode' => 'Agustus 2026',
-                'nik' => $nik,
-                'nama' => 'Nur Hidayah',
-                'jabatan' => 'Pegawai',
+                'nik' => $pegawai['nik'],
+                'nama' => $pegawai['nama'],
+                'jabatan' => $pegawai['jabatan'],
                 'gaji_pokok' => 4500000,
                 'tunjangan_jabatan' => 1200000,
                 'tunjangan_keluarga' => 450000,
@@ -137,15 +176,15 @@ class ApiPegawaiController extends Controller
      */
     public function slipThr(Request $request)
     {
-        $nik = $request->header('X-NIK') ?? $request->query('nik', '1800003');
+        $pegawai = $this->getPegawaiByRequest($request);
 
         return response()->json([
             'success' => true,
             'message' => 'Data slip THR berhasil diambil',
             'data' => [
                 'tahun' => '2026',
-                'nik' => $nik,
-                'nama' => 'Nur Hidayah',
+                'nik' => $pegawai['nik'],
+                'nama' => $pegawai['nama'],
                 'nominal_thr' => 4500000,
                 'tgl_cair' => '2026-04-10',
                 'status' => 'DITERBITKAN',
@@ -158,15 +197,15 @@ class ApiPegawaiController extends Controller
      */
     public function slipGaji13(Request $request)
     {
-        $nik = $request->header('X-NIK') ?? $request->query('nik', '1800003');
+        $pegawai = $this->getPegawaiByRequest($request);
 
         return response()->json([
             'success' => true,
             'message' => 'Data Gaji 13 berhasil diambil',
             'data' => [
                 'tahun' => '2026',
-                'nik' => $nik,
-                'nama' => 'Nur Hidayah',
+                'nik' => $pegawai['nik'],
+                'nama' => $pegawai['nama'],
                 'nominal' => 4500000,
                 'tgl_cair' => '2026-06-15',
                 'status' => 'DITERBITKAN',
@@ -179,15 +218,15 @@ class ApiPegawaiController extends Controller
      */
     public function insentif(Request $request)
     {
-        $nik = $request->header('X-NIK') ?? $request->query('nik', '1800003');
+        $pegawai = $this->getPegawaiByRequest($request);
 
         return response()->json([
             'success' => true,
             'message' => 'Data insentif berhasil diambil',
             'data' => [
                 'periode' => 'Juli 2026',
-                'nik' => $nik,
-                'nama' => 'Nur Hidayah',
+                'nik' => $pegawai['nik'],
+                'nama' => $pegawai['nama'],
                 'nominal_insentif' => 850000,
                 'keterangan' => 'Insentif Kinerja Bulanan',
             ],
