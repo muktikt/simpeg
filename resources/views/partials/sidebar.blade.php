@@ -14,6 +14,39 @@
 
     $slugify = fn ($label) => \Illuminate\Support\Str::slug($label);
     $canSee = fn ($group) => empty($group['roles']) || in_array($myRole, $group['roles'], true);
+
+    $currentRouteName = request()->route() ? request()->route()->getName() : '';
+
+    $isItemActive = function($item) use ($slugify, $currentRouteName) {
+        if (!empty($item['route_name'])) {
+            if ($currentRouteName === $item['route_name']) {
+                if (!empty($item['params'])) {
+                    foreach ($item['params'] as $pk => $pv) {
+                        if (request()->query($pk) !== (string)$pv && request($pk) !== (string)$pv) {
+                            return false;
+                        }
+                    }
+                }
+                return true;
+            }
+
+            if (str_ends_with($item['route_name'], '.index')) {
+                $baseName = substr($item['route_name'], 0, -6);
+                if (str_starts_with($currentRouteName, $baseName . '.')) {
+                    if (!empty($item['params'])) {
+                        foreach ($item['params'] as $pk => $pv) {
+                            if (request()->query($pk) !== (string)$pv && request($pk) !== (string)$pv) {
+                                return false;
+                            }
+                        }
+                    }
+                    return true;
+                }
+            }
+            return false;
+        }
+        return request()->routeIs('placeholder') && request()->route('slug') === $slugify($item['label']);
+    };
 @endphp
 
 <aside class="sidebar">
@@ -33,9 +66,9 @@
             @php
                 $href = $item['route_name'] ? route($item['route_name']) : route('placeholder', $slugify($item['label']));
                 if (!empty($item['personal'])) $href .= (str_contains($href, '?') ? '&' : '?') . 'my=1';
+                $isSingleActive = request()->routeIs($item['route_name']) && (!empty($item['personal']) ? request('my') : true);
             @endphp
-            <a href="{{ $href }}"
-               class="nav-link {{ request()->routeIs($item['route_name']) && (!empty($item['personal']) ? request('my') : true) ? 'active' : '' }}">
+            <a href="{{ $href }}" class="nav-link {{ $isSingleActive ? 'active' : '' }}">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">{!! $icons[$item['icon']] !!}</svg>
                 {{ $item['label'] }}
             </a>
@@ -43,7 +76,16 @@
 
         @foreach ($menu['groups'] as $groupIdx => $group)
             @continue(! $canSee($group))
-            <div class="nav-group" data-group-id="grp-{{ $groupIdx }}">
+            @php
+                $hasActiveChild = false;
+                foreach ($group['items'] as $it) {
+                    if ($canSee($it) && $isItemActive($it)) {
+                        $hasActiveChild = true;
+                        break;
+                    }
+                }
+            @endphp
+            <div class="nav-group {{ $hasActiveChild ? 'open' : '' }}" data-group-id="grp-{{ $groupIdx }}">
                 <button type="button" class="nav-group-btn" onclick="toggleGroup(this)">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="16" height="16">{!! $icons[$group['icon']] !!}</svg>
                     {{ $group['label'] }}
@@ -55,8 +97,9 @@
                         @php
                             $params = $item['params'] ?? [];
                             $href = $item['route_name'] ? route($item['route_name'], $params) : route('placeholder', $slugify($item['label']));
+                            $active = $isItemActive($item);
                         @endphp
-                        <a href="{{ $href }}">
+                        <a href="{{ $href }}" class="{{ $active ? 'active' : '' }}">
                             {{ $item['label'] }}
                         </a>
                     @endforeach
@@ -85,12 +128,24 @@
         try { localStorage.setItem(KEY, JSON.stringify(ids)); } catch(e) {}
     }
 
-    // Restore saved open states
+    // Restore saved open states and keep server-rendered active groups open
     var openIds = getOpenIds();
     document.querySelectorAll('.nav-group[data-group-id]').forEach(function(g) {
-        if (openIds.indexOf(g.dataset.groupId) !== -1) {
+        if (openIds.indexOf(g.dataset.groupId) !== -1 || g.classList.contains('open')) {
             g.classList.add('open');
         }
+    });
+    saveOpenIds();
+
+    // When clicking any link inside a nav-group, ensure its group remains open
+    document.querySelectorAll('.nav-group-items a').forEach(function(link) {
+        link.addEventListener('click', function() {
+            var group = this.closest('.nav-group');
+            if (group && group.dataset.groupId) {
+                group.classList.add('open');
+                saveOpenIds();
+            }
+        });
     });
 
     // Restore sidebar scroll position

@@ -556,8 +556,9 @@ body.app-page {
 }
 
 .nav-group-items a.active {
-  color: rgba(255, 255, 255, 0.85);
-  font-weight: 500;
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
+  font-weight: 600;
 }
 
 .main {

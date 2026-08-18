@@ -25,7 +25,7 @@
     </form>
 
     @if ($myRole === '1')
-        <a href="{{ route('absensi.create') }}" class="btn btn-primary">
+        <a href="{{ route('absensi.create', ['bulan' => $bulan, 'tahun' => $tahun]) }}" class="btn btn-primary">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
             Input Absensi
         </a>
@@ -64,9 +64,11 @@
                         <td>
                             <div class="row-actions">
                                 <a href="{{ route('absensi.edit', $a['id']) }}" class="btn btn-outline btn-sm">Edit</a>
-                                <form action="{{ route('absensi.destroy', $a['id']) }}" method="POST" onsubmit="return confirmSubmit(event, 'Hapus data absensi ini?', 'Konfirmasi Hapus', 'danger', 'Ya, Hapus');" style="margin:0;">
+                                <form action="{{ route('absensi.destroy', ['id' => $a['id'], 'bulan' => $bulan, 'tahun' => $tahun]) }}" method="POST" onsubmit="return confirmSubmit(event, 'Hapus data absensi ini?', 'Konfirmasi Hapus', 'danger', 'Ya, Hapus');" style="margin:0;">
                                     @csrf
                                     @method('DELETE')
+                                    <input type="hidden" name="bulan" value="{{ $bulan }}">
+                                    <input type="hidden" name="tahun" value="{{ $tahun }}">
                                     <button type="submit" class="btn btn-danger btn-sm">Hapus</button>
                                 </form>
                             </div>

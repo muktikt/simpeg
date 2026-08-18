@@ -261,16 +261,21 @@ class GajiProsesController extends Controller
         return redirect()->back()->with('success', 'Gaji berhasil disetujui ke tahap berikutnya.');
     }
 
-    public function destroy(int $id)
+    public function destroy(Request $request, int $id)
     {
         $gaji = collect($this->all())->firstWhere('id', $id);
         abort_if(! $gaji, 404);
         abort_if($gaji['status'] === 'terbit', 400, 'Gaji yang sudah terbit tidak bisa dihapus.');
 
+        $bulan = $request->input('bulan', $request->query('bulan', $gaji['bulan'] ?? null));
+        $tahun = $request->input('tahun', $request->query('tahun', $gaji['tahun'] ?? null));
+
         $data = collect($this->all())->reject(fn ($row) => $row['id'] === $id)->values()->all();
         $this->save($data);
 
-        return redirect()->route('gaji-proses.index')->with('success', 'Draft proses gaji berhasil dihapus.');
+        $params = array_filter(['bulan' => $bulan, 'tahun' => $tahun]);
+
+        return redirect()->route('gaji-proses.index', $params)->with('success', 'Draft proses gaji berhasil dihapus.');
     }
 
     protected function validateData(Request $request): array

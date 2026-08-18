@@ -15,7 +15,7 @@
 
         <div class="form-actions">
             <button type="submit" class="btn btn-primary">Simpan</button>
-            <a href="{{ route('absensi.index') }}" class="btn btn-outline">Batal</a>
+            <a href="{{ route('absensi.index', ['bulan' => $bulan ?? request('bulan', now()->month), 'tahun' => $tahun ?? request('tahun', now()->year)]) }}" class="btn btn-outline">Batal</a>
         </div>
     </form>
 </div>

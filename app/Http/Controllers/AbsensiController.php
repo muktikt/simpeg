@@ -112,11 +112,16 @@ class AbsensiController extends Controller
         ]);
     }
 
-    public function create()
+    public function create(Request $request)
     {
+        $bulan = (int) $request->get('bulan', now()->month);
+        $tahun = (int) $request->get('tahun', now()->year);
+
         return view('absensi.create', [
             'pegawaiList' => $this->pegawaiList(),
             'bulanList' => self::BULAN,
+            'bulan' => $bulan,
+            'tahun' => $tahun,
         ]);
     }
 
@@ -167,12 +172,24 @@ class AbsensiController extends Controller
             ->with('success', 'Data absensi berhasil diperbarui.');
     }
 
-    public function destroy(int $id)
+    public function destroy(Request $request, int $id)
     {
+        $item = collect($this->all())->firstWhere('id', $id);
+        $bulan = $request->input('bulan', $request->query('bulan', $item['bulan'] ?? null));
+        $tahun = $request->input('tahun', $request->query('tahun', $item['tahun'] ?? null));
+
         $data = collect($this->all())->reject(fn ($row) => $row['id'] === $id)->values()->all();
         $this->save($data);
 
-        return redirect()->route('absensi.index')->with('success', 'Data absensi berhasil dihapus.');
+        $params = [];
+        if ($bulan) {
+            $params['bulan'] = $bulan;
+        }
+        if ($tahun) {
+            $params['tahun'] = $tahun;
+        }
+
+        return redirect()->route('absensi.index', $params)->with('success', 'Data absensi berhasil dihapus.');
     }
 
     /**
