@@ -31,20 +31,28 @@ class UserAksesController extends Controller
             '2000000001' => '1', // Mukti - Admin
             '6000000001' => '1', // Rina - Admin (SDM)
             '2000000002' => '2', // Dewi - Keuangan
-            '5000000001' => '7', // Dedi Supriadi - Direksi (DIRUT)
-            '5000000002' => '7', // Victoria Usang - Direksi
+            '5000000001' => '7', // H. Dedi Supriadi - Direksi (DIRUT)
+            '5000000002' => '1', // Victoria Usang - SDM
+            '4000000001' => '1', // Siti Rahmawati - Kadiv Administrasi
+            '4000000005' => '1', // Nur Aisyah Lestari - Kadiv Administrasi
+            '4000000006' => '1', // Agus Setiawan - Kadiv Teknik
+            '4000000002' => '5', // Ahmad Fauzi - KSPI
+            '4000000003' => '5', // Dedi Kurniawan - TPDPK
+            '3000000003' => '5', // Budi Santoso - Pegawai
         ];
 
         $defaultPasswords = [
             '3000000003' => 'pegawai123',
-            '4000000001' => 'kadivadmin123',
-            '4000000006' => 'kadivteknik123',
+            '4000000001' => 'kadiv123',
+            '4000000006' => 'kadivteknik2026',
             '4000000002' => 'kspi123',
             '4000000003' => 'tpdpk123',
             '5000000001' => 'dirut123',
-            '5000000002' => 'direksi123',
+            '5000000002' => 'sdm123',
             '6000000001' => 'sdm123',
-            '4000000005' => 'pegawai123',
+            '4000000005' => 'kadiv123',
+            '2000000001' => 'admin123',
+            '2000000002' => 'keuangan123',
         ];
 
         $existing = session('dummy_userakses', []);
@@ -55,9 +63,20 @@ class UserAksesController extends Controller
             return ! in_array($item['username'] ?? '', $obsoleteNiks, true);
         }));
 
+        $updated = count($filtered) !== count($existing);
+
+        // Sync default passwords for existing items
+        foreach ($filtered as &$item) {
+            $nik = $item['username'] ?? '';
+            if (isset($defaultPasswords[$nik]) && $item['password'] !== $defaultPasswords[$nik]) {
+                $item['password'] = $defaultPasswords[$nik];
+                $updated = true;
+            }
+        }
+        unset($item);
+
         $existingNiks = array_column($filtered, 'username');
         $maxId = $filtered ? max(array_column($filtered, 'id')) : 0;
-        $updated = count($filtered) !== count($existing);
 
         foreach ($allPegawai as $p) {
             if (! in_array($p['nik'], $existingNiks, true)) {

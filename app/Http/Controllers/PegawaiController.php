@@ -173,9 +173,9 @@ class PegawaiController extends Controller
                 'id' => 11,
                 'nik' => '5000000002',
                 'nama' => 'Victoria Usang',
-                'jabatan' => 'Direktur Umum',
+                'jabatan' => 'Staf SDM',
                 'unit_kerja' => 'Kantor Pusat',
-                'status_peg' => 'DI',
+                'status_peg' => 'PT',
                 'tgl_masuk' => '2019-07-01',
                 'telp' => '081255443322',
                 'alamat' => 'Jl. Ahmad Yani No. 50, Indramayu',
@@ -189,7 +189,7 @@ class PegawaiController extends Controller
                 'id' => 12,
                 'nik' => '4000000005',
                 'nama' => 'Nur Aisyah Lestari',
-                'jabatan' => 'Staf Administrasi',
+                'jabatan' => 'Kepala Divisi Administrasi',
                 'unit_kerja' => 'Kantor Pusat',
                 'status_peg' => 'PT',
                 'tgl_masuk' => '2020-01-01',
@@ -238,40 +238,45 @@ class PegawaiController extends Controller
 
     protected function all(): array
     {
-        $this->seedIfEmpty();
-        $sessionPegawai = session('dummy_pegawai', []);
-
         try {
-            $supabasePegawai = \App\Services\SupabaseService::get('pegawai');
-            if ($supabasePegawai) {
-                $sessionNiks = array_column($sessionPegawai, 'nik');
-                foreach ($supabasePegawai as $sp) {
-                    $nik = $sp['nik'] ?? null;
-                    if ($nik && ! in_array($nik, $sessionNiks, true)) {
-                        $sessionPegawai[] = [
-                            'id' => count($sessionPegawai) + 1,
-                            'nik' => (string) $nik,
-                            'nama' => $sp['name'] ?? ($sp['nama'] ?? 'Pegawai'),
-                            'jabatan' => $sp['jabatan'] ?? 'Staf',
-                            'unit_kerja' => $sp['unit_kerja'] ?? 'Kantor Pusat',
-                            'status_peg' => 'PT',
-                            'tgl_masuk' => date('Y-m-d'),
-                            'telp' => '-',
-                            'alamat' => '-',
-                            'keluarga' => [],
-                            'golongan' => [],
-                            'jabatan_riwayat' => [],
-                            'pendidikan' => [],
-                            'prestasi' => [],
-                        ];
-                    }
+            $dbPegawai = \Illuminate\Support\Facades\DB::table('pegawai')->get();
+            if ($dbPegawai->isNotEmpty()) {
+                $list = [];
+                $index = 1;
+                foreach ($dbPegawai as $sp) {
+                    $keluarga = \Illuminate\Support\Facades\DB::table('keluarga')->where('pegawai_id', $sp->id)->get()->toArray();
+                    $pendidikan = \Illuminate\Support\Facades\DB::table('pendidikan')->where('pegawai_id', $sp->id)->get()->toArray();
+                    $golongan = \Illuminate\Support\Facades\DB::table('riwayat_golongan')->where('pegawai_id', $sp->id)->get()->toArray();
+                    $jabatanRiwayat = \Illuminate\Support\Facades\DB::table('riwayat_jabatan')->where('pegawai_id', $sp->id)->get()->toArray();
+                    $prestasi = \Illuminate\Support\Facades\DB::table('prestasi')->where('pegawai_id', $sp->id)->get()->toArray();
+
+                    $list[] = [
+                        'id' => $index++,
+                        'db_id' => $sp->id,
+                        'nik' => (string) $sp->nik,
+                        'nama' => $sp->name ?? 'Pegawai',
+                        'gelar' => $sp->gelar ?? '',
+                        'jabatan' => $sp->jabatan ?? 'Staf',
+                        'unit_kerja' => $sp->unit_kerja ?? 'Kantor Pusat',
+                        'status_peg' => $sp->status ?? 'PT',
+                        'tgl_masuk' => date('Y-m-d'),
+                        'telp' => $sp->no_telp ?? '-',
+                        'alamat' => $sp->alamat ?? '-',
+                        'keluarga' => $keluarga,
+                        'golongan' => $golongan,
+                        'jabatan_riwayat' => $jabatanRiwayat,
+                        'pendidikan' => $pendidikan,
+                        'prestasi' => $prestasi,
+                    ];
                 }
+                return $list;
             }
         } catch (\Throwable $e) {
-            // Fallback to session
+            // Fallback to session defaults
         }
 
-        return $sessionPegawai;
+        $this->seedIfEmpty();
+        return session('dummy_pegawai', []);
     }
 
     protected function save(array $data): void

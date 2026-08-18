@@ -4,124 +4,103 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use App\Http\Controllers\PegawaiController;
+use Illuminate\Support\Facades\DB;
 
 class ApiPegawaiController extends Controller
 {
-    protected function getAllPegawai(): array
-    {
-        if (! session()->has('dummy_pegawai')) {
-            app(PegawaiController::class)->index(request());
-        }
+    protected array $defaultPasswords = [
+        '3000000003' => 'pegawai123',
+        '4000000001' => 'kadiv123',
+        '4000000006' => 'kadivteknik2026',
+        '4000000002' => 'kspi123',
+        '4000000003' => 'tpdpk123',
+        '5000000001' => 'dirut123',
+        '5000000002' => 'sdm123',
+        '4000000005' => 'kadiv123',
+        '2000000001' => 'admin123',
+        '2000000002' => 'keuangan123',
+        '6000000001' => 'sdm123',
+    ];
 
-        return session('dummy_pegawai', []);
-    }
-
-    protected function getAllUserAkses(): array
-    {
-        if (! session()->has('dummy_userakses')) {
-            app(\App\Http\Controllers\UserAksesController::class)->index();
-        }
-
-        return session('dummy_userakses', []);
-    }
-
-    protected function getPegawaiByRequest(Request $request): array
+    /**
+     * Ambil data pegawai aktif berdasarkan request (header X-NIK atau query parameter)
+     */
+    protected function getPegawaiByRequest(Request $request)
     {
         $nik = $request->header('X-NIK') ?? $request->query('nik');
-        $allPegawai = $this->getAllPegawai();
 
         if ($nik) {
-            $found = collect($allPegawai)->firstWhere('nik', $nik);
-            if ($found) {
-                return $found;
+            $pegawai = DB::table('pegawai')->where('nik', $nik)->first();
+            if ($pegawai) {
+                return $pegawai;
             }
         }
 
-        $allUserAkses = $this->getAllUserAkses();
-        if ($nik) {
-            $ua = collect($allUserAkses)->firstWhere('username', $nik);
-            if ($ua) {
-                return [
-                    'nik' => $nik,
-                    'nama' => $ua['nama'],
-                    'jabatan' => 'Staf SIMPEG',
-                    'unit_kerja' => 'PDAM Tirta Darma Ayu',
-                ];
-            }
-        }
-
-        return $allPegawai[0] ?? [
-            'nik' => '1800001',
-            'nama' => 'Dewi Anggraini',
-            'jabatan' => 'Staf Keuangan',
-            'unit_kerja' => 'Divisi Keuangan',
-        ];
+        return DB::table('pegawai')->first();
     }
 
     /**
-     * Auth - Login (Dapat dilakukan oleh SEMUA Pegawai untuk Mobile App)
+     * Auth - Login Pegawai (Mobile App Flutter)
      */
     public function login(Request $request)
     {
         $request->validate([
-            'nik' => 'required|string',
+            'nik' => 'required',
             'password' => 'required|string',
         ]);
 
-        $nik = trim($request->nik);
-        $allPegawai = $this->getAllPegawai();
-        $allUserAkses = $this->getAllUserAkses();
+        $nik = (string) trim($request->nik);
+        $pegawai = DB::table('pegawai')->where('nik', $nik)->first();
 
-        $userAkses = collect($allUserAkses)->firstWhere('username', $nik);
-        $pegawai = collect($allPegawai)->firstWhere('nik', $nik);
-
-        $user = null;
-        if ($userAkses || $pegawai) {
-            $expectedPass = $userAkses['password'] ?? 'password';
-            $user = [
-                'nik' => $nik,
-                'password' => $expectedPass,
-                'nama_peg' => $pegawai['nama'] ?? ($userAkses['nama'] ?? 'Pegawai'),
-                'jabatan' => $pegawai['jabatan'] ?? 'Pegawai',
-                'userlevel' => (string) ($userAkses['userlevel'] ?? '5'), // Pegawai (default)
-            ];
-        } elseif (isset($this->dummyUsers[$nik])) {
-            $user = $this->dummyUsers[$nik];
-        }
-
-        if (! $user || $request->password !== $user['password']) {
+        if (! $pegawai) {
             return response()->json([
                 'success' => false,
-                'message' => 'NIK atau kata sandi salah.',
+                'message' => 'NIK tidak terdaftar dalam database.',
             ], 401);
         }
 
-        $roleKode = 'PEGAWAI';
-        $jabatanLower = strtolower($user['jabatan']);
-        if ($user['userlevel'] === '1' || str_contains($jabatanLower, 'sdm')) {
-            $roleKode = 'SDM';
-        } elseif ($user['userlevel'] === '7' || str_contains($jabatanLower, 'direktur') || str_contains($jabatanLower, 'direksi')) {
-            $roleKode = 'DIRUT';
-        } elseif (str_contains($jabatanLower, 'kadiv') || str_contains($jabatanLower, 'kepala divisi')) {
-            $roleKode = 'KADIV';
-        } elseif (str_contains($jabatanLower, 'kspi')) {
-            $roleKode = 'KSPI';
-        } elseif (str_contains($jabatanLower, 'tpdpk')) {
-            $roleKode = 'TPDPK';
+        $expectedPass = $this->defaultPasswords[$nik] ?? 'password';
+        if ($request->password !== $expectedPass) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Kata sandi salah.',
+            ], 401);
         }
 
-        $token = base64_encode($user['nik'] . ':' . time());
+        // Tentukan Role & Userlevel berdasarkan role/jabatan di database
+        $roleKode = 'PEGAWAI';
+        $userLevel = '5';
+        $dbRole = strtolower($pegawai->role ?? '');
+        $jabatanLower = strtolower($pegawai->jabatan ?? '');
+
+        if ($dbRole === 'direktur' || $nik === '5000000001' || str_contains($jabatanLower, 'direktur utama')) {
+            $roleKode = 'DIRUT';
+            $userLevel = '7';
+        } elseif ($dbRole === 'admin' || $dbRole === 'sdm' || $nik === '5000000002' || str_contains($jabatanLower, 'sdm') || $jabatanLower === 'admin' || $jabatanLower === 'administrator') {
+            $roleKode = 'SDM';
+            $userLevel = '1';
+        } elseif ($dbRole === 'keuangan' || $dbRole === 'keu' || str_contains($jabatanLower, 'keuangan')) {
+            $roleKode = 'KEUANGAN';
+            $userLevel = '2';
+        } else {
+            $roleKode = 'PEGAWAI';
+            $userLevel = '5';
+        }
+
+        $token = base64_encode($pegawai->nik . ':' . time());
 
         return response()->json([
             'success' => true,
             'message' => 'Login berhasil',
             'data' => [
                 'user' => [
-                    'nik' => $user['nik'],
-                    'nama' => $user['nama_peg'],
-                    'jabatan' => $user['jabatan'],
-                    'userlevel' => $user['userlevel'],
+                    'id' => $pegawai->id,
+                    'nik' => $pegawai->nik,
+                    'nama' => $pegawai->name,
+                    'jabatan' => $pegawai->jabatan,
+                    'unit_kerja' => $pegawai->unit_kerja ?? 'PDAM Tirta Darma Ayu',
+                    'golongan' => $pegawai->golongan ?? '',
+                    'userlevel' => $userLevel,
                     'role' => $roleKode,
                 ],
                 'token' => $token,
@@ -147,16 +126,46 @@ class ApiPegawaiController extends Controller
     }
 
     /**
-     * Profil Pegawai Lengkap
+     * Profil Pegawai Lengkap (Mengambil dari Supabase)
      */
     public function profile(Request $request)
     {
         $pegawai = $this->getPegawaiByRequest($request);
 
+        if (! $pegawai) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Data pegawai tidak ditemukan.',
+            ], 404);
+        }
+
+        $keluarga = DB::table('keluarga')->where('pegawai_id', $pegawai->id)->get();
+        $pendidikan = DB::table('pendidikan')->where('pegawai_id', $pegawai->id)->get();
+        $riwayatGol = DB::table('riwayat_golongan')->where('pegawai_id', $pegawai->id)->get();
+        $riwayatJab = DB::table('riwayat_jabatan')->where('pegawai_id', $pegawai->id)->get();
+
         return response()->json([
             'success' => true,
             'message' => 'Data profil berhasil diambil',
-            'data' => $pegawai,
+            'data' => [
+                'id' => $pegawai->id,
+                'nik' => $pegawai->nik,
+                'nama' => $pegawai->name,
+                'gelar' => $pegawai->gelar,
+                'jabatan' => $pegawai->jabatan,
+                'unit_kerja' => $pegawai->unit_kerja ?? 'PDAM Tirta Darma Ayu',
+                'golongan' => $pegawai->golongan,
+                'status' => $pegawai->status ?? 'Pegawai Tetap',
+                'tempat_tanggal_lahir' => $pegawai->tempat_tanggal_lahir,
+                'status_pernikahan' => $pegawai->status_pernikahan,
+                'alamat' => $pegawai->alamat,
+                'no_telp' => $pegawai->no_telp,
+                'foto_url' => $pegawai->foto_url,
+                'keluarga' => $keluarga,
+                'pendidikan' => $pendidikan,
+                'riwayat_golongan' => $riwayatGol,
+                'riwayat_jabatan' => $riwayatJab,
+            ],
         ]);
     }
 
@@ -167,21 +176,33 @@ class ApiPegawaiController extends Controller
     {
         $pegawai = $this->getPegawaiByRequest($request);
 
+        if (! $pegawai) {
+            return response()->json(['success' => false, 'message' => 'Pegawai tidak ditemukan.'], 404);
+        }
+
+        $payroll = DB::table('payroll')->where('pegawai_id', $pegawai->id)->orderByDesc('created_at')->first();
+
+        if (! $payroll) {
+            $payroll = [
+                'periode' => date('F Y'),
+                'gapok' => 4500000,
+                'tunjangan_jabatan' => 1200000,
+                'tunjangan_istri' => 450000,
+                'tunjangan_anak' => 200000,
+                'potongan_dapenma' => 150000,
+                'potongan_bank_bjb' => 200000,
+                'total_terima' => 6000000,
+            ];
+        }
+
         return response()->json([
             'success' => true,
             'message' => 'Data slip gaji berhasil diambil',
             'data' => [
-                'periode' => 'Agustus 2026',
-                'nik' => $pegawai['nik'],
-                'nama' => $pegawai['nama'],
-                'jabatan' => $pegawai['jabatan'],
-                'gaji_pokok' => 4500000,
-                'tunjangan_jabatan' => 1200000,
-                'tunjangan_keluarga' => 450000,
-                'insentif' => 850000,
-                'potongan_dapenma' => 150000,
-                'potongan_bjb' => 200000,
-                'total_terima' => 6650000,
+                'nik' => $pegawai->nik,
+                'nama' => $pegawai->name,
+                'jabatan' => $pegawai->jabatan,
+                'payroll' => $payroll,
             ],
         ]);
     }
@@ -192,17 +213,24 @@ class ApiPegawaiController extends Controller
     public function slipThr(Request $request)
     {
         $pegawai = $this->getPegawaiByRequest($request);
+        if (! $pegawai) {
+            return response()->json(['success' => false, 'message' => 'Pegawai tidak ditemukan.'], 404);
+        }
+
+        $thr = DB::table('thr')->where('pegawai_id', $pegawai->id)->orderByDesc('created_at')->first();
 
         return response()->json([
             'success' => true,
             'message' => 'Data slip THR berhasil diambil',
             'data' => [
-                'tahun' => '2026',
-                'nik' => $pegawai['nik'],
-                'nama' => $pegawai['nama'],
-                'nominal_thr' => 4500000,
-                'tgl_cair' => '2026-04-10',
-                'status' => 'DITERBITKAN',
+                'nik' => $pegawai->nik,
+                'nama' => $pegawai->name,
+                'thr' => $thr ?? [
+                    'tahun' => date('Y'),
+                    'gapok' => 4500000,
+                    'status' => 'DITERBITKAN',
+                    'tanggal_cair' => date('Y') . '-04-10',
+                ],
             ],
         ]);
     }
@@ -213,17 +241,24 @@ class ApiPegawaiController extends Controller
     public function slipGaji13(Request $request)
     {
         $pegawai = $this->getPegawaiByRequest($request);
+        if (! $pegawai) {
+            return response()->json(['success' => false, 'message' => 'Pegawai tidak ditemukan.'], 404);
+        }
+
+        $gaji13 = DB::table('gaji_13')->where('pegawai_id', $pegawai->id)->orderByDesc('created_at')->first();
 
         return response()->json([
             'success' => true,
             'message' => 'Data Gaji 13 berhasil diambil',
             'data' => [
-                'tahun' => '2026',
-                'nik' => $pegawai['nik'],
-                'nama' => $pegawai['nama'],
-                'nominal' => 4500000,
-                'tgl_cair' => '2026-06-15',
-                'status' => 'DITERBITKAN',
+                'nik' => $pegawai->nik,
+                'nama' => $pegawai->name,
+                'gaji_13' => $gaji13 ?? [
+                    'tahun' => date('Y'),
+                    'jumlah' => 4500000,
+                    'status' => 'DITERBITKAN',
+                    'tanggal_cair' => date('Y') . '-06-15',
+                ],
             ],
         ]);
     }
@@ -234,16 +269,23 @@ class ApiPegawaiController extends Controller
     public function insentif(Request $request)
     {
         $pegawai = $this->getPegawaiByRequest($request);
+        if (! $pegawai) {
+            return response()->json(['success' => false, 'message' => 'Pegawai tidak ditemukan.'], 404);
+        }
+
+        $insentif = DB::table('insentif')->where('pegawai_id', $pegawai->id)->orderByDesc('created_at')->first();
 
         return response()->json([
             'success' => true,
             'message' => 'Data insentif berhasil diambil',
             'data' => [
-                'periode' => 'Juli 2026',
-                'nik' => $pegawai['nik'],
-                'nama' => $pegawai['nama'],
-                'nominal_insentif' => 850000,
-                'keterangan' => 'Insentif Kinerja Bulanan',
+                'nik' => $pegawai->nik,
+                'nama' => $pegawai->name,
+                'insentif' => $insentif ?? [
+                    'periode' => date('F Y'),
+                    'judul' => 'Insentif Kinerja Bulanan',
+                    'insentif_jabatan' => 850000,
+                ],
             ],
         ]);
     }
@@ -253,25 +295,21 @@ class ApiPegawaiController extends Controller
      */
     public function absensi(Request $request)
     {
+        $pegawai = $this->getPegawaiByRequest($request);
+        if (! $pegawai) {
+            return response()->json(['success' => false, 'message' => 'Pegawai tidak ditemukan.'], 404);
+        }
+
+        $data = DB::table('absensi_harian')
+            ->where('pegawai_id', $pegawai->id)
+            ->orderByDesc('tanggal')
+            ->limit(30)
+            ->get();
+
         return response()->json([
             'success' => true,
             'message' => 'Data absensi berhasil diambil',
-            'data' => [
-                [
-                    'tanggal' => date('Y-m-d'),
-                    'jam_masuk' => '07:45:00',
-                    'jam_keluar' => '16:30:00',
-                    'status' => 'HADIR',
-                    'keterangan' => 'Tepat Waktu',
-                ],
-                [
-                    'tanggal' => date('Y-m-d', strtotime('-1 day')),
-                    'jam_masuk' => '07:50:00',
-                    'jam_keluar' => '16:35:00',
-                    'status' => 'HADIR',
-                    'keterangan' => 'Tepat Waktu',
-                ],
-            ],
+            'data' => $data,
         ]);
     }
 
@@ -286,12 +324,30 @@ class ApiPegawaiController extends Controller
             'longitude' => 'nullable|numeric',
         ]);
 
+        $pegawai = DB::table('pegawai')->where('nik', $request->nik)->first();
+        if (! $pegawai) {
+            return response()->json(['success' => false, 'message' => 'Pegawai tidak ditemukan.'], 404);
+        }
+
+        $now = now();
+        $inserted = DB::table('absensi_harian')->insertGetId([
+            'pegawai_id' => $pegawai->id,
+            'tanggal' => $now->toDateString(),
+            'jam_masuk' => $now->toDateTimeString(),
+            'status' => 'HADIR',
+            'keterangan' => 'Absen Mobile App',
+            'lat' => $request->latitude,
+            'lng' => $request->longitude,
+            'created_at' => $now,
+        ]);
+
         return response()->json([
             'success' => true,
             'message' => 'Berhasil melakukan absensi masuk.',
             'data' => [
-                'tanggal' => date('Y-m-d'),
-                'jam_masuk' => date('H:i:s'),
+                'id' => $inserted,
+                'tanggal' => $now->toDateString(),
+                'jam_masuk' => $now->toTimeString(),
                 'status' => 'HADIR',
             ]
         ]);
@@ -302,10 +358,20 @@ class ApiPegawaiController extends Controller
      */
     public function sanksi(Request $request)
     {
+        $pegawai = $this->getPegawaiByRequest($request);
+        if (! $pegawai) {
+            return response()->json(['success' => false, 'message' => 'Pegawai tidak ditemukan.'], 404);
+        }
+
+        $data = DB::table('sanksi')
+            ->where('pegawai_id', $pegawai->id)
+            ->orderByDesc('created_at')
+            ->get();
+
         return response()->json([
             'success' => true,
             'message' => 'Data sanksi berhasil diambil',
-            'data' => [],
+            'data' => $data,
         ]);
     }
 
@@ -314,16 +380,20 @@ class ApiPegawaiController extends Controller
      */
     public function prestasi(Request $request)
     {
+        $pegawai = $this->getPegawaiByRequest($request);
+        if (! $pegawai) {
+            return response()->json(['success' => false, 'message' => 'Pegawai tidak ditemukan.'], 404);
+        }
+
+        $data = DB::table('prestasi')
+            ->where('pegawai_id', $pegawai->id)
+            ->orderByDesc('created_at')
+            ->get();
+
         return response()->json([
             'success' => true,
             'message' => 'Data prestasi berhasil diambil',
-            'data' => [
-                [
-                    'tahun' => '2025',
-                    'nama_prestasi' => 'Pegawai Teladan Semester 2',
-                    'tingkat' => 'Perusahaan',
-                ]
-            ],
+            'data' => $data,
         ]);
     }
 
@@ -332,19 +402,20 @@ class ApiPegawaiController extends Controller
      */
     public function getCuti(Request $request)
     {
+        $pegawai = $this->getPegawaiByRequest($request);
+        if (! $pegawai) {
+            return response()->json(['success' => false, 'message' => 'Pegawai tidak ditemukan.'], 404);
+        }
+
+        $data = DB::table('pengajuan_cuti')
+            ->where('pegawai_id', $pegawai->id)
+            ->orderByDesc('created_at')
+            ->get();
+
         return response()->json([
             'success' => true,
             'message' => 'Data pengajuan cuti berhasil diambil',
-            'data' => [
-                [
-                    'id' => 1,
-                    'jenis_cuti' => 'Cuti Tahunan',
-                    'tgl_mulai' => '2026-05-10',
-                    'tgl_selesai' => '2026-05-12',
-                    'alasan' => 'Acara Keluarga',
-                    'status' => 'APPROVED',
-                ]
-            ],
+            'data' => $data,
         ]);
     }
 
@@ -361,9 +432,28 @@ class ApiPegawaiController extends Controller
             'alasan' => 'required|string',
         ]);
 
+        $pegawai = DB::table('pegawai')->where('nik', $request->nik)->first();
+        if (! $pegawai) {
+            return response()->json(['success' => false, 'message' => 'Pegawai tidak ditemukan.'], 404);
+        }
+
+        $now = now();
+        $id = DB::table('pengajuan_cuti')->insertGetId([
+            'pegawai_id' => $pegawai->id,
+            'nama_pegawai' => $pegawai->name,
+            'jenis' => $request->jenis_cuti,
+            'tanggal_mulai' => $request->tgl_mulai,
+            'tanggal_selesai' => $request->tgl_selesai,
+            'alasan' => $request->alasan,
+            'status' => 'PENDING',
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
         return response()->json([
             'success' => true,
             'message' => 'Pengajuan cuti berhasil dikirim.',
+            'data' => ['id' => $id],
         ]);
     }
 
@@ -380,9 +470,23 @@ class ApiPegawaiController extends Controller
             'kegiatan' => 'required|string',
         ]);
 
+        $pegawai = DB::table('pegawai')->where('nik', $request->nik)->first();
+        if (! $pegawai) {
+            return response()->json(['success' => false, 'message' => 'Pegawai tidak ditemukan.'], 404);
+        }
+
+        $id = DB::table('lembur')->insertGetId([
+            'pegawai_id' => $pegawai->id,
+            'bulan' => date('F Y', strtotime($request->tanggal)),
+            'jam_lembur' => 3,
+            'uang_lembur' => 150000,
+            'created_at' => now(),
+        ]);
+
         return response()->json([
             'success' => true,
             'message' => 'Pengajuan lembur berhasil dikirim.',
+            'data' => ['id' => $id],
         ]);
     }
 
@@ -391,10 +495,21 @@ class ApiPegawaiController extends Controller
      */
     public function pengaduan(Request $request)
     {
+        $pegawai = $this->getPegawaiByRequest($request);
+        if (! $pegawai) {
+            return response()->json(['success' => false, 'message' => 'Pegawai tidak ditemukan.'], 404);
+        }
+
+        $data = DB::table('pengaduan_pegawai')
+            ->where('pelapor_id', $pegawai->id)
+            ->orWhere('nik', $pegawai->nik)
+            ->orderByDesc('created_at')
+            ->get();
+
         return response()->json([
             'success' => true,
             'message' => 'Data pengaduan berhasil diambil',
-            'data' => [],
+            'data' => $data,
         ]);
     }
 
@@ -406,9 +521,35 @@ class ApiPegawaiController extends Controller
             'pesan' => 'required|string',
         ]);
 
+        $pegawai = DB::table('pegawai')->where('nik', $request->nik)->first();
+        if (! $pegawai) {
+            return response()->json(['success' => false, 'message' => 'Pegawai tidak ditemukan.'], 404);
+        }
+
+        $now = now();
+        $nomorPengaduan = 'PGD-' . date('Ymd') . '-' . rand(1000, 9999);
+
+        $id = DB::table('pengaduan_pegawai')->insertGetId([
+            'nomor_pengaduan' => $nomorPengaduan,
+            'pelapor_id' => $pegawai->id,
+            'kategori' => 'Umum',
+            'judul' => $request->subjek,
+            'deskripsi' => $request->pesan,
+            'tanggal_pengaduan' => $now,
+            'nama_pegawai' => $pegawai->name,
+            'nik' => $pegawai->nik,
+            'cabang' => $pegawai->unit_kerja ?? 'Kantor Pusat',
+            'golongan' => $pegawai->golongan ?? '',
+            'anonim' => false,
+            'status' => 'DIAJUKAN',
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
         return response()->json([
             'success' => true,
             'message' => 'Pengaduan berhasil dikirim ke SDM.',
+            'data' => ['id' => $id, 'nomor_pengaduan' => $nomorPengaduan],
         ]);
     }
 }

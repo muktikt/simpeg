@@ -4,57 +4,24 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class LoginController extends Controller
 {
-    /**
-     * DUMMY USERS - satu akun per role, buat testing filter menu & akses.
-     * Ganti ini kalau sudah siap dihubungkan ke tabel userlogin + tbl_pegawai asli.
-     *
-     * userlevel (lihat config/simpeg_roles.php): 1=Admin, 2=Keuangan, 5=Pegawai, 7=Direksi
-     */
-    /**
-     * Data user diambil secara dinamis dari UserAkses & Pegawai yang terhubung ke Supabase.
-     */
-    protected array $dummyUsers = [];
-
-    protected function getAllowedWebUsers(): array
-    {
-        $userAksesController = app(\App\Http\Controllers\UserAksesController::class);
-        $userAksesList = $userAksesController->index()->getData()['users'] ?? session('dummy_userakses', []);
-        $allPegawai = app(\App\Http\Controllers\PegawaiController::class)->index(request())->getData()['pegawai'] ?? session('dummy_pegawai', []);
-
-        $result = [];
-        if (is_iterable($userAksesList)) {
-            foreach ($userAksesList as $ua) {
-                $nik = is_array($ua) ? ($ua['username'] ?? '') : ($ua->username ?? '');
-                if (! $nik) continue;
-
-                $pass = is_array($ua) ? ($ua['password'] ?? 'password') : ($ua->password ?? 'password');
-                $nama = is_array($ua) ? ($ua['nama'] ?? '') : ($ua->nama ?? '');
-                $level = is_array($ua) ? ($ua['userlevel'] ?? '5') : ($ua->userlevel ?? '5');
-
-                $peg = collect($allPegawai)->firstWhere('nik', $nik);
-                $pegNama = is_array($peg) ? ($peg['nama'] ?? '') : ($peg->nama ?? '');
-                $pegJabatan = is_array($peg) ? ($peg['jabatan'] ?? '') : ($peg->jabatan ?? '');
-
-                $result[$nik] = [
-                    'nik' => $nik,
-                    'password' => $pass,
-                    'nama_peg' => $nama ?: ($pegNama ?: 'Pegawai'),
-                    'jabatan' => $pegJabatan ?: 'Pegawai',
-                    'userlevel' => (string) $level,
-                ];
-            }
-        }
-
-        return $result;
-    }
+    protected array $defaultPasswords = [
+        '3000000003' => 'pegawai123',
+        '4000000001' => 'kadiv123',
+        '4000000006' => 'kadivteknik2026',
+        '4000000002' => 'kspi123',
+        '4000000003' => 'tpdpk123',
+        '5000000001' => 'dirut123',
+        '5000000002' => 'sdm123',
+        '4000000005' => 'kadiv123',
+    ];
 
     /**
-     * Pegawai (userlevel 5) tidak diarahkan ke dashboard perusahaan -
-     * mengikuti sistem lama (menu_incl_pdam.php) yang landing page-nya
-     * langsung profil diri sendiri, bukan dashboard statistik perusahaan.
+     * Pegawai (userlevel 5) diarahkan ke profil diri sendiri,
+     * role lain (Admin, Keuangan, Direksi) ke dashboard.
      */
     protected function redirectRouteFor(array $user): string
     {
@@ -73,31 +40,66 @@ class LoginController extends Controller
     public function login(Request $request)
     {
         $request->validate([
-            'nik' => 'required|string',
+            'nik' => 'required',
             'password' => 'required|string',
         ]);
 
-        $allowedUsers = $this->getAllowedWebUsers();
-        $user = $allowedUsers[$request->nik] ?? null;
+        $nik = (string) trim($request->nik);
 
-        if ($user && $request->password === $user['password']) {
-            $request->session()->regenerate();
-            $request->session()->put('simpeg_user', $user);
-
-            return redirect()->route($this->redirectRouteFor($user));
+        // 1. Cari pegawai murni di database Supabase
+        $pegawai = null;
+        try {
+            $pegawai = DB::table('pegawai')->where('nik', $nik)->first();
+        } catch (\Throwable $e) {
+            // DB connection error handling
         }
 
-        $allPegawai = session('dummy_pegawai', []);
-        $isPegawai = collect($allPegawai)->contains('nik', $request->nik);
-        if ($isPegawai && ! $user) {
+        if (! $pegawai) {
             return back()
-                ->withErrors(['nik' => 'NIK Anda terdaftar sebagai pegawai, tetapi belum diberi hak akses ke Web SIMPEG. Silakan hubungi Administrator.'])
+                ->withErrors(['nik' => 'NIK tidak terdaftar dalam database.'])
                 ->onlyInput('nik');
         }
 
-        return back()
-            ->withErrors(['nik' => 'NIK atau kata sandi salah.'])
-            ->onlyInput('nik');
+        // 2. Verifikasi Password
+        $expectedPass = $this->defaultPasswords[$nik] ?? 'password';
+        if ($request->password !== $expectedPass) {
+            return back()
+                ->withErrors(['nik' => 'Kata sandi yang Anda masukkan salah.'])
+                ->onlyInput('nik');
+        }
+
+        // 3. Tentukan userlevel murni berdasarkan database:
+        // Level 1 = Admin / SDM
+        // Level 2 = Keuangan
+        // Level 7 = Direksi (DIRUT)
+        // Level 5 = Pegawai biasa (termasuk Kadiv, KSPI, TPDPK)
+        $userLevel = '5';
+        $dbRole = strtolower($pegawai->role ?? '');
+        $jabatanLower = strtolower($pegawai->jabatan ?? '');
+
+        if ($dbRole === 'direktur' || $nik === '5000000001' || str_contains($jabatanLower, 'direktur utama')) {
+            $userLevel = '7'; // DIRUT
+        } elseif ($dbRole === 'admin' || $dbRole === 'sdm' || $nik === '5000000002' || str_contains($jabatanLower, 'sdm') || $jabatanLower === 'admin' || $jabatanLower === 'administrator') {
+            $userLevel = '1'; // Admin / SDM
+        } elseif ($dbRole === 'keuangan' || $dbRole === 'keu' || str_contains($jabatanLower, 'keuangan')) {
+            $userLevel = '2'; // Keuangan
+        } else {
+            $userLevel = '5'; // Pegawai biasa (Kadiv, KSPI, TPDPK, Pelaksana, dll)
+        }
+
+        $user = [
+            'id' => $pegawai->id,
+            'nik' => $pegawai->nik,
+            'password' => $expectedPass,
+            'nama_peg' => $pegawai->name,
+            'jabatan' => $pegawai->jabatan,
+            'userlevel' => $userLevel,
+        ];
+
+        $request->session()->regenerate();
+        $request->session()->put('simpeg_user', $user);
+
+        return redirect()->route($this->redirectRouteFor($user));
     }
 
     public function logout(Request $request)
