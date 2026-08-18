@@ -21,12 +21,7 @@ class ProfileController extends Controller
     {
         $userLogin = session('simpeg_user');
 
-        // Pastikan session dummy_pegawai terisi jika belum ada
-        if (! session()->has('dummy_pegawai')) {
-            app(PegawaiController::class)->index(request());
-        }
-
-        $allPegawai = session('dummy_pegawai', []);
+        $allPegawai = app(PegawaiController::class)->all();
         $pegawai = collect($allPegawai)->firstWhere('nik', $userLogin['nik']);
 
         if (! $pegawai) {
@@ -88,7 +83,7 @@ class ProfileController extends Controller
             'file' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:5000',
         ]);
 
-        $allPegawai = session('dummy_pegawai', []);
+        $allPegawai = app(PegawaiController::class)->all();
         $fileName = 'Dokumen_' . time() . '.pdf';
         
         if ($request->hasFile('file')) {

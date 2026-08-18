@@ -37,7 +37,7 @@ class GajiLaporanController extends Controller
 
     protected function pegawaiById(int $id): ?array
     {
-        return collect(session('dummy_pegawai', []))->firstWhere('id', $id);
+        return collect(app(PegawaiController::class)->all())->firstWhere('id', $id);
     }
 
     protected function periodeInput(Request $request): array

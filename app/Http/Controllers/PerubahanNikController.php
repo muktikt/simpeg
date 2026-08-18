@@ -27,7 +27,7 @@ class PerubahanNikController extends Controller
     public function index()
     {
         return view('perubahan-nik.index', [
-            'pegawaiList' => session('dummy_pegawai', []),
+            'pegawaiList' => app(PegawaiController::class)->all(),
         ]);
     }
 
@@ -38,7 +38,7 @@ class PerubahanNikController extends Controller
             'nik_baru' => 'required|string|max:20',
         ]);
 
-        $pegawaiList = session('dummy_pegawai', []);
+        $pegawaiList = app(PegawaiController::class)->all();
         $pegawai = collect($pegawaiList)->firstWhere('id', $validated['pegawai_id']);
         abort_if(! $pegawai, 404);
 

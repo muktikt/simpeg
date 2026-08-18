@@ -87,7 +87,7 @@ class PotonganKeuController extends Controller
 
     protected function pegawaiList(): array
     {
-        return collect(session('dummy_pegawai', []))->where('status_peg', '!=', 'PN')->values()->all();
+        return collect(app(PegawaiController::class)->all())->where('status_peg', '!=', 'PN')->values()->all();
     }
 
     protected function pegawaiById(int $id): ?array

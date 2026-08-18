@@ -19,7 +19,7 @@
                 <select id="pegawai_id" name="pegawai_id" required onchange="onPegawaiChange()">
                     <option value="">-- Pilih Pegawai --</option>
                     @foreach ($pegawaiList as $p)
-                        <option value="{{ $p['id'] }}" @selected((string) old('pegawai_id') === (string) $p['id'])>{{ $p['nik'] }} - {{ $p['nama'] }}</option>
+                        <option value="{{ $p['id'] }}" @selected((string) old('pegawai_id') === (string) $p['id'])>{{ $p['nik'] }} - {{ $p['nama'] }} ({{ $p['jabatan'] }})</option>
                     @endforeach
                 </select>
                 @error('pegawai_id') <div class="form-error">{{ $message }}</div> @enderror

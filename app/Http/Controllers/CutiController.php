@@ -20,7 +20,7 @@ class CutiController extends Controller
      */
     protected function pegawaiById(int $id): ?array
     {
-        return collect(session('dummy_pegawai', []))->firstWhere('id', $id);
+        return collect(app(PegawaiController::class)->all())->firstWhere('id', $id);
     }
 
     public function index(Request $request)

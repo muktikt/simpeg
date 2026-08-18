@@ -36,7 +36,7 @@ class LaporanPotonganController extends Controller
     {
         $key = "dummy_potongan_{$tipe}";
         $data = collect(session($key, []));
-        $pegawai = collect(session('dummy_pegawai', []));
+        $pegawai = collect(app(PegawaiController::class)->all());
 
         $bulan = $bulan ?? now()->month;
         $tahun = $tahun ?? now()->year;

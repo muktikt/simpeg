@@ -47,7 +47,7 @@ class DapenmaController extends Controller
     protected function pegawaiList(): array
     {
         // Pegawai berstatus Pensiun (PN) tidak ditampilkan di dropdown pilih pegawai.
-        return collect(session('dummy_pegawai', []))->where('status_peg', '!=', 'PN')->values()->all();
+        return collect(app(PegawaiController::class)->all())->where('status_peg', '!=', 'PN')->values()->all();
     }
 
     protected function pegawaiById(int $id): ?array

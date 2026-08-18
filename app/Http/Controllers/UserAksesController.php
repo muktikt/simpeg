@@ -21,23 +21,16 @@ class UserAksesController extends Controller
      */
     protected function seedIfEmpty(): void
     {
-        if (! session()->has('dummy_pegawai')) {
-            app(PegawaiController::class)->index(request());
-        }
-
-        $allPegawai = session('dummy_pegawai', []);
+        $allPegawai = app(PegawaiController::class)->all();
 
         $defaultRoles = [
-            '2000000001' => '1', // Mukti - Admin
-            '6000000001' => '1', // Rina - Admin (SDM)
-            '2000000002' => '2', // Dewi - Keuangan
             '5000000001' => '7', // H. Dedi Supriadi - Direksi (DIRUT)
             '5000000002' => '1', // Victoria Usang - SDM
-            '4000000001' => '1', // Siti Rahmawati - Kadiv Administrasi
-            '4000000005' => '1', // Nur Aisyah Lestari - Kadiv Administrasi
-            '4000000006' => '1', // Agus Setiawan - Kadiv Teknik
-            '4000000002' => '5', // Ahmad Fauzi - KSPI
-            '4000000003' => '5', // Dedi Kurniawan - TPDPK
+            '4000000001' => '5', // Siti Rahmawati - Pegawai (Kadiv Admin)
+            '4000000005' => '5', // Nur Aisyah Lestari - Pegawai (Kadiv Admin)
+            '4000000006' => '5', // Agus Setiawan - Pegawai (Kadiv Teknik)
+            '4000000002' => '5', // Ahmad Fauzi - Pegawai (KSPI)
+            '4000000003' => '5', // Dedi Kurniawan - Pegawai (TPDPK)
             '3000000003' => '5', // Budi Santoso - Pegawai
         ];
 

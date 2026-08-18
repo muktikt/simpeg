@@ -22,43 +22,6 @@ class PegawaiController extends Controller
         return [
             [
                 'id' => 1,
-                'nik' => '2000000001',
-                'nama' => 'Mukti Kurniawan',
-                'jabatan' => 'Staf SDM',
-                'unit_kerja' => 'Kantor Pusat',
-                'status_peg' => 'PT',
-                'tgl_masuk' => '2017-11-25',
-                'telp' => '081234567890',
-                'alamat' => 'Jl. Merdeka No. 10, Kota A',
-                'keluarga' => [
-                    ['id' => 1, 'nama' => 'Sri Wahyuni', 'hubungan' => 'Istri/Suami', 'tgl_lahir' => '1992-03-14', 'keterangan' => '-'],
-                    ['id' => 2, 'nama' => 'Budi Santoso', 'hubungan' => 'Anak', 'tgl_lahir' => '2002-05-10', 'keterangan' => 'Tidak Kuliah'],
-                    ['id' => 3, 'nama' => 'Citra Santoso', 'hubungan' => 'Anak', 'tgl_lahir' => '2015-08-20', 'keterangan' => '-'],
-                ],
-                'golongan' => [['id' => 1, 'golongan' => 'III/A', 'tmt' => '2020-01-01']],
-                'jabatan_riwayat' => [['id' => 1, 'jabatan' => 'Staf SDM', 'unit_kerja' => 'Kantor Pusat', 'tmt' => '2021-06-01']],
-                'pendidikan' => [['id' => 1, 'jenjang' => 'S1', 'jurusan' => 'Manajemen', 'institusi' => 'Universitas A', 'tahun_lulus' => '2016']],
-                'prestasi' => [['id' => 1, 'judul' => 'Pegawai Teladan', 'keterangan' => 'Penghargaan tahunan unit kerja', 'tanggal' => '2023-12-10']],
-            ],
-            [
-                'id' => 2,
-                'nik' => '2000000002',
-                'nama' => 'Dewi Anggraini',
-                'jabatan' => 'Staf Keuangan',
-                'unit_kerja' => 'Divisi Keuangan',
-                'status_peg' => 'PT',
-                'tgl_masuk' => '2018-03-02',
-                'telp' => '081298765432',
-                'alamat' => 'Jl. Sudirman No. 22, Kota B',
-                'keluarga' => [],
-                'golongan' => [['id' => 1, 'golongan' => 'II/D', 'tmt' => '2019-01-01']],
-                'jabatan_riwayat' => [['id' => 1, 'jabatan' => 'Staf Keuangan', 'unit_kerja' => 'Divisi Keuangan', 'tmt' => '2019-01-01']],
-                'pendidikan' => [['id' => 1, 'jenjang' => 'D3', 'jurusan' => 'Akuntansi', 'institusi' => 'Politeknik B', 'tahun_lulus' => '2017']],
-                'prestasi' => [],
-            ],
-
-            [
-                'id' => 4,
                 'nik' => '3000000003',
                 'nama' => 'Budi Santoso',
                 'jabatan' => 'Staf Unit Produksi Indramayu',
@@ -74,7 +37,7 @@ class PegawaiController extends Controller
                 'prestasi' => [],
             ],
             [
-                'id' => 5,
+                'id' => 2,
                 'nik' => '4000000001',
                 'nama' => 'Siti Rahmawati',
                 'jabatan' => 'Kepala Divisi Administrasi',
@@ -90,7 +53,7 @@ class PegawaiController extends Controller
                 'prestasi' => [],
             ],
             [
-                'id' => 6,
+                'id' => 3,
                 'nik' => '4000000006',
                 'nama' => 'Agus Setiawan',
                 'jabatan' => 'Kepala Divisi Teknik',
@@ -106,7 +69,7 @@ class PegawaiController extends Controller
                 'prestasi' => [],
             ],
             [
-                'id' => 7,
+                'id' => 4,
                 'nik' => '4000000002',
                 'nama' => 'Ahmad Fauzi',
                 'jabatan' => 'Kepala Satuan Pengawas Internal',
@@ -122,15 +85,15 @@ class PegawaiController extends Controller
                 'prestasi' => [],
             ],
             [
-                'id' => 8,
+                'id' => 5,
                 'nik' => '4000000003',
                 'nama' => 'Dedi Kurniawan',
                 'jabatan' => 'Tim Penegak Disiplin Pegawai dan Kode Etik',
                 'unit_kerja' => 'Kantor Pusat',
                 'status_peg' => 'PT',
-                'tgl_masuk' => '2017-02-15',
+                'tgl_masuk' => '2017-04-15',
                 'telp' => '081266554433',
-                'alamat' => 'Jl. Gajah Mada No. 15, Indramayu',
+                'alamat' => 'Jl. Veteran No. 15, Indramayu',
                 'keluarga' => [],
                 'golongan' => [],
                 'jabatan_riwayat' => [],
@@ -138,15 +101,15 @@ class PegawaiController extends Controller
                 'prestasi' => [],
             ],
             [
-                'id' => 9,
+                'id' => 6,
                 'nik' => '5000000001',
                 'nama' => 'H. Dedi Supriadi',
                 'jabatan' => 'Direktur Utama',
                 'unit_kerja' => 'Kantor Pusat',
-                'status_peg' => 'DI',
+                'status_peg' => 'PT',
                 'tgl_masuk' => '2012-01-01',
                 'telp' => '081122334455',
-                'alamat' => 'Jl. Widarasari No. 1, Indramayu',
+                'alamat' => 'Jl. MT Haryono No. 1, Indramayu',
                 'keluarga' => [],
                 'golongan' => [],
                 'jabatan_riwayat' => [],
@@ -154,23 +117,7 @@ class PegawaiController extends Controller
                 'prestasi' => [],
             ],
             [
-                'id' => 10,
-                'nik' => '6000000001',
-                'nama' => 'Rina Amelia',
-                'jabatan' => 'Staf SDM',
-                'unit_kerja' => 'Kantor Pusat',
-                'status_peg' => 'PT',
-                'tgl_masuk' => '2019-07-01',
-                'telp' => '081255443322',
-                'alamat' => 'Jl. Ahmad Yani No. 50, Indramayu',
-                'keluarga' => [],
-                'golongan' => [],
-                'jabatan_riwayat' => [],
-                'pendidikan' => [],
-                'prestasi' => [],
-            ],
-            [
-                'id' => 11,
+                'id' => 7,
                 'nik' => '5000000002',
                 'nama' => 'Victoria Usang',
                 'jabatan' => 'Staf SDM',
@@ -186,7 +133,7 @@ class PegawaiController extends Controller
                 'prestasi' => [],
             ],
             [
-                'id' => 12,
+                'id' => 8,
                 'nik' => '4000000005',
                 'nama' => 'Nur Aisyah Lestari',
                 'jabatan' => 'Kepala Divisi Administrasi',
@@ -236,7 +183,7 @@ class PegawaiController extends Controller
         }
     }
 
-    protected function all(): array
+    public function all(): array
     {
         try {
             $dbPegawai = \Illuminate\Support\Facades\DB::table('pegawai')->get();
@@ -269,6 +216,7 @@ class PegawaiController extends Controller
                         'prestasi' => $prestasi,
                     ];
                 }
+                session()->put('dummy_pegawai', $list);
                 return $list;
             }
         } catch (\Throwable $e) {

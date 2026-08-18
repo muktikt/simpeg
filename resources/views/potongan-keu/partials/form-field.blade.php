@@ -10,7 +10,7 @@
             <option value="">-- Pilih Pegawai --</option>
             @foreach ($pegawaiList as $p)
                 <option value="{{ $p['id'] }}" @selected((string) old('pegawai_id', $item['pegawai_id'] ?? '') === (string) $p['id'])>
-                    {{ $p['nik'] }} - {{ $p['nama'] }}
+                    {{ $p['nik'] }} - {{ $p['nama'] }} ({{ $p['jabatan'] }})
                 </option>
             @endforeach
         </select>

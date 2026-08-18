@@ -39,7 +39,7 @@ class InsentifController extends Controller
                 ->filter(fn ($row) => $row['status'] === 'terbit');
         }
 
-        $pegawaiList = session('dummy_pegawai', []);
+        $pegawaiList = app(PegawaiController::class)->all();
         $data = $data->map(function ($row) use ($pegawaiList) {
             $p = collect($pegawaiList)->firstWhere('id', $row['pegawai_id']);
             $row['unit_kerja'] = $p['unit_kerja'] ?? '-';
