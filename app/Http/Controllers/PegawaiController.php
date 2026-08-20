@@ -148,6 +148,22 @@ class PegawaiController extends Controller
                 'pendidikan' => [],
                 'prestasi' => [],
             ],
+            [
+                'id' => 9,
+                'nik' => '6000000001',
+                'nama' => 'Antony Loyal',
+                'jabatan' => 'Staf Unit Produksi Indramayu',
+                'unit_kerja' => 'Cabang Indramayu',
+                'status_peg' => 'PT',
+                'tgl_masuk' => '2021-02-01',
+                'telp' => '081211223344',
+                'alamat' => 'Blok Panggang, Tegalsembadra',
+                'keluarga' => [],
+                'golongan' => [],
+                'jabatan_riwayat' => [],
+                'pendidikan' => [],
+                'prestasi' => [],
+            ],
         ];
     }
 

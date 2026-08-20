@@ -11,12 +11,12 @@ class LoginController extends Controller
     protected array $defaultPasswords = [
         '3000000003' => 'pegawai123',
         '4000000001' => 'kadiv123',
-        '4000000006' => 'kadivteknik2026',
+        '4000000006' => 'kadivteknik2025',
+        '4000000005' => 'kadivadmin2025',
         '4000000002' => 'kspi123',
         '4000000003' => 'tpdpk123',
         '5000000001' => 'dirut123',
         '5000000002' => 'sdm123',
-        '4000000005' => 'kadiv123',
     ];
 
     /**
@@ -60,9 +60,25 @@ class LoginController extends Controller
                 ->onlyInput('nik');
         }
 
-        // 2. Verifikasi Password
+        // 2. Verifikasi Password langsung ke hash auth.users Supabase atau defaultPasswords
+        $passwordValid = false;
+        try {
+            $authUser = DB::table('auth.users')->where('email', "{$nik}@gmail.com")->first();
+            if ($authUser && ! empty($authUser->encrypted_password)) {
+                if (password_verify($request->password, $authUser->encrypted_password)) {
+                    $passwordValid = true;
+                }
+            }
+        } catch (\Throwable $e) {
+            // Fallback to static verify
+        }
+
         $expectedPass = $this->defaultPasswords[$nik] ?? 'password';
-        if ($request->password !== $expectedPass) {
+        if (! $passwordValid && $request->password === $expectedPass) {
+            $passwordValid = true;
+        }
+
+        if (! $passwordValid) {
             return back()
                 ->withErrors(['nik' => 'Kata sandi yang Anda masukkan salah.'])
                 ->onlyInput('nik');

@@ -26,6 +26,7 @@ class UserAksesController extends Controller
         $defaultRoles = [
             '5000000001' => '7', // H. Dedi Supriadi - Direksi (DIRUT)
             '5000000002' => '1', // Victoria Usang - SDM
+            '6000000001' => '2', // Antony Loyal - Keuangan
             '4000000001' => '5', // Siti Rahmawati - Pegawai (Kadiv Admin)
             '4000000005' => '5', // Nur Aisyah Lestari - Pegawai (Kadiv Admin)
             '4000000006' => '5', // Agus Setiawan - Pegawai (Kadiv Teknik)
@@ -37,13 +38,13 @@ class UserAksesController extends Controller
         $defaultPasswords = [
             '3000000003' => 'pegawai123',
             '4000000001' => 'kadiv123',
-            '4000000006' => 'kadivteknik2026',
+            '4000000006' => 'kadivteknik2025',
+            '4000000005' => 'kadivadmin2025',
             '4000000002' => 'kspi123',
             '4000000003' => 'tpdpk123',
             '5000000001' => 'dirut123',
             '5000000002' => 'sdm123',
-            '6000000001' => 'sdm123',
-            '4000000005' => 'kadiv123',
+            '6000000001' => 'keuangan123',
             '2000000001' => 'admin123',
             '2000000002' => 'keuangan123',
         ];
