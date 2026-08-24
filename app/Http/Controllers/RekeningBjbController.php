@@ -15,16 +15,7 @@ class RekeningBjbController extends Controller
     protected function seedIfEmpty(): void
     {
         if (! session()->has('dummy_rek_bjb')) {
-            $pegawai = collect(session('dummy_pegawai', []))->where('status_peg', '!=', 'PN')->take(3);
-            $seed = [];
-            foreach ($pegawai as $idx => $p) {
-                $seed[] = [
-                    'id'     => $idx + 1,
-                    'nik'    => $p['nik'],
-                    'no_rek' => '00' . rand(10000000, 99999999),
-                ];
-            }
-            session()->put('dummy_rek_bjb', $seed);
+            session()->put('dummy_rek_bjb', []);
         }
     }
 

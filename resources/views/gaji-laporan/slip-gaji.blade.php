@@ -156,7 +156,7 @@
                     <tr>
                         <td class="cell-nik">{{ $d['nik'] }}</td>
                         <td class="cell-name">{{ $d['nama'] }}</td>
-                        <td>{{ \App\Http\Controllers\GajiProsesController::KATEGORI[$d['kategori']] ?? $d['kategori'] }}</td>
+                        <td>{{ \App\Http\Controllers\GajiProsesController::KATEGORI[$d['kategori'] ?? 'pegawai'] ?? ($d['kategori'] ?? 'Pegawai Tetap') }}</td>
                         <td>Rp {{ number_format($d['gaji_bersih'], 0, ',', '.') }}</td>
                         <td><a href="{{ route('gaji-proses.show', $d['id']) }}" class="btn btn-outline btn-sm">Lihat Slip</a></td>
                     </tr>

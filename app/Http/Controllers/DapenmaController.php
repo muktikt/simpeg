@@ -19,16 +19,7 @@ class DapenmaController extends Controller
     protected function seedIfEmpty(): void
     {
         if (! session()->has('dummy_dapenma')) {
-            session()->put('dummy_dapenma', [
-                [
-                    'id' => 1,
-                    'pegawai_id' => 1,
-                    'nomor_peserta' => 'DPM-2017-001',
-                    'nominal_phdp' => 4200000,
-                    'tgl_update' => now()->toDateString(),
-                    'petugas_entri' => 'Admin'
-                ],
-            ]);
+            session()->put('dummy_dapenma', []);
         }
     }
 
@@ -50,9 +41,17 @@ class DapenmaController extends Controller
         return collect(app(PegawaiController::class)->all())->where('status_peg', '!=', 'PN')->values()->all();
     }
 
-    protected function pegawaiById(int $id): ?array
+    protected function pegawaiById(mixed $id): ?array
     {
-        return collect($this->pegawaiList())->firstWhere('id', $id);
+        if (! $id) {
+            return null;
+        }
+
+        return collect($this->pegawaiList())->first(function ($p) use ($id) {
+            return (string) ($p['id'] ?? '') === (string) $id
+                || (string) ($p['db_id'] ?? '') === (string) $id
+                || (string) ($p['nik'] ?? '') === (string) $id;
+        });
     }
 
     protected function withCalculated(array $row): array

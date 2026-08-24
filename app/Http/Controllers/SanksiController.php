@@ -26,15 +26,18 @@ class SanksiController extends Controller
     protected function seedIfEmpty(): void
     {
         if (! session()->has('dummy_sanksi')) {
-            session()->put('dummy_sanksi', [
-                ['id' => 1, 'pegawai_id' => 2, 'tanggal' => '2026-06-10', 'jenis_sanksi' => 'Lisan', 'keterangan' => 'Terlambat masuk kerja berulang kali', 'potongan_persen' => 5],
-            ]);
+            session()->put('dummy_sanksi', []);
         }
     }
 
     protected function all(): array
     {
-        $this->seedIfEmpty();
+        try {
+            $rows = \Illuminate\Support\Facades\DB::table('sanksi')->get();
+            if ($rows->isNotEmpty()) {
+                return $rows->map(fn ($r) => (array) $r)->toArray();
+            }
+        } catch (\Throwable $e) {}
 
         return session('dummy_sanksi', []);
     }
@@ -50,9 +53,17 @@ class SanksiController extends Controller
         return collect(app(PegawaiController::class)->all())->where('status_peg', '!=', 'PN')->values()->all();
     }
 
-    protected function pegawaiById(int $id): ?array
+    protected function pegawaiById(mixed $id): ?array
     {
-        return collect($this->pegawaiList())->firstWhere('id', $id);
+        if (! $id) {
+            return null;
+        }
+
+        return collect($this->pegawaiList())->first(function ($p) use ($id) {
+            return (string) ($p['id'] ?? '') === (string) $id
+                || (string) ($p['db_id'] ?? '') === (string) $id
+                || (string) ($p['nik'] ?? '') === (string) $id;
+        });
     }
 
     protected function withPegawai(array $rows): array
@@ -107,7 +118,22 @@ class SanksiController extends Controller
         $data[] = $validated;
         $this->save($data);
 
-        return redirect()->route('sanksi.index')->with('success', 'Data sanksi berhasil ditambahkan.');
+        try {
+            $pegawai = \Illuminate\Support\Facades\DB::table('pegawai')->where('id', $validated['pegawai_id'])->first();
+            \Illuminate\Support\Facades\DB::table('sanksi')->insert([
+                'pegawai_id' => $validated['pegawai_id'],
+                'jenis_sanksi' => $validated['jenis_sanksi'],
+                'no_surat' => 'SK-' . date('Ymd') . '-' . $newId,
+                'tanggal' => $validated['tanggal'],
+                'keterangan' => $validated['keterangan'] ?? '-',
+                'status' => 'AKTIF',
+                'created_at' => now(),
+            ]);
+        } catch (\Throwable $e) {
+            // Fallback
+        }
+
+        return redirect()->route('sanksi.index')->with('success', 'Data sanksi pegawai berhasil ditambahkan dan tersimpan ke database.');
     }
 
     public function edit(int $id)

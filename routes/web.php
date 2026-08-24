@@ -26,6 +26,8 @@ use App\Http\Controllers\PotonganKeuController;
 use App\Http\Controllers\RekeningBjbController;
 use App\Http\Controllers\CekNikController;
 use App\Http\Controllers\LaporanPotonganController;
+use App\Http\Controllers\SettingAplikasiController;
+use App\Http\Controllers\PengaduanController;
 
 Route::get('/', [LoginController::class, 'showLoginForm'])->name('login');
 Route::post('/login', [LoginController::class, 'login'])->name('login.attempt');
@@ -220,15 +222,23 @@ Route::middleware(['simpeg.auth'])->group(function () {
         });
     });
 
+    // SET Aplikasi - Admin only
+    Route::prefix('setting-aplikasi')->name('setting-aplikasi.')->middleware(['simpeg.auth:1'])->group(function () {
+        Route::get('/', [SettingAplikasiController::class, 'index'])->name('index');
+        Route::put('/', [SettingAplikasiController::class, 'update'])->name('update');
+    });
+
     // Perubahan NIK - Admin only.
     Route::prefix('perubahan-nik')->name('perubahan-nik.')->middleware(['simpeg.auth:1'])->group(function () {
         Route::get('/', [PerubahanNikController::class, 'index'])->name('index');
         Route::post('/', [PerubahanNikController::class, 'update'])->name('update');
     });
 
-    // Cuti - READ ONLY, tidak punya data sendiri (lihat catatan di
-    // CutiController). Admin, Keuangan, Direksi (bukan role Pegawai).
-    Route::get('/cuti', [CutiController::class, 'index'])->middleware(['simpeg.auth:1,2,7'])->name('cuti.index');
+    // Cuti Pegawai & Laporan Cuti
+    Route::prefix('cuti')->name('cuti.')->group(function () {
+        Route::get('/', [CutiController::class, 'index'])->middleware(['simpeg.auth:1,2,5,7'])->name('index');
+        Route::put('/{id}/status', [CutiController::class, 'updateStatus'])->middleware(['simpeg.auth:1'])->whereNumber('id')->name('update-status');
+    });
 
     // Pengaturan Akun Pengguna (Hak Akses User) - Admin only.
     Route::prefix('user-akses')->name('user-akses.')->middleware(['simpeg.auth:1'])->group(function () {
@@ -332,36 +342,11 @@ Route::middleware(['simpeg.auth'])->group(function () {
     Route::get('/approval', [ApprovalController::class, 'index'])->middleware(['simpeg.auth:1,2,7'])->name('approval.index');
 
     // Pengaduan Pegawai - Pegawai (5) & Admin (1)
-    Route::get('/pengaduan', function () {
-        $pengaduan = session('dummy_pengaduan', []);
-        $myRole = session('simpeg_user.userlevel');
-        $myNik = session('simpeg_user.nik');
-        if ($myRole === '5') {
-            $pengaduan = collect($pengaduan)->where('nik', $myNik)->values()->all();
-        }
-        return view('pengaduan.index', compact('pengaduan'));
-    })->name('pengaduan.index');
-
-    Route::post('/pengaduan', function (\Illuminate\Http\Request $request) {
-        $validated = $request->validate([
-            'subjek' => 'required|string|max:150',
-            'pesan' => 'required|string',
-        ]);
-        $userLogin = session('simpeg_user');
-        $items = session('dummy_pengaduan', []);
-        $newId = $items ? max(array_column($items, 'id')) + 1 : 1;
-        $items[] = [
-            'id' => $newId,
-            'nik' => $userLogin['nik'],
-            'nama' => $userLogin['nama_peg'],
-            'subjek' => $validated['subjek'],
-            'pesan' => $validated['pesan'],
-            'status' => 'Pending',
-            'tanggal' => date('Y-m-d H:i'),
-        ];
-        session()->put('dummy_pengaduan', $items);
-        return back()->with('success', 'Pengaduan berhasil dikirim.');
-    })->name('pengaduan.store');
+    Route::prefix('pengaduan')->name('pengaduan.')->group(function () {
+        Route::get('/', [PengaduanController::class, 'index'])->name('index');
+        Route::post('/', [PengaduanController::class, 'store'])->name('store');
+        Route::put('/{id}/status', [PengaduanController::class, 'updateStatus'])->middleware(['simpeg.auth:1'])->whereNumber('id')->name('update-status');
+    });
 
     // Profile - Khusus role Pegawai (role 5) di web. Admin & Keuangan mengelola data via Data Pegawai.
     Route::prefix('profile')->name('profile.')->middleware(['simpeg.auth:5'])->group(function () {

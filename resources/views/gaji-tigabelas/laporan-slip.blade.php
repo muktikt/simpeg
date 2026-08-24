@@ -27,7 +27,7 @@
 @if (session('simpeg_user.userlevel') === '5' || request('my'))
     @php
         $item = $data->first();
-        $totalNominal = $item ? ($item['gaji13_diterima'] ?? 2218400) : 2218400;
+        $totalNominal = !empty($rincianAnak) ? collect($rincianAnak)->sum('nominal') : ($item['gaji13_diterima'] ?? 0);
         $tahunAjaran = ($tahun - 1) . '/' . $tahun;
     @endphp
 
@@ -54,7 +54,7 @@
         </div>
 
         <div style="display: flex; flex-direction: column; gap: 16px; margin-bottom: 20px;">
-            @foreach ($rincianAnak as $anak)
+            @forelse ($rincianAnak as $anak)
                 <div style="border: 1px solid #e2e8f0; border-radius: 12px; padding: 18px 20px; background: #fff;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 10px;">
                         <div style="display: flex; align-items: center; gap: 12px;">
@@ -86,7 +86,11 @@
                         </div>
                     </div>
                 </div>
-            @endforeach
+            @empty
+                <div style="padding: 24px; text-align: center; color: #64748b; font-size: 13px; background: #f8fafc; border-radius: 10px; border: 1px dashed #cbd5e1;">
+                    Belum ada data anak yang tercatat pada database kepegawaian untuk akun ini.
+                </div>
+            @endforelse
         </div>
 
         <div style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; background: var(--teal-soft); border-radius: 12px; border: 1px solid var(--border);">

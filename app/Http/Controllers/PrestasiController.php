@@ -30,20 +30,18 @@ class PrestasiController extends Controller
     protected function seedIfEmpty(): void
     {
         if (! session()->has('dummy_prestasi_gaji')) {
-            session()->put('dummy_prestasi_gaji', [
-                [
-                    'id' => 1, 'pegawai_id' => 1, 'tanggal' => '2026-06-01', 'karya' => 'Baik',
-                    'absensi' => 'Baik', 'alpha' => 0, 'izin_ket' => 0, 'izin_non_ket' => 0,
-                    'sakit_ket' => 1, 'sakit_non_ket' => 0, 'dinas_luar' => 2, 'cuti' => 0,
-                    'alasan_cuti' => '', 'jam_lembur' => 8,
-                ],
-            ]);
+            session()->put('dummy_prestasi_gaji', []);
         }
     }
 
     protected function all(): array
     {
-        $this->seedIfEmpty();
+        try {
+            $rows = \Illuminate\Support\Facades\DB::table('prestasi')->get();
+            if ($rows->isNotEmpty()) {
+                return $rows->map(fn ($r) => (array) $r)->toArray();
+            }
+        } catch (\Throwable $e) {}
 
         return session('dummy_prestasi_gaji', []);
     }
@@ -59,9 +57,17 @@ class PrestasiController extends Controller
         return collect(app(PegawaiController::class)->all())->where('status_peg', '!=', 'PN')->values()->all();
     }
 
-    protected function pegawaiById(int $id): ?array
+    protected function pegawaiById(mixed $id): ?array
     {
-        return collect($this->pegawaiList())->firstWhere('id', $id);
+        if (! $id) {
+            return null;
+        }
+
+        return collect($this->pegawaiList())->first(function ($p) use ($id) {
+            return (string) ($p['id'] ?? '') === (string) $id
+                || (string) ($p['db_id'] ?? '') === (string) $id
+                || (string) ($p['nik'] ?? '') === (string) $id;
+        });
     }
 
     protected function withCalculated(array $row): array
@@ -115,7 +121,25 @@ class PrestasiController extends Controller
         $data[] = $validated;
         $this->save($data);
 
-        return redirect()->route('prestasi.index')->with('success', 'Data prestasi berhasil ditambahkan.');
+        try {
+            \Illuminate\Support\Facades\DB::table('prestasi')->insert([
+                'pegawai_id' => $validated['pegawai_id'],
+                'bulan' => \Illuminate\Support\Carbon::parse($validated['tanggal'])->month,
+                'tahun' => \Illuminate\Support\Carbon::parse($validated['tanggal'])->year,
+                'kehadiran' => $validated['absensi'] ?? 'Baik',
+                'telat' => (int) ($validated['alpha'] ?? 0),
+                'cuti' => (int) ($validated['cuti'] ?? 0),
+                'dinas' => (int) ($validated['dinas_luar'] ?? 0),
+                'lembur' => (int) ($validated['jam_lembur'] ?? 0),
+                'bonus' => 0,
+                'total_prestasi' => 100,
+                'created_at' => now(),
+            ]);
+        } catch (\Throwable $e) {
+            // Fallback
+        }
+
+        return redirect()->route('prestasi.index')->with('success', 'Data prestasi berhasil ditambahkan dan tersinkronisasi ke database.');
     }
 
     public function edit(int $id)

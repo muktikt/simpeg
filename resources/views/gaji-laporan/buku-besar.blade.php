@@ -35,11 +35,11 @@
         <tbody>
             @forelse ($data as $d)
                 <tr>
-                    <td class="cell-nik">{{ $d['nik'] }}</td>
-                    <td class="cell-name">{{ $d['nama'] }}</td>
-                    <td>Rp {{ number_format($d['total_pendapatan'], 0, ',', '.') }}</td>
-                    <td>Rp {{ number_format($d['total_potongan'], 0, ',', '.') }}</td>
-                    <td><strong>Rp {{ number_format($d['gaji_bersih'], 0, ',', '.') }}</strong></td>
+                    <td class="cell-nik">{{ $d['nik'] ?? '-' }}</td>
+                    <td class="cell-name">{{ $d['nama'] ?? '-' }}</td>
+                    <td>Rp {{ number_format($d['total_pendapatan'] ?? ($d['gaji_pokok'] ?? 0), 0, ',', '.') }}</td>
+                    <td>Rp {{ number_format($d['total_potongan'] ?? 0, 0, ',', '.') }}</td>
+                    <td><strong>Rp {{ number_format($d['gaji_bersih'] ?? ($d['total_terima'] ?? 0), 0, ',', '.') }}</strong></td>
                 </tr>
             @empty
                 <tr><td colspan="5"><div class="table-empty">Belum ada gaji yang terbit untuk periode ini.</div></td></tr>

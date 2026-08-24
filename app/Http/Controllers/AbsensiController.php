@@ -48,9 +48,17 @@ class AbsensiController extends Controller
         return collect(app(PegawaiController::class)->all())->where('status_peg', '!=', 'PN')->values()->all();
     }
 
-    protected function pegawaiById(int $id): ?array
+    protected function pegawaiById(mixed $id): ?array
     {
-        return collect($this->pegawaiList())->firstWhere('id', $id);
+        if (! $id) {
+            return null;
+        }
+
+        return collect($this->pegawaiList())->first(function ($p) use ($id) {
+            return (string) ($p['id'] ?? '') === (string) $id
+                || (string) ($p['db_id'] ?? '') === (string) $id
+                || (string) ($p['nik'] ?? '') === (string) $id;
+        });
     }
 
     /**

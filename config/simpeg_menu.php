@@ -28,7 +28,7 @@ return [
             'icon' => 'settings',
             'roles' => ['1'],
             'items' => [
-                ['label' => 'SET Aplikasi', 'route_name' => null],
+                ['label' => 'SET Aplikasi', 'route_name' => 'setting-aplikasi.index'],
                 ['label' => 'Pengaturan Akun Pengguna', 'route_name' => 'user-akses.index'],
                 ['label' => 'Perubahan NIK', 'route_name' => 'perubahan-nik.index'],
             ],
