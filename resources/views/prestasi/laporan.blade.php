@@ -32,13 +32,13 @@
         <tbody>
             @forelse ($prestasi as $p)
                 <tr>
-                    <td>{{ formatTglIndo($p['tanggal']) }}</td>
-                    <td class="cell-nik">{{ $p['nik'] }}</td>
-                    <td class="cell-name">{{ $p['nama'] }}</td>
-                    <td>{{ $p['karya'] }}</td>
-                    <td>{{ $p['absensi'] }}</td>
-                    <td>{{ $p['jam_lembur'] }} jam</td>
-                    <td>Rp {{ number_format($p['nominal_lembur'], 0, ',', '.') }}</td>
+                    <td>{{ formatTglIndo($p['tanggal'] ?? null) }}</td>
+                    <td class="cell-nik">{{ $p['nik'] ?? '-' }}</td>
+                    <td class="cell-name">{{ $p['nama'] ?? '-' }}</td>
+                    <td>{{ $p['karya'] ?? '-' }}</td>
+                    <td>{{ $p['absensi'] ?? '-' }}</td>
+                    <td>{{ $p['jam_lembur'] ?? 0 }} jam</td>
+                    <td>Rp {{ number_format($p['nominal_lembur'] ?? 0, 0, ',', '.') }}</td>
                 </tr>
             @empty
                 <tr><td colspan="7"><div class="table-empty">Belum ada data prestasi pegawai.</div></td></tr>

@@ -69,9 +69,13 @@ class SanksiController extends Controller
     protected function withPegawai(array $rows): array
     {
         return collect($rows)->map(function ($row) {
-            $p = $this->pegawaiById($row['pegawai_id']);
-            $row['nik'] = $p['nik'] ?? '-';
-            $row['nama'] = $p['nama'] ?? '(pegawai tidak ditemukan)';
+            $p = $this->pegawaiById($row['pegawai_id'] ?? null);
+            $row['nik'] = $p['nik'] ?? ($row['nik'] ?? '-');
+            $row['nama'] = $p['nama'] ?? ($row['nama_pegawai'] ?? '(pegawai tidak ditemukan)');
+            $row['jenis_sanksi'] = $row['jenis_sanksi'] ?? ($row['jenis'] ?? '-');
+            $row['keterangan'] = $row['keterangan'] ?? ($row['ket_sanksi'] ?? '-');
+            $row['potongan_persen'] = $row['potongan_persen'] ?? ($row['pot_persen'] ?? 0);
+            $row['tanggal'] = $row['tanggal'] ?? ($row['tgl_sanksi'] ?? ($row['created_at'] ?? now()->toDateString()));
 
             return $row;
         })->all();

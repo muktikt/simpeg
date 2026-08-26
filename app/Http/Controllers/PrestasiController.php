@@ -72,11 +72,15 @@ class PrestasiController extends Controller
 
     protected function withCalculated(array $row): array
     {
-        $p = $this->pegawaiById($row['pegawai_id']);
-        $row['nik'] = $p['nik'] ?? '-';
-        $row['nama'] = $p['nama'] ?? '(pegawai tidak ditemukan)';
+        $p = $this->pegawaiById($row['pegawai_id'] ?? null);
+        $row['nik'] = $p['nik'] ?? ($row['nik'] ?? '-');
+        $row['nama'] = $p['nama'] ?? ($row['nama_pegawai'] ?? '(pegawai tidak ditemukan)');
+        $row['karya'] = $row['karya'] ?? '-';
+        $row['absensi'] = $row['absensi'] ?? '-';
+        $row['jam_lembur'] = (float) ($row['jam_lembur'] ?? 0);
         $row['nominal_lembur_harian'] = self::RATE_LEMBUR_PER_JAM;
-        $row['nominal_lembur'] = $row['jam_lembur'] * self::RATE_LEMBUR_PER_JAM;
+        $row['nominal_lembur'] = $row['nominal_lembur'] ?? ($row['jam_lembur'] * self::RATE_LEMBUR_PER_JAM);
+        $row['tanggal'] = $row['tanggal'] ?? ($row['created_at'] ?? now()->toDateString());
 
         return $row;
     }

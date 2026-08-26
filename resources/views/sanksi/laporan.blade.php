@@ -31,12 +31,12 @@
         <tbody>
             @forelse ($sanksi as $s)
                 <tr>
-                    <td>{{ formatTglIndo($s['tanggal']) }}</td>
-                    <td class="cell-nik">{{ $s['nik'] }}</td>
-                    <td class="cell-name">{{ $s['nama'] }}</td>
-                    <td>{{ $s['jenis_sanksi'] }}</td>
-                    <td>{{ $s['keterangan'] ?: '-' }}</td>
-                    <td>{{ $s['potongan_persen'] }}%</td>
+                    <td>{{ formatTglIndo($s['tanggal'] ?? null) }}</td>
+                    <td class="cell-nik">{{ $s['nik'] ?? '-' }}</td>
+                    <td class="cell-name">{{ $s['nama'] ?? '-' }}</td>
+                    <td>{{ $s['jenis_sanksi'] ?? '-' }}</td>
+                    <td>{{ ($s['keterangan'] ?? '') ?: '-' }}</td>
+                    <td>{{ $s['potongan_persen'] ?? ($s['pot_persen'] ?? 0) }}%</td>
                 </tr>
             @empty
                 <tr><td colspan="6"><div class="table-empty">Belum ada data sanksi pegawai.</div></td></tr>
