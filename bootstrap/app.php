@@ -17,6 +17,7 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
         $middleware->alias([
             'simpeg.auth' => \App\Http\Middleware\SimpegAuth::class,
+            'api.key' => \App\Http\Middleware\ApiKeyAuth::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
