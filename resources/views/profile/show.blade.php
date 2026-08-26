@@ -40,7 +40,7 @@
             <p>Status</p>
         </div>
         <div>
-            <p>{{ !empty($pegawai['tgl_masuk']) ? \Illuminate\Support\Carbon::parse($pegawai['tgl_masuk'])->translatedFormat('d M Y') : '-' }}</p>
+            <p>{{ formatTglIndo($pegawai['tgl_masuk'] ?? null) }}</p>
             <p>Tgl Masuk</p>
         </div>
     </div>

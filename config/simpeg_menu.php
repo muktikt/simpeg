@@ -18,7 +18,7 @@ return [
         ['label' => 'Tunjangan Pendidikan', 'icon' => 'calendar', 'route_name' => 'gaji-tigabelas.laporan-slip', 'personal' => true, 'roles' => ['5']],
         ['label' => 'Insentif', 'icon' => 'report', 'route_name' => 'insentif.laporan-slip', 'personal' => true, 'roles' => ['5']],
         ['label' => 'Lembur', 'icon' => 'report', 'route_name' => 'gaji-laporan.lembur', 'personal' => true, 'roles' => ['5']],
-        ['label' => 'Pengaduan', 'icon' => 'report', 'route_name' => 'pengaduan.index', 'roles' => ['5', '1']],
+        ['label' => 'Pengaduan', 'icon' => 'report', 'route_name' => 'pengaduan.index', 'roles' => ['1', '2', '5', '7']],
         ['label' => 'Approval', 'icon' => 'report', 'route_name' => 'approval.index', 'roles' => ['1', '7']],
     ],
 

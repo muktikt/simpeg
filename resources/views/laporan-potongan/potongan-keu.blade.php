@@ -47,7 +47,7 @@
                 @forelse ($items as $item)
                     <tr>
                         <td>{{ $loop->iteration }}</td>
-                        <td>{{ \Illuminate\Support\Carbon::parse($item['tgl_potongan'])->translatedFormat('d/m/Y') }}</td>
+                        <td>{{ formatTglIndo($item['tgl_potongan'], 'd/m/Y') }}</td>
                         <td class="cell-nik">{{ $item['nik'] }}</td>
                         <td class="cell-name">{{ $item['nama'] }}</td>
                         @foreach ($kolom as $k)

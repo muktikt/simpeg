@@ -12,7 +12,6 @@ class LoginController extends Controller
         '3000000003' => 'pegawai123',
         '4000000001' => 'kadiv123',
         '4000000006' => 'kadivteknik2025',
-        '4000000005' => 'kadivadmin2025',
         '4000000002' => 'kspi123',
         '4000000003' => 'tpdpk123',
         '5000000001' => 'dirut123',
@@ -84,23 +83,31 @@ class LoginController extends Controller
                 ->onlyInput('nik');
         }
 
-        // 3. Tentukan userlevel murni berdasarkan database:
-        // Level 1 = Admin / SDM
-        // Level 2 = Keuangan
-        // Level 7 = Direksi (DIRUT)
-        // Level 5 = Pegawai biasa (termasuk Kadiv, KSPI, TPDPK)
-        $userLevel = '5';
-        $dbRole = strtolower($pegawai->role ?? '');
-        $jabatanLower = strtolower($pegawai->jabatan ?? '');
+        // 3. Tentukan userlevel & role pengaduan murni dari kolom database (pegawai.role & pegawai.divisi_kadiv):
+        $dbRole = strtolower(trim($pegawai->role ?? 'pegawai'));
+        $divisiKadiv = $pegawai->divisi_kadiv ?? null;
 
-        if ($dbRole === 'direktur' || $nik === '5000000001' || str_contains($jabatanLower, 'direktur utama')) {
+        if ($dbRole === 'direktur') {
             $userLevel = '7'; // DIRUT
-        } elseif ($dbRole === 'admin' || $dbRole === 'sdm' || $nik === '5000000002' || str_contains($jabatanLower, 'sdm') || $jabatanLower === 'admin' || $jabatanLower === 'administrator') {
+            $rolePengaduan = 'dirut';
+        } elseif ($dbRole === 'kspi') {
+            $userLevel = '5';
+            $rolePengaduan = 'kspi';
+        } elseif ($dbRole === 'tpdpk') {
+            $userLevel = '5';
+            $rolePengaduan = 'tpdpk';
+        } elseif ($dbRole === 'kadiv' || $dbRole === 'kadivkategori') {
+            $userLevel = '5';
+            $rolePengaduan = 'kadiv';
+        } elseif ($dbRole === 'admin' || $dbRole === 'sdm') {
             $userLevel = '1'; // Admin / SDM
-        } elseif ($dbRole === 'keuangan' || $dbRole === 'keu' || str_contains($jabatanLower, 'keuangan')) {
+            $rolePengaduan = 'sdm';
+        } elseif ($dbRole === 'keuangan' || $dbRole === 'keu') {
             $userLevel = '2'; // Keuangan
+            $rolePengaduan = 'keuangan';
         } else {
-            $userLevel = '5'; // Pegawai biasa (Kadiv, KSPI, TPDPK, Pelaksana, dll)
+            $userLevel = '5'; // Pegawai biasa
+            $rolePengaduan = 'pegawai';
         }
 
         $user = [
@@ -110,6 +117,8 @@ class LoginController extends Controller
             'nama_peg' => $pegawai->name,
             'jabatan' => $pegawai->jabatan,
             'userlevel' => $userLevel,
+            'role_pengaduan' => $rolePengaduan,
+            'divisi_kadiv' => $divisiKadiv,
         ];
 
         $request->session()->regenerate();

@@ -75,7 +75,7 @@
                     <tr>
                         <td class="cell-nik">{{ $d['nik'] }}</td>
                         <td class="cell-name">{{ $d['nama'] }}</td>
-                        <td>{{ \Illuminate\Support\Carbon::parse($d['tanggal'])->translatedFormat('d M Y') }}</td>
+                        <td>{{ formatTglIndo($d['tanggal'] ?? null) }}</td>
                         <td>{{ $d['jam_lembur'] }} jam</td>
                         <td>Rp {{ number_format($d['nominal_lembur'], 0, ',', '.') }}</td>
                     </tr>

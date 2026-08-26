@@ -141,7 +141,7 @@
     <div class="meta">
         <div><p>{{ $pegawai['nik'] }}</p><p>NIK</p></div>
         <div><p><span class="badge badge-{{ $pegawai['status_peg'] }}">{{ $badgeLabel[$pegawai['status_peg']] ?? $pegawai['status_peg'] }}</span></p><p>Status</p></div>
-        <div><p>{{ \Illuminate\Support\Carbon::parse($pegawai['tgl_masuk'])->translatedFormat('d M Y') }}</p><p>Tgl Masuk</p></div>
+        <div><p>{{ formatTglIndo($pegawai['tgl_masuk'] ?? null) }}</p><p>Tgl Masuk</p></div>
     </div>
     @if ($myRole === '1')
         @if ($pegawai['status_peg'] === 'CP')

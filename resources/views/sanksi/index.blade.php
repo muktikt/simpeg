@@ -40,7 +40,7 @@
             @forelse ($sanksi as $s)
                 <tr>
                     <td>{{ $loop->iteration }}</td>
-                    <td>{{ \Illuminate\Support\Carbon::parse($s['tanggal'])->translatedFormat('d M Y') }}</td>
+                    <td>{{ formatTglIndo($s['tanggal']) }}</td>
                     <td class="cell-nik">{{ $s['nik'] }}</td>
                     <td class="cell-name">{{ $s['nama'] }}</td>
                     <td>{{ $s['jenis_sanksi'] }}</td>

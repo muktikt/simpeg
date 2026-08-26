@@ -39,7 +39,7 @@
                     <td>{{ $d['nomor_peserta'] }}</td>
                     <td>Rp {{ number_format($d['nominal_phdp'], 0, ',', '.') }}</td>
                     <td>Rp {{ number_format($d['nominal_beban'], 0, ',', '.') }}</td>
-                    <td>{{ \Illuminate\Support\Carbon::parse($d['tgl_update'])->translatedFormat('d M Y') }}</td>
+                    <td>{{ formatTglIndo($d['tgl_update'] ?? null) }}</td>
                     <td>
                         <div class="row-actions">
                             <a href="{{ route('dapenma.edit', $d['id']) }}" class="btn btn-outline btn-sm">Edit</a>

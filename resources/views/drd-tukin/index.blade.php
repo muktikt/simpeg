@@ -32,7 +32,7 @@
             @forelse ($drd as $d)
                 <tr>
                     <td>{{ $loop->iteration }}</td>
-                    <td>{{ \Illuminate\Support\Carbon::parse($d['tanggal'])->translatedFormat('d M Y') }}</td>
+                    <td>{{ formatTglIndo($d['tanggal'] ?? null) }}</td>
                     <td>Rp {{ number_format($d['nominal_drd'], 0, ',', '.') }}</td>
                     <td>Rp {{ number_format($d['nominal_penerimaan'], 0, ',', '.') }}</td>
                     <td>{{ $d['efisiensi_persen'] }}%</td>

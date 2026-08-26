@@ -49,7 +49,7 @@
             @forelse ($prestasi as $p)
                 <tr>
                     <td>{{ $loop->iteration }}</td>
-                    <td>{{ \Illuminate\Support\Carbon::parse($p['tanggal'])->translatedFormat('d M Y') }}</td>
+                    <td>{{ formatTglIndo($p['tanggal']) }}</td>
                     <td class="cell-nik">{{ $p['nik'] }}</td>
                     <td class="cell-name">{{ $p['nama'] }}</td>
                     <td>{{ $p['karya'] }}</td>

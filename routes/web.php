@@ -341,11 +341,29 @@ Route::middleware(['simpeg.auth'])->group(function () {
     // Gaji Proses/THR/Gaji13 yang menunggu approval user yang login.
     Route::get('/approval', [ApprovalController::class, 'index'])->middleware(['simpeg.auth:1,2,7'])->name('approval.index');
 
-    // Pengaduan Pegawai - Pegawai (5) & Admin (1)
+    // Pengaduan Pegawai - Multi-Role Workflow (Pegawai, Kadiv, KSPI, DIRUT, TPDPK, SDM)
     Route::prefix('pengaduan')->name('pengaduan.')->group(function () {
         Route::get('/', [PengaduanController::class, 'index'])->name('index');
         Route::post('/', [PengaduanController::class, 'store'])->name('store');
-        Route::put('/{id}/status', [PengaduanController::class, 'updateStatus'])->middleware(['simpeg.auth:1'])->whereNumber('id')->name('update-status');
+        Route::get('/{id}', [PengaduanController::class, 'detail'])->whereNumber('id')->name('detail');
+
+        // Aksi Role Kadiv
+        Route::post('/{id}/kadiv-verifikasi', [PengaduanController::class, 'kadivVerifikasi'])->whereNumber('id')->name('kadiv-verifikasi');
+        Route::post('/{id}/kadiv-alihkan', [PengaduanController::class, 'kadivAlihkan'])->whereNumber('id')->name('kadiv-alihkan');
+
+        // Aksi Role KSPI
+        Route::post('/{id}/kspi-tolak', [PengaduanController::class, 'kspiTolak'])->whereNumber('id')->name('kspi-tolak');
+        Route::post('/{id}/kspi-teruskan-dirut', [PengaduanController::class, 'kspiTeruskanDirut'])->whereNumber('id')->name('kspi-teruskan-dirut');
+        Route::post('/{id}/kspi-pilih-eksekutor', [PengaduanController::class, 'kspiPilihEksekutor'])->whereNumber('id')->name('kspi-pilih-eksekutor');
+        Route::post('/{id}/kspi-review-hasil', [PengaduanController::class, 'kspiReviewHasil'])->whereNumber('id')->name('kspi-review-hasil');
+
+        // Aksi Role DIRUT
+        Route::post('/{id}/dirut-tahap1', [PengaduanController::class, 'dirutTahap1'])->whereNumber('id')->name('dirut-tahap1');
+        Route::post('/{id}/dirut-tahap2', [PengaduanController::class, 'dirutTahap2'])->whereNumber('id')->name('dirut-tahap2');
+        Route::post('/{id}/dirut-peninjauan-kembali', [PengaduanController::class, 'dirutPeninjauanKembali'])->whereNumber('id')->name('dirut-peninjauan-kembali');
+
+        // Aksi Role TPDPK / Kadiv (Eksekutor Investigasi)
+        Route::post('/{id}/tpdpk-hasil-investigasi', [PengaduanController::class, 'tpdpkHasilInvestigasi'])->whereNumber('id')->name('tpdpk-hasil-investigasi');
     });
 
     // Profile - Khusus role Pegawai (role 5) di web. Admin & Keuangan mengelola data via Data Pegawai.

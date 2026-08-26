@@ -58,7 +58,7 @@
                     <td>{{ $c['unit_kerja'] }}</td>
                     <td><span style="font-weight:600; color:#1e3a8a;">{{ $c['jenis'] }}</span></td>
                     <td style="white-space:nowrap; font-size:13px;">
-                        {{ \Illuminate\Support\Carbon::parse($c['tanggal_mulai'])->format('d M Y') }} s/d {{ \Illuminate\Support\Carbon::parse($c['tanggal_selesai'])->format('d M Y') }}
+                        {{ formatTglIndo($c['tanggal_mulai'] ?? null) }} s/d {{ formatTglIndo($c['tanggal_selesai'] ?? null) }}
                     </td>
                     <td style="font-size:13px; max-width:220px;">{{ $c['alasan'] ?: '-' }}</td>
                     <td>

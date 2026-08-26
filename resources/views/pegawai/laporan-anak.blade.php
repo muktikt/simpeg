@@ -30,7 +30,7 @@
                     <td class="cell-nik">{{ $d['nik_pegawai'] }}</td>
                     <td class="cell-name">{{ $d['nama_pegawai'] }}</td>
                     <td>{{ $d['nama'] }}</td>
-                    <td>{{ \Illuminate\Support\Carbon::parse($d['tgl_lahir'])->translatedFormat('d M Y') }}</td>
+                    <td>{{ formatTglIndo($d['tgl_lahir'] ?? null) }}</td>
                     <td>{{ $d['usia'] }} tahun</td>
                     <td>{{ $d['keterangan'] }}</td>
                 </tr>
