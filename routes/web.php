@@ -28,6 +28,7 @@ use App\Http\Controllers\CekNikController;
 use App\Http\Controllers\LaporanPotonganController;
 use App\Http\Controllers\SettingAplikasiController;
 use App\Http\Controllers\PengaduanController;
+use App\Http\Controllers\PengumumanController;
 
 Route::get('/', [LoginController::class, 'showLoginForm'])->name('login');
 Route::post('/login', [LoginController::class, 'login'])->name('login.attempt');
@@ -242,6 +243,21 @@ Route::middleware(['simpeg.auth'])->group(function () {
     Route::prefix('cuti')->name('cuti.')->group(function () {
         Route::get('/', [CutiController::class, 'index'])->middleware(['simpeg.auth:1,2,5,7'])->name('index');
         Route::put('/{id}/status', [CutiController::class, 'updateStatus'])->middleware(['simpeg.auth:1'])->whereNumber('id')->name('update-status');
+    });
+
+    // Kelola Pengumuman (SDM CRUD & Sinkronisasi Mobile)
+    Route::prefix('pengumuman')->name('pengumuman.')->group(function () {
+        Route::middleware(['simpeg.auth:1'])->group(function () {
+            Route::get('/', [PengumumanController::class, 'index'])->name('index');
+            Route::get('/create', [PengumumanController::class, 'create'])->name('create');
+            Route::post('/', [PengumumanController::class, 'store'])->name('store');
+            Route::get('/{id}/edit', [PengumumanController::class, 'edit'])->whereNumber('id')->name('edit');
+            Route::put('/{id}', [PengumumanController::class, 'update'])->whereNumber('id')->name('update');
+            Route::delete('/{id}', [PengumumanController::class, 'destroy'])->whereNumber('id')->name('destroy');
+            Route::post('/{id}/toggle-aktif', [PengumumanController::class, 'toggleAktif'])->whereNumber('id')->name('toggle-aktif');
+            Route::post('/{id}/toggle-sematkan', [PengumumanController::class, 'toggleSematkan'])->whereNumber('id')->name('toggle-sematkan');
+        });
+        Route::get('/{id}', [PengumumanController::class, 'show'])->middleware(['simpeg.auth:1,2,5,7'])->whereNumber('id')->name('show');
     });
 
     // Pengaturan Akun Pengguna (Hak Akses User) - Admin only.

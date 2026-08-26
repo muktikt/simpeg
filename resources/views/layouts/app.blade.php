@@ -165,6 +165,12 @@
                     {{ session('success') }}
                 </div>
             @endif
+            @if (session('error'))
+                <div class="flash-error" style="background:#FEE2E2; color:#DC2626; border:1px solid #FECACA; padding:12px 16px; border-radius:10px; margin-bottom:16px; display:flex; align-items:center; gap:8px; font-weight:500; font-size:14px;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                    {{ session('error') }}
+                </div>
+            @endif
             @yield('content')
         </div>
     </div>

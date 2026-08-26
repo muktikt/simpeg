@@ -19,6 +19,7 @@ return [
         ['label' => 'Insentif', 'icon' => 'report', 'route_name' => 'insentif.laporan-slip', 'personal' => true, 'roles' => ['5']],
         ['label' => 'Lembur', 'icon' => 'report', 'route_name' => 'gaji-laporan.lembur', 'personal' => true, 'roles' => ['5']],
         ['label' => 'Pengaduan', 'icon' => 'report', 'route_name' => 'pengaduan.index', 'roles' => ['1', '2', '5', '7']],
+        ['label' => 'Kelola Pengumuman', 'icon' => 'report', 'route_name' => 'pengumuman.index', 'roles' => ['1']],
         ['label' => 'Approval', 'icon' => 'report', 'route_name' => 'approval.index', 'roles' => ['1', '7']],
     ],
 
@@ -29,6 +30,7 @@ return [
             'roles' => ['1'],
             'items' => [
                 ['label' => 'SET Aplikasi', 'route_name' => 'setting-aplikasi.index'],
+                ['label' => 'Kelola Pengumuman', 'route_name' => 'pengumuman.index'],
                 ['label' => 'Pengaturan Akun Pengguna', 'route_name' => 'user-akses.index'],
                 ['label' => 'Perubahan NIK', 'route_name' => 'perubahan-nik.index'],
             ],
