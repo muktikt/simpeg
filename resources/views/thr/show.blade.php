@@ -69,13 +69,19 @@
     </div>
 </div>
 
-<div class="form-actions" style="max-width:100%;">
-    @if ($thr['status'] !== 'terbit' && $thr['bisa_approve'])
-        <form action="{{ route('thr.terbitkan', $thr['id']) }}" method="POST" onsubmit="return confirmSubmit(event, 'Setujui THR ini ke tahap berikutnya?', 'Konfirmasi Persetujuan', 'warning', 'Ya, Setujui');">
-            @csrf
-            <button type="submit" class="btn btn-primary">Setujui ke Tahap Berikutnya</button>
-        </form>
-    @endif
-    <a href="{{ route('thr.index') }}" class="btn btn-outline">Kembali</a>
+<div class="form-actions" style="max-width:100%; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+    <div style="display:flex; gap:10px; align-items:center;">
+        @if ($thr['status'] !== 'terbit' && ($thr['bisa_approve'] ?? false))
+            <form action="{{ route('thr.terbitkan', $thr['id']) }}" method="POST" onsubmit="return confirmSubmit(event, 'Setujui THR ini ke tahap berikutnya?', 'Konfirmasi Persetujuan', 'warning', 'Ya, Setujui');">
+                @csrf
+                <button type="submit" class="btn btn-primary">Setujui ke Tahap Berikutnya</button>
+            </form>
+        @endif
+        <button type="button" class="btn btn-primary" onclick="window.print()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="16" height="16" style="margin-right:6px;"><path d="M6 9V3h12v6"/><path d="M6 18h12v4H6z"/><rect x="4" y="9" width="16" height="9" rx="1"/></svg>
+            Cetak Slip
+        </button>
+    </div>
+    <a href="{{ in_array(session('simpeg_user.userlevel'), ['1', '2', '7']) ? route('thr.index') : route('thr.laporan-slip') }}" class="btn btn-outline">Kembali</a>
 </div>
 @endsection

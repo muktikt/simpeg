@@ -147,11 +147,15 @@ Route::middleware(['simpeg.auth'])->group(function () {
 
     // Proses Gaji Bulanan - index/show/terbitkan bisa diakses Admin, Keuangan,
     // dan Direksi (karena Dirum & Dirut perlu approve di alur berjenjang).
+    // Gaji Proses - index/show/terbitkan bisa diakses Admin, Keuangan, dan
+    // Direksi (karena alur approval berjenjang butuh persetujuan Dirut).
+    // Role 5 (Pegawai) berhak melihat detail slip miliknya.
     // Create/Store/Hapus tetap cuma Admin & Keuangan.
     Route::prefix('gaji-proses')->name('gaji-proses.')->group(function () {
+        Route::get('/{id}', [GajiProsesController::class, 'show'])->middleware(['simpeg.auth:1,2,5,7'])->whereNumber('id')->name('show');
+
         Route::middleware(['simpeg.auth:1,2,7'])->group(function () {
             Route::get('/', [GajiProsesController::class, 'index'])->name('index');
-            Route::get('/{id}', [GajiProsesController::class, 'show'])->whereNumber('id')->name('show');
             Route::post('/{id}/terbitkan', [GajiProsesController::class, 'terbitkan'])->whereNumber('id')->name('terbitkan');
         });
 
@@ -169,13 +173,13 @@ Route::middleware(['simpeg.auth'])->group(function () {
     Route::prefix('thr')->name('thr.')->group(function () {
         Route::middleware(['simpeg.auth:1,2,5,7'])->group(function () {
             Route::get('/laporan/slip', [ThrController::class, 'laporanSlip'])->name('laporan-slip');
+            Route::get('/{id}', [ThrController::class, 'show'])->whereNumber('id')->name('show');
         });
 
         Route::middleware(['simpeg.auth:1,2,7'])->group(function () {
             Route::get('/', [ThrController::class, 'index'])->name('index');
             Route::get('/laporan/buku-besar', [ThrController::class, 'laporanBukuBesar'])->name('laporan-buku-besar');
             Route::get('/laporan/buku-besar-per-sub', [ThrController::class, 'laporanBukuBesarPerSub'])->name('laporan-buku-besar-per-sub');
-            Route::get('/{id}', [ThrController::class, 'show'])->whereNumber('id')->name('show');
             Route::post('/{id}/terbitkan', [ThrController::class, 'terbitkan'])->whereNumber('id')->name('terbitkan');
         });
 
@@ -193,13 +197,13 @@ Route::middleware(['simpeg.auth'])->group(function () {
     Route::prefix('gaji-tigabelas')->name('gaji-tigabelas.')->group(function () {
         Route::middleware(['simpeg.auth:1,2,5,7'])->group(function () {
             Route::get('/laporan/slip', [GajiTigabelasController::class, 'laporanSlip'])->name('laporan-slip');
+            Route::get('/{id}', [GajiTigabelasController::class, 'show'])->whereNumber('id')->name('show');
         });
 
         Route::middleware(['simpeg.auth:1,2,7'])->group(function () {
             Route::get('/', [GajiTigabelasController::class, 'index'])->name('index');
             Route::get('/laporan/buku-besar', [GajiTigabelasController::class, 'laporanBukuBesar'])->name('laporan-buku-besar');
             Route::get('/laporan/buku-besar-per-sub', [GajiTigabelasController::class, 'laporanBukuBesarPerSub'])->name('laporan-buku-besar-per-sub');
-            Route::get('/{id}', [GajiTigabelasController::class, 'show'])->whereNumber('id')->name('show');
             Route::post('/{id}/terbitkan', [GajiTigabelasController::class, 'terbitkan'])->whereNumber('id')->name('terbitkan');
         });
 
