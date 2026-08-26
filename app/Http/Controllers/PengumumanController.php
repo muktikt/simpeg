@@ -219,6 +219,15 @@ class PengumumanController extends Controller
                 'updated_at' => now(),
             ]);
 
+            // Kirim Push Notification instan ke seluruh perangkat HP via OneSignal jika langsung aktif
+            if ($request->boolean('aktif', true) && empty($terbitPada)) {
+                \App\Services\OneSignalService::kirimPengumuman(
+                    $validated['judul'],
+                    $validated['isi'],
+                    $targetRoles
+                );
+            }
+
             return redirect()->route('pengumuman.index')->with('success', 'Pengumuman baru berhasil diterbitkan dan tersinkronisasi ke aplikasi mobile.');
         } catch (\Throwable $e) {
             return back()->withInput()->with('error', 'Gagal menyimpan pengumuman: ' . $e->getMessage());
