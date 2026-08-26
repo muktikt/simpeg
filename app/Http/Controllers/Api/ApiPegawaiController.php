@@ -140,6 +140,40 @@ class ApiPegawaiController extends Controller
     }
 
     /**
+     * List Semua Data Pegawai (butuh header X-API-KEY)
+     */
+    public function listPegawai(Request $request)
+    {
+        $keyword = strtolower((string) $request->query('search', ''));
+        $perPage = min((int) $request->query('per_page', 50), 200) ?: 50;
+
+        $query = DB::table('pegawai')
+            ->select(['id', 'nik', 'name', 'gelar', 'jabatan', 'unit_kerja', 'unit_kerja_singkat', 'golongan', 'status', 'role'])
+            ->when($keyword !== '', function ($q) use ($keyword) {
+                $q->where(function ($q2) use ($keyword) {
+                    $q2->whereRaw('LOWER(name) LIKE ?', ["%{$keyword}%"])
+                        ->orWhereRaw('LOWER(nik) LIKE ?', ["%{$keyword}%"])
+                        ->orWhereRaw('LOWER(unit_kerja) LIKE ?', ["%{$keyword}%"]);
+                });
+            })
+            ->orderBy('name');
+
+        $pegawai = $query->paginate($perPage);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Data pegawai berhasil diambil',
+            'data' => $pegawai->items(),
+            'meta' => [
+                'current_page' => $pegawai->currentPage(),
+                'per_page' => $pegawai->perPage(),
+                'total' => $pegawai->total(),
+                'last_page' => $pegawai->lastPage(),
+            ],
+        ]);
+    }
+
+    /**
      * Profil Pegawai Lengkap (Mengambil dari Supabase)
      */
     public function profile(Request $request)

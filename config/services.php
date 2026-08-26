@@ -35,4 +35,8 @@ return [
         ],
     ],
 
+    'simpeg' => [
+        'api_key' => env('SIMPEG_API_KEY'),
+    ],
+
 ];

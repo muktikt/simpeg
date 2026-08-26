@@ -16,6 +16,7 @@ Route::prefix('v1')->group(function () {
 
     // Data Pegawai & Profil
     Route::get('/profile', [ApiPegawaiController::class, 'profile']);
+    Route::get('/pegawai', [ApiPegawaiController::class, 'listPegawai'])->middleware('api.key');
 
     // Keuangan & Payroll
     Route::get('/payroll/slip-gaji', [ApiPegawaiController::class, 'slipGaji']);
