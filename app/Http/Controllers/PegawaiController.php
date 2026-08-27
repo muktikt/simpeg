@@ -199,20 +199,20 @@ class PegawaiController extends Controller
         }
     }
 
+    protected static ?array $memoryCache = null;
+
     public function all(): array
     {
+        if (static::$memoryCache !== null) {
+            return static::$memoryCache;
+        }
+
         try {
             $dbPegawai = \Illuminate\Support\Facades\DB::table('pegawai')->get();
             if ($dbPegawai->isNotEmpty()) {
                 $list = [];
                 $index = 1;
                 foreach ($dbPegawai as $sp) {
-                    $keluarga = \Illuminate\Support\Facades\DB::table('keluarga')->where('pegawai_id', $sp->id)->get()->toArray();
-                    $pendidikan = \Illuminate\Support\Facades\DB::table('pendidikan')->where('pegawai_id', $sp->id)->get()->toArray();
-                    $golongan = \Illuminate\Support\Facades\DB::table('riwayat_golongan')->where('pegawai_id', $sp->id)->get()->toArray();
-                    $jabatanRiwayat = \Illuminate\Support\Facades\DB::table('riwayat_jabatan')->where('pegawai_id', $sp->id)->get()->toArray();
-                    $prestasi = \Illuminate\Support\Facades\DB::table('prestasi')->where('pegawai_id', $sp->id)->get()->toArray();
-
                     $list[] = [
                         'id' => $index++,
                         'db_id' => $sp->id,
@@ -225,14 +225,15 @@ class PegawaiController extends Controller
                         'tgl_masuk' => date('Y-m-d'),
                         'telp' => $sp->no_telp ?? '-',
                         'alamat' => $sp->alamat ?? '-',
-                        'keluarga' => $keluarga,
-                        'golongan' => $golongan,
-                        'jabatan_riwayat' => $jabatanRiwayat,
-                        'pendidikan' => $pendidikan,
-                        'prestasi' => $prestasi,
+                        'keluarga' => [],
+                        'golongan' => [],
+                        'jabatan_riwayat' => [],
+                        'pendidikan' => [],
+                        'prestasi' => [],
                     ];
                 }
                 session()->put('dummy_pegawai', $list);
+                static::$memoryCache = $list;
                 return $list;
             }
         } catch (\Throwable $e) {
@@ -240,11 +241,14 @@ class PegawaiController extends Controller
         }
 
         $this->seedIfEmpty();
-        return session('dummy_pegawai', []);
+        $res = session('dummy_pegawai', []);
+        static::$memoryCache = $res;
+        return $res;
     }
 
     protected function save(array $data): void
     {
+        static::$memoryCache = $data;
         session()->put('dummy_pegawai', $data);
     }
 
@@ -252,6 +256,17 @@ class PegawaiController extends Controller
     {
         $pegawai = collect($this->all())->firstWhere('id', $id);
         if ($pegawai) {
+            // Muat relasi detail hanya untuk pegawai yang dibuka ini (on-demand)
+            if (!empty($pegawai['db_id']) && empty($pegawai['keluarga'])) {
+                try {
+                    $pegawai['keluarga'] = \Illuminate\Support\Facades\DB::table('keluarga')->where('pegawai_id', $pegawai['db_id'])->get()->toArray();
+                    $pegawai['pendidikan'] = \Illuminate\Support\Facades\DB::table('pendidikan')->where('pegawai_id', $pegawai['db_id'])->get()->toArray();
+                    $pegawai['golongan'] = \Illuminate\Support\Facades\DB::table('riwayat_golongan')->where('pegawai_id', $pegawai['db_id'])->get()->toArray();
+                    $pegawai['jabatan_riwayat'] = \Illuminate\Support\Facades\DB::table('riwayat_jabatan')->where('pegawai_id', $pegawai['db_id'])->get()->toArray();
+                    $pegawai['prestasi'] = \Illuminate\Support\Facades\DB::table('prestasi')->where('pegawai_id', $pegawai['db_id'])->get()->toArray();
+                } catch (\Throwable $e) {}
+            }
+
             if (! isset($pegawai['surat_kerja'])) {
                 $pegawai['surat_kerja'] = [
                     'nomor' => 'SK/SDM/2024/001',

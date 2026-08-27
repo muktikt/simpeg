@@ -36,7 +36,7 @@ class LaporanPotonganController extends Controller
     {
         $key = "dummy_potongan_{$tipe}";
         $data = collect(session($key, []));
-        $pegawai = collect(app(PegawaiController::class)->all());
+        $pegawaiMap = collect(app(PegawaiController::class)->all())->keyBy('nik');
 
         $bulan = $bulan ?? now()->month;
         $tahun = $tahun ?? now()->year;
@@ -44,8 +44,8 @@ class LaporanPotonganController extends Controller
         return $data->filter(function ($r) use ($bulan, $tahun) {
             $d = \Carbon\Carbon::parse($r['tgl_potongan']);
             return $d->month === $bulan && $d->year === $tahun;
-        })->map(function ($r) use ($pegawai) {
-            $p = $pegawai->firstWhere('nik', $r['nik']);
+        })->map(function ($r) use ($pegawaiMap) {
+            $p = $pegawaiMap->get($r['nik']);
             $r['nama'] = $p['nama'] ?? '(tidak ditemukan)';
             $total = 0;
             foreach ($this->kolom as $k) {

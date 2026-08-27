@@ -85,7 +85,7 @@
                     }
                 }
             @endphp
-            <div class="nav-group {{ $hasActiveChild ? 'open' : '' }}" data-group-id="grp-{{ $groupIdx }}">
+            <div class="nav-group {{ $hasActiveChild ? 'open' : '' }}" data-group-id="{{ $slugify($group['label']) }}">
                 <button type="button" class="nav-group-btn" onclick="toggleGroup(this)">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="16" height="16">{!! $icons[$group['icon']] !!}</svg>
                     {{ $group['label'] }}
@@ -111,42 +111,14 @@
 </aside>
 
 <script>
-// Sidebar dropdown persistence + scroll position restore
+// Sidebar dropdown control: tertutup secara default, hanya terbuka saat diklik atau saat halaman aktif
 (function() {
-    var KEY = 'simpeg_sidebar_open';
     var SCROLL_KEY = 'simpeg_sidebar_scroll';
 
-    function getOpenIds() {
-        try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch(e) { return []; }
-    }
-
-    function saveOpenIds() {
-        var ids = [];
-        document.querySelectorAll('.nav-group.open').forEach(function(g) {
-            if (g.dataset.groupId) ids.push(g.dataset.groupId);
-        });
-        try { localStorage.setItem(KEY, JSON.stringify(ids)); } catch(e) {}
-    }
-
-    // Restore saved open states and keep server-rendered active groups open
-    var openIds = getOpenIds();
-    document.querySelectorAll('.nav-group[data-group-id]').forEach(function(g) {
-        if (openIds.indexOf(g.dataset.groupId) !== -1 || g.classList.contains('open')) {
-            g.classList.add('open');
-        }
-    });
-    saveOpenIds();
-
-    // When clicking any link inside a nav-group, ensure its group remains open
-    document.querySelectorAll('.nav-group-items a').forEach(function(link) {
-        link.addEventListener('click', function() {
-            var group = this.closest('.nav-group');
-            if (group && group.dataset.groupId) {
-                group.classList.add('open');
-                saveOpenIds();
-            }
-        });
-    });
+    // Bersihkan legacy localStorage agar tidak memaksa semua dropdown terbuka
+    try {
+        localStorage.removeItem('simpeg_sidebar_open');
+    } catch(e) {}
 
     // Restore sidebar scroll position
     var navScroll = document.querySelector('.nav-scroll');
@@ -162,12 +134,11 @@
         });
     }
 
-    // Toggle + persist
+    // Toggle dropdown saat diklik
     window.toggleGroup = function(btn) {
         var group = btn.closest('.nav-group');
         if (!group) return;
         group.classList.toggle('open');
-        saveOpenIds();
     };
 })();
 </script>

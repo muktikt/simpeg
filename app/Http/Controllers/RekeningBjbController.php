@@ -30,9 +30,20 @@ class RekeningBjbController extends Controller
         session()->put('dummy_rek_bjb', $data);
     }
 
+    protected ?array $cachedPegawaiList = null;
+
     protected function pegawaiList(): array
     {
-        return collect(app(PegawaiController::class)->all())->where('status_peg', '!=', 'PN')->values()->all();
+        if ($this->cachedPegawaiList !== null) {
+            return $this->cachedPegawaiList;
+        }
+
+        $this->cachedPegawaiList = collect(app(PegawaiController::class)->all())
+            ->where('status_peg', '!=', 'PN')
+            ->values()
+            ->all();
+
+        return $this->cachedPegawaiList;
     }
 
     protected function withNama(array $row): array
@@ -44,12 +55,18 @@ class RekeningBjbController extends Controller
 
     public function index()
     {
+        $pegawaiList = $this->pegawaiList();
+        $pegawaiMap = collect($pegawaiList)->keyBy('nik');
+
         $items = collect($this->all())
-            ->map(fn ($r) => $this->withNama($r))
+            ->map(function ($r) use ($pegawaiMap) {
+                $r['nama'] = $pegawaiMap->get($r['nik'])['nama'] ?? '(tidak ditemukan)';
+                return $r;
+            })
             ->sortBy('nik')
             ->values();
 
-        $totalPegawai = count($this->pegawaiList());
+        $totalPegawai = count($pegawaiList);
         $sudahMasuk   = $items->count();
         $belumMasuk   = max(0, $totalPegawai - $sudahMasuk);
 

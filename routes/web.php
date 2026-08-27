@@ -35,9 +35,8 @@ Route::post('/login', [LoginController::class, 'login'])->name('login.attempt');
 Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 
 Route::middleware(['simpeg.auth'])->group(function () {
-    // Beranda (dashboard perusahaan) - bukan untuk role Pegawai, yang
-    // landing page-nya adalah profil sendiri (lihat LoginController).
     Route::get('/beranda', [DashboardController::class, 'index'])->middleware(['simpeg.auth:1,2,7'])->name('dashboard');
+    Route::get('/dashboard', fn () => redirect()->route('dashboard'));
 
     // Data Pegawai - list & laporan perusahaan TIDAK untuk role Pegawai
     // (mereka hanya boleh lihat data diri sendiri lewat halaman Profil).
@@ -68,44 +67,33 @@ Route::middleware(['simpeg.auth'])->group(function () {
         });
     });
 
-    // Absensi - Read boleh semua role yang login, Create/Update/Delete cuma Admin.
-    Route::prefix('absensi')->name('absensi.')->group(function () {
-        Route::middleware(['simpeg.auth:1,2'])->group(function () {
-            Route::get('/', [AbsensiController::class, 'index'])->name('index');
-            Route::get('/laporan', [AbsensiController::class, 'laporan'])->name('laporan');
-        });
+    // Absensi - Read & CRUD hanya Admin SDM.
+    Route::prefix('absensi')->name('absensi.')->middleware(['simpeg.auth:1'])->group(function () {
+        Route::get('/', [AbsensiController::class, 'index'])->name('index');
+        Route::get('/laporan', [AbsensiController::class, 'laporan'])->name('laporan');
+        Route::get('/create', [AbsensiController::class, 'create'])->name('create');
+        Route::post('/', [AbsensiController::class, 'store'])->name('store');
+        Route::get('/{id}/edit', [AbsensiController::class, 'edit'])->whereNumber('id')->name('edit');
+        Route::put('/{id}', [AbsensiController::class, 'update'])->whereNumber('id')->name('update');
+        Route::delete('/{id}', [AbsensiController::class, 'destroy'])->whereNumber('id')->name('destroy');
 
-        Route::middleware(['simpeg.auth:1'])->group(function () {
-            Route::get('/create', [AbsensiController::class, 'create'])->name('create');
-            Route::post('/', [AbsensiController::class, 'store'])->name('store');
-            Route::get('/{id}/edit', [AbsensiController::class, 'edit'])->whereNumber('id')->name('edit');
-            Route::put('/{id}', [AbsensiController::class, 'update'])->whereNumber('id')->name('update');
-            Route::delete('/{id}', [AbsensiController::class, 'destroy'])->whereNumber('id')->name('destroy');
-
-            // SET Hari Kerja - satu nilai global, bukan daftar.
-            Route::get('/hari-kerja', [AbsensiController::class, 'hariKerjaEdit'])->name('hari-kerja');
-            Route::put('/hari-kerja', [AbsensiController::class, 'hariKerjaUpdate'])->name('hari-kerja.update');
-        });
+        // SET Hari Kerja - satu nilai global, bukan daftar.
+        Route::get('/hari-kerja', [AbsensiController::class, 'hariKerjaEdit'])->name('hari-kerja');
+        Route::put('/hari-kerja', [AbsensiController::class, 'hariKerjaUpdate'])->name('hari-kerja.update');
     });
 
-    // Gaji Pokok - Read boleh Admin & Keuangan. Tambah/Edit cuma Admin.
-    // Catatan: sistem lama TIDAK punya fitur hapus untuk gaji pokok, jadi di sini juga tidak ada.
-    Route::prefix('gaji-pokok')->name('gaji-pokok.')->group(function () {
-        Route::middleware(['simpeg.auth:1,2'])->group(function () {
-            Route::get('/', [GajiPokokController::class, 'index'])->name('index');
-            Route::get('/laporan', [GajiPokokController::class, 'laporan'])->name('laporan');
-        });
-
-        Route::middleware(['simpeg.auth:1'])->group(function () {
-            Route::get('/create', [GajiPokokController::class, 'create'])->name('create');
-            Route::post('/', [GajiPokokController::class, 'store'])->name('store');
-            Route::get('/{id}/edit', [GajiPokokController::class, 'edit'])->whereNumber('id')->name('edit');
-            Route::put('/{id}', [GajiPokokController::class, 'update'])->whereNumber('id')->name('update');
-        });
+    // Gaji Pokok - Admin SDM only
+    Route::prefix('gaji-pokok')->name('gaji-pokok.')->middleware(['simpeg.auth:1'])->group(function () {
+        Route::get('/', [GajiPokokController::class, 'index'])->name('index');
+        Route::get('/laporan', [GajiPokokController::class, 'laporan'])->name('laporan');
+        Route::get('/create', [GajiPokokController::class, 'create'])->name('create');
+        Route::post('/', [GajiPokokController::class, 'store'])->name('store');
+        Route::get('/{id}/edit', [GajiPokokController::class, 'edit'])->whereNumber('id')->name('edit');
+        Route::put('/{id}', [GajiPokokController::class, 'update'])->whereNumber('id')->name('update');
     });
 
-    // DRD Tukin - full CRUD, Admin & Keuangan (sesuai grup menu Pengaturan Proses Gaji).
-    Route::prefix('drd-tukin')->name('drd-tukin.')->middleware(['simpeg.auth:1,2'])->group(function () {
+    // DRD Tukin - Admin SDM only
+    Route::prefix('drd-tukin')->name('drd-tukin.')->middleware(['simpeg.auth:1'])->group(function () {
         Route::get('/', [DrdTukinController::class, 'index'])->name('index');
         Route::get('/create', [DrdTukinController::class, 'create'])->name('create');
         Route::post('/', [DrdTukinController::class, 'store'])->name('store');
@@ -114,53 +102,38 @@ Route::middleware(['simpeg.auth'])->group(function () {
         Route::delete('/{id}', [DrdTukinController::class, 'destroy'])->whereNumber('id')->name('destroy');
     });
 
-    // Sanksi Pegawai - Admin & Keuangan saja. Direksi TIDAK punya menu
-    // Sanksi di sistem lama (dicek dari menu_incl_dirut.php).
-    Route::prefix('sanksi')->name('sanksi.')->middleware(['simpeg.auth:1,2'])->group(function () {
+    // Sanksi Pegawai - Admin SDM only
+    Route::prefix('sanksi')->name('sanksi.')->middleware(['simpeg.auth:1'])->group(function () {
         Route::get('/', [SanksiController::class, 'index'])->name('index');
         Route::get('/laporan', [SanksiController::class, 'laporan'])->name('laporan');
-
-        Route::middleware(['simpeg.auth:1,2'])->group(function () {
-            Route::get('/create', [SanksiController::class, 'create'])->name('create');
-            Route::post('/', [SanksiController::class, 'store'])->name('store');
-            Route::get('/{id}/edit', [SanksiController::class, 'edit'])->whereNumber('id')->name('edit');
-            Route::put('/{id}', [SanksiController::class, 'update'])->whereNumber('id')->name('update');
-            Route::delete('/{id}', [SanksiController::class, 'destroy'])->whereNumber('id')->name('destroy');
-        });
+        Route::get('/create', [SanksiController::class, 'create'])->name('create');
+        Route::post('/', [SanksiController::class, 'store'])->name('store');
+        Route::get('/{id}/edit', [SanksiController::class, 'edit'])->whereNumber('id')->name('edit');
+        Route::put('/{id}', [SanksiController::class, 'update'])->whereNumber('id')->name('update');
+        Route::delete('/{id}', [SanksiController::class, 'destroy'])->whereNumber('id')->name('destroy');
     });
 
-    // Prestasi (rekap kerja bulanan untuk gaji) - index bisa dilihat semua role
-    // login, tambah/edit/hapus cuma Admin & Keuangan.
-    Route::prefix('prestasi')->name('prestasi.')->group(function () {
-        Route::middleware(['simpeg.auth:1,2'])->group(function () {
-            Route::get('/', [PrestasiController::class, 'index'])->name('index');
-            Route::get('/laporan', [PrestasiController::class, 'laporan'])->name('laporan');
-        });
-
-        Route::middleware(['simpeg.auth:1,2'])->group(function () {
-            Route::get('/create', [PrestasiController::class, 'create'])->name('create');
-            Route::post('/', [PrestasiController::class, 'store'])->name('store');
-            Route::get('/{id}/edit', [PrestasiController::class, 'edit'])->whereNumber('id')->name('edit');
-            Route::put('/{id}', [PrestasiController::class, 'update'])->whereNumber('id')->name('update');
-            Route::delete('/{id}', [PrestasiController::class, 'destroy'])->whereNumber('id')->name('destroy');
-        });
+    // Prestasi - Admin SDM only
+    Route::prefix('prestasi')->name('prestasi.')->middleware(['simpeg.auth:1'])->group(function () {
+        Route::get('/', [PrestasiController::class, 'index'])->name('index');
+        Route::get('/laporan', [PrestasiController::class, 'laporan'])->name('laporan');
+        Route::get('/create', [PrestasiController::class, 'create'])->name('create');
+        Route::post('/', [PrestasiController::class, 'store'])->name('store');
+        Route::get('/{id}/edit', [PrestasiController::class, 'edit'])->whereNumber('id')->name('edit');
+        Route::put('/{id}', [PrestasiController::class, 'update'])->whereNumber('id')->name('update');
+        Route::delete('/{id}', [PrestasiController::class, 'destroy'])->whereNumber('id')->name('destroy');
     });
 
-    // Proses Gaji Bulanan - index/show/terbitkan bisa diakses Admin, Keuangan,
-    // dan Direksi (karena Dirum & Dirut perlu approve di alur berjenjang).
-    // Gaji Proses - index/show/terbitkan bisa diakses Admin, Keuangan, dan
-    // Direksi (karena alur approval berjenjang butuh persetujuan Dirut).
-    // Role 5 (Pegawai) berhak melihat detail slip miliknya.
-    // Create/Store/Hapus tetap cuma Admin & Keuangan.
+    // Gaji Proses - Admin SDM (1) dan Direksi (7). Role 5 (Pegawai) untuk detail slip pribadi.
     Route::prefix('gaji-proses')->name('gaji-proses.')->group(function () {
-        Route::get('/{id}', [GajiProsesController::class, 'show'])->middleware(['simpeg.auth:1,2,5,7'])->whereNumber('id')->name('show');
+        Route::get('/{id}', [GajiProsesController::class, 'show'])->middleware(['simpeg.auth:1,5,7'])->whereNumber('id')->name('show');
 
-        Route::middleware(['simpeg.auth:1,2,7'])->group(function () {
+        Route::middleware(['simpeg.auth:1,7'])->group(function () {
             Route::get('/', [GajiProsesController::class, 'index'])->name('index');
             Route::post('/{id}/terbitkan', [GajiProsesController::class, 'terbitkan'])->whereNumber('id')->name('terbitkan');
         });
 
-        Route::middleware(['simpeg.auth:1,2'])->group(function () {
+        Route::middleware(['simpeg.auth:1'])->group(function () {
             Route::get('/create', [GajiProsesController::class, 'create'])->name('create');
             Route::post('/', [GajiProsesController::class, 'store'])->name('store');
             Route::delete('/{id}', [GajiProsesController::class, 'destroy'])->whereNumber('id')->name('destroy');
@@ -168,23 +141,24 @@ Route::middleware(['simpeg.auth'])->group(function () {
         });
     });
 
-    // THR - index/show/terbitkan bisa diakses Admin, Keuangan, dan Direksi
-    // (karena Dirum & Dirut perlu approve di alur berjenjang).
-    // Tambah/Hapus tetap cuma Admin & Keuangan.
+    // THR - Admin SDM (1) dan Direksi (7). Role 5 (Pegawai) untuk slip pribadi.
     Route::prefix('thr')->name('thr.')->group(function () {
-        Route::middleware(['simpeg.auth:1,2,5,7'])->group(function () {
+        Route::middleware(['simpeg.auth:1,5,7'])->group(function () {
             Route::get('/laporan/slip', [ThrController::class, 'laporanSlip'])->name('laporan-slip');
             Route::get('/{id}', [ThrController::class, 'show'])->whereNumber('id')->name('show');
         });
 
         Route::middleware(['simpeg.auth:1,2,7'])->group(function () {
-            Route::get('/', [ThrController::class, 'index'])->name('index');
             Route::get('/laporan/buku-besar', [ThrController::class, 'laporanBukuBesar'])->name('laporan-buku-besar');
             Route::get('/laporan/buku-besar-per-sub', [ThrController::class, 'laporanBukuBesarPerSub'])->name('laporan-buku-besar-per-sub');
+        });
+
+        Route::middleware(['simpeg.auth:1,7'])->group(function () {
+            Route::get('/', [ThrController::class, 'index'])->name('index');
             Route::post('/{id}/terbitkan', [ThrController::class, 'terbitkan'])->whereNumber('id')->name('terbitkan');
         });
 
-        Route::middleware(['simpeg.auth:1,2'])->group(function () {
+        Route::middleware(['simpeg.auth:1'])->group(function () {
             Route::get('/create', [ThrController::class, 'create'])->name('create');
             Route::post('/', [ThrController::class, 'store'])->name('store');
             Route::delete('/{id}', [ThrController::class, 'destroy'])->whereNumber('id')->name('destroy');
@@ -192,23 +166,24 @@ Route::middleware(['simpeg.auth'])->group(function () {
         });
     });
 
-    // Gaji 13 / Tunjangan Pendidikan - satu modul yang sama (dicek dari
-    // menu_incl.php asli, "Laporan Tunj. Pendidikan" mengarah ke file yang
-    // sama dengan Gaji 13). Index/show bisa dilihat Admin, Keuangan, Direksi.
+    // Gaji 13 / Tunjangan Pendidikan
     Route::prefix('gaji-tigabelas')->name('gaji-tigabelas.')->group(function () {
-        Route::middleware(['simpeg.auth:1,2,5,7'])->group(function () {
+        Route::middleware(['simpeg.auth:1,5,7'])->group(function () {
             Route::get('/laporan/slip', [GajiTigabelasController::class, 'laporanSlip'])->name('laporan-slip');
             Route::get('/{id}', [GajiTigabelasController::class, 'show'])->whereNumber('id')->name('show');
         });
 
         Route::middleware(['simpeg.auth:1,2,7'])->group(function () {
-            Route::get('/', [GajiTigabelasController::class, 'index'])->name('index');
             Route::get('/laporan/buku-besar', [GajiTigabelasController::class, 'laporanBukuBesar'])->name('laporan-buku-besar');
             Route::get('/laporan/buku-besar-per-sub', [GajiTigabelasController::class, 'laporanBukuBesarPerSub'])->name('laporan-buku-besar-per-sub');
+        });
+
+        Route::middleware(['simpeg.auth:1,7'])->group(function () {
+            Route::get('/', [GajiTigabelasController::class, 'index'])->name('index');
             Route::post('/{id}/terbitkan', [GajiTigabelasController::class, 'terbitkan'])->whereNumber('id')->name('terbitkan');
         });
 
-        Route::middleware(['simpeg.auth:1,2'])->group(function () {
+        Route::middleware(['simpeg.auth:1'])->group(function () {
             Route::get('/create', [GajiTigabelasController::class, 'create'])->name('create');
             Route::post('/', [GajiTigabelasController::class, 'store'])->name('store');
             Route::delete('/{id}', [GajiTigabelasController::class, 'destroy'])->whereNumber('id')->name('destroy');
@@ -216,12 +191,12 @@ Route::middleware(['simpeg.auth'])->group(function () {
         });
     });
 
-    // Insentif
+    // Insentif - Admin SDM only
     Route::prefix('insentif')->name('insentif.')->group(function () {
-        Route::middleware(['simpeg.auth:1,2,5'])->group(function () {
+        Route::middleware(['simpeg.auth:1,5'])->group(function () {
             Route::get('/laporan/slip', [InsentifController::class, 'laporanSlip'])->name('laporan-slip');
         });
-        Route::middleware(['simpeg.auth:1,2'])->group(function () {
+        Route::middleware(['simpeg.auth:1'])->group(function () {
             Route::get('/laporan/buku-besar', [InsentifController::class, 'laporanBukuBesar'])->name('laporan-buku-besar');
             Route::get('/laporan/buku-besar-per-sub', [InsentifController::class, 'laporanBukuBesarPerSub'])->name('laporan-buku-besar-per-sub');
         });
@@ -241,7 +216,7 @@ Route::middleware(['simpeg.auth'])->group(function () {
 
     // Cuti Pegawai & Laporan Cuti
     Route::prefix('cuti')->name('cuti.')->group(function () {
-        Route::get('/', [CutiController::class, 'index'])->middleware(['simpeg.auth:1,2,5,7'])->name('index');
+        Route::get('/', [CutiController::class, 'index'])->middleware(['simpeg.auth:1,5,7'])->name('index');
         Route::put('/{id}/status', [CutiController::class, 'updateStatus'])->middleware(['simpeg.auth:1'])->whereNumber('id')->name('update-status');
     });
 
@@ -270,8 +245,8 @@ Route::middleware(['simpeg.auth'])->group(function () {
         Route::delete('/{id}', [UserAksesController::class, 'destroy'])->whereNumber('id')->name('destroy');
     });
 
-    // Asuransi (Dapenma) - Admin & Keuangan.
-    Route::prefix('dapenma')->name('dapenma.')->middleware(['simpeg.auth:1,2'])->group(function () {
+    // Asuransi (Dapenma) - Admin SDM only
+    Route::prefix('dapenma')->name('dapenma.')->middleware(['simpeg.auth:1'])->group(function () {
         Route::get('/', [DapenmaController::class, 'index'])->name('index');
         Route::get('/create', [DapenmaController::class, 'create'])->name('create');
         Route::post('/', [DapenmaController::class, 'store'])->name('store');
@@ -281,11 +256,9 @@ Route::middleware(['simpeg.auth'])->group(function () {
     });
 
     // Laporan Penggajian - Direksi di sistem lama HANYA punya akses ke
-    // Slip Gaji, Buku Besar Gaji, dan Buku Besar Per Sub (dicek dari
-    // menu_incl_dirut.php). Lembur/Payroll/Pajak/BPJSTK/Tunj. Perumahan
-    // cuma untuk Admin & Keuangan.
+    // Laporan Penggajian
     Route::prefix('gaji-laporan')->name('gaji-laporan.')->group(function () {
-        Route::middleware(['simpeg.auth:1,2,5,7'])->group(function () {
+        Route::middleware(['simpeg.auth:1,5,7'])->group(function () {
             Route::get('/slip-gaji', [GajiLaporanController::class, 'slipGaji'])->name('slip-gaji');
         });
 
@@ -294,13 +267,16 @@ Route::middleware(['simpeg.auth'])->group(function () {
             Route::get('/buku-besar-per-sub', [GajiLaporanController::class, 'bukuBesarPerSub'])->name('buku-besar-per-sub');
         });
 
-        Route::middleware(['simpeg.auth:1,2,5'])->group(function () {
+        Route::middleware(['simpeg.auth:1,5'])->group(function () {
             Route::get('/lembur', [GajiLaporanController::class, 'lembur'])->name('lembur');
         });
 
         Route::middleware(['simpeg.auth:1,2'])->group(function () {
             Route::get('/payroll', [GajiLaporanController::class, 'payroll'])->name('payroll');
             Route::get('/pajak', [GajiLaporanController::class, 'pajak'])->name('pajak');
+        });
+
+        Route::middleware(['simpeg.auth:1'])->group(function () {
             Route::get('/bpjstk', [GajiLaporanController::class, 'bpjstk'])->name('bpjstk');
             Route::get('/tunj-perumahan', [GajiLaporanController::class, 'tunjPerumahan'])->name('tunj-perumahan');
         });
@@ -314,6 +290,7 @@ Route::middleware(['simpeg.auth'])->group(function () {
     // Potongan Keuangan (Gaji / THR / Gaji 13) - CRUD + terbitkan + belum-masuk
     Route::prefix('potongan-keu')->name('potongan-keu.')->middleware(['simpeg.auth:2'])->group(function () {
         Route::get('/{tipe}', [PotonganKeuController::class, 'index'])->name('index')->where('tipe', 'gaji|thr|gaji13');
+        Route::get('/{tipe}/terbit', [PotonganKeuController::class, 'terbitIndex'])->name('terbit')->where('tipe', 'gaji|thr|gaji13');
         Route::get('/{tipe}/create', [PotonganKeuController::class, 'create'])->name('create')->where('tipe', 'gaji|thr|gaji13');
         Route::post('/{tipe}', [PotonganKeuController::class, 'store'])->name('store')->where('tipe', 'gaji|thr|gaji13');
         Route::get('/{tipe}/{id}/edit', [PotonganKeuController::class, 'edit'])->name('edit')->where('tipe', 'gaji|thr|gaji13')->whereNumber('id');

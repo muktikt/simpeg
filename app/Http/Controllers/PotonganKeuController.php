@@ -85,9 +85,20 @@ class PotonganKeuController extends Controller
         session()->put($this->sessionKey($tipe), $data);
     }
 
+    protected ?array $cachedPegawaiList = null;
+
     protected function pegawaiList(): array
     {
-        return collect(app(PegawaiController::class)->all())->where('status_peg', '!=', 'PN')->values()->all();
+        if ($this->cachedPegawaiList !== null) {
+            return $this->cachedPegawaiList;
+        }
+
+        $this->cachedPegawaiList = collect(app(PegawaiController::class)->all())
+            ->where('status_peg', '!=', 'PN')
+            ->values()
+            ->all();
+
+        return $this->cachedPegawaiList;
     }
 
     protected function pegawaiById(mixed $id): ?array
@@ -103,9 +114,14 @@ class PotonganKeuController extends Controller
         });
     }
 
-    protected function withCalculated(array $row): array
+    protected function withCalculated(array $row, ?\Illuminate\Support\Collection $pegawaiMap = null): array
     {
-        $p = collect($this->pegawaiList())->firstWhere('nik', $row['nik']);
+        if ($pegawaiMap) {
+            $p = $pegawaiMap->get($row['nik']);
+        } else {
+            $p = collect($this->pegawaiList())->firstWhere('nik', $row['nik']);
+        }
+
         $row['nama'] = $p['nama'] ?? '(tidak ditemukan)';
         $total = 0;
         foreach ($this->kolom as $k) {
@@ -125,12 +141,15 @@ class PotonganKeuController extends Controller
     public function index(string $tipe)
     {
         $this->validateTipe($tipe);
+        $pegawaiList = $this->pegawaiList();
+        $pegawaiMap = collect($pegawaiList)->keyBy('nik');
+
         $items = collect($this->all($tipe))
-            ->map(fn ($row) => $this->withCalculated($row))
+            ->map(fn ($row) => $this->withCalculated($row, $pegawaiMap))
             ->sortBy('nik')
             ->values();
 
-        $totalPegawai = count($this->pegawaiList());
+        $totalPegawai = count($pegawaiList);
         $sudahMasuk   = $items->count();
         $belumMasuk   = max(0, $totalPegawai - $sudahMasuk);
 
@@ -247,7 +266,39 @@ class PotonganKeuController extends Controller
         return redirect()->route('potongan-keu.index', $tipe)->with('success', 'Potongan berhasil dihapus.');
     }
 
-    // ───── TERBIT ─────
+    // ───── PROSES TERBIT POTONGAN (SESUAI SISTEM LAMA) ─────
+
+    public function terbitIndex(string $tipe)
+    {
+        $this->validateTipe($tipe);
+        $pegawaiList = $this->pegawaiList();
+        $pegawaiMap = collect($pegawaiList)->keyBy('nik');
+
+        // Sesuai proses_terbit_potongan.php: filter data status 'N' (Menunggu)
+        $allItems = collect($this->all($tipe))
+            ->map(fn ($row) => $this->withCalculated($row, $pegawaiMap))
+            ->sortBy('nik')
+            ->values();
+
+        $items = $allItems->where('status', '!=', 'Y')->values();
+        $sudahDiterbitkan = $allItems->where('status', '===', 'Y')->count();
+
+        $totals = [];
+        foreach ($this->kolom as $k) {
+            $totals[$k] = $items->sum($k);
+        }
+        $totals['grand_total'] = $items->sum('total');
+
+        return view('potongan-keu.terbit', [
+            'items'            => $items,
+            'sudahDiterbitkan' => $sudahDiterbitkan,
+            'tipe'             => $tipe,
+            'tipeLabel'        => $this->tipeLabels[$tipe],
+            'kolom'            => $this->kolom,
+            'kolomLabels'      => $this->kolomLabels,
+            'totals'           => $totals,
+        ]);
+    }
 
     public function terbitkan(Request $request, string $tipe)
     {
@@ -260,7 +311,7 @@ class PotonganKeuController extends Controller
         })->all();
 
         $this->save($tipe, $data);
-        return redirect()->route('potongan-keu.index', $tipe)->with('success', 'Semua potongan berhasil diterbitkan.');
+        return redirect()->route('potongan-keu.terbit', $tipe)->with('success', 'Semua potongan ' . strtolower($this->tipeLabels[$tipe]) . ' berhasil diterbitkan dan disetujui.');
     }
 
     // ───── BELUM MASUK ─────
