@@ -202,7 +202,7 @@ class PengumumanController extends Controller
             : null;
 
         try {
-            DB::table('pengumuman')->insert([
+            $newId = DB::table('pengumuman')->insertGetId([
                 'judul' => trim($validated['judul']),
                 'isi' => trim($validated['isi']),
                 'aktif' => $request->boolean('aktif', true),
@@ -224,7 +224,8 @@ class PengumumanController extends Controller
                 \App\Services\OneSignalService::kirimPengumuman(
                     $validated['judul'],
                     $validated['isi'],
-                    $targetRoles
+                    $targetRoles,
+                    ['pengumuman_id' => $newId]
                 );
             }
 
