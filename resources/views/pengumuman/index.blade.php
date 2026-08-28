@@ -75,7 +75,7 @@
                             </span>
                         @elseif ($p['status_kode'] === 'terjadwal')
                             <span style="background:#FEF3C7; color:#D97706; font-size:11px; font-weight:700; padding:3px 8px; border-radius:6px;">
-                                🕒 Terjadwal ({{ formatTglIndo($p['terbit_pada']) }})
+                                🕒 Terjadwal ({{ formatTglIndo($p['terbit_pada'], 'd M Y, H:i') }})
                             </span>
                         @elseif ($p['status_kode'] === 'kedaluwarsa')
                             <span style="background:#FEE2E2; color:#DC2626; font-size:11px; font-weight:700; padding:3px 8px; border-radius:6px;">
@@ -88,7 +88,7 @@
                         @endif
 
                         <span style="font-size:12px; color:#94A3B8;">
-                            Dibuat: {{ formatTglIndo($p['created_at']) }} oleh <strong>{{ $p['pembuat'] ?? 'SDM' }}</strong>
+                            Dibuat: {{ formatTglIndo($p['created_at'], 'd M Y, H:i') }} oleh <strong>{{ $p['pembuat'] ?? 'SDM' }}</strong>
                         </span>
                     </div>
 
