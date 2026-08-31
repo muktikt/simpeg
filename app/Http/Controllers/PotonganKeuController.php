@@ -304,9 +304,17 @@ class PotonganKeuController extends Controller
     {
         $this->validateTipe($tipe);
 
-        $data = collect($this->all($tipe))->map(function ($row) {
-            $row['status'] = 'Y';
-            $row['tgl_update'] = now()->toDateString();
+        // Sesuai sistem lama (terbitkan_potongan_keu.php):
+        // - Hanya proses row yang status='N' (belum terbit)
+        // - Catat siapa yang menyetujui (disetujui_oleh)
+        $approverNik = session('simpeg_user.nik', config('simpeg_approval.keuangan', '0'));
+
+        $data = collect($this->all($tipe))->map(function ($row) use ($approverNik) {
+            if ($row['status'] === 'N') {
+                $row['status'] = 'Y';
+                $row['disetujui_oleh'] = $approverNik;
+                $row['tgl_update'] = now()->toDateString();
+            }
             return $row;
         })->all();
 

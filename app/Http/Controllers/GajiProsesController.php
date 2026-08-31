@@ -432,20 +432,53 @@ class GajiProsesController extends Controller
                                 'periode' => $bulanNama . ' ' . ($approved['tahun'] ?? now()->year),
                             ],
                             [
-                                'gapok' => (float) ($approved['gaji_pokok'] ?? $approved['gapok'] ?? 4500000),
-                                'tunjangan_jabatan' => (float) ($approved['tunj_jabatan'] ?? $approved['tunjangan_jabatan'] ?? 0),
-                                'tunjangan_istri' => (float) ($approved['tunj_istri'] ?? $approved['tunjangan_istri'] ?? 0),
-                                'tunjangan_anak' => (float) ($approved['tunj_anak'] ?? $approved['tunjangan_anak'] ?? 0),
-                                'potongan_dapenma' => (float) ($approved['pot_dapenma'] ?? $approved['potongan_dapenma'] ?? 0),
-                                'potongan_bank_bjb' => (float) ($approved['pot_bjbs'] ?? $approved['potongan_bank_bjb'] ?? 0),
-                                'total_terima' => (float) ($approved['gaji_diterima'] ?? $approved['total_terima'] ?? 5000000),
+                                // Komponen Pendapatan (semua key konsisten dengan store())
+                                'gapok' => (float) ($approved['gapok'] ?? 0),
+                                'tunjangan_istri' => (float) ($approved['tunjangan_istri'] ?? 0),
+                                'tunjangan_anak' => (float) ($approved['tunjangan_anak'] ?? 0),
+                                'tunjangan_prestasi' => (float) ($approved['tunjangan_prestasi'] ?? 0),
+                                'tunjangan_jabatan' => (float) ($approved['tunjangan_jabatan'] ?? 0),
+                                'tunjangan_transport' => (float) ($approved['tunjangan_transport'] ?? 0),
+                                'tunjangan_pangan' => (float) ($approved['tunjangan_pangan'] ?? 0),
+                                'tunjangan_bpjstk' => (float) ($approved['tunjangan_bpjstk'] ?? 0),
+                                'tunjangan_perumahan' => (float) ($approved['tunjangan_perumahan'] ?? 0),
+                                'tunjangan_perusahaan' => (float) ($approved['tunjangan_perusahaan'] ?? 0),
+                                'tunjangan_airminum' => (float) ($approved['tunjangan_airminum'] ?? 0),
+                                'tunjangan_bpjskes' => (float) ($approved['tunjangan_bpjskes'] ?? 0),
+                                'tunjangan_komunikasi' => (float) ($approved['tunjangan_komunikasi'] ?? 0),
+                                'tunjangan_pajak' => (float) ($approved['tunjangan_pajak'] ?? 0),
+                                'lembur' => (float) ($approved['lembur'] ?? 0),
+                                // Komponen Potongan
+                                'potongan_sanksi' => (float) ($approved['potongan_sanksi'] ?? 0),
+                                'potongan_dapenma' => (float) ($approved['potongan_dapenma'] ?? 0),
+                                'potongan_bpjstk' => (float) ($approved['potongan_bpjstk'] ?? 0),
+                                'potongan_bpjskes' => (float) ($approved['potongan_bpjskes'] ?? 0),
+                                'potongan_perumahan' => (float) ($approved['potongan_perumahan'] ?? 0),
+                                'potongan_pajak' => (float) ($approved['potongan_pajak'] ?? 0),
+                                'potongan_korpri' => (float) ($approved['potongan_korpri'] ?? 0),
+                                'potongan_tperusahaan' => (float) ($approved['potongan_tperusahaan'] ?? 0),
+                                'potongan_lain' => (float) ($approved['potongan_lain'] ?? 0),
+                                'potongan_koperasi' => (float) ($approved['potongan_koperasi'] ?? 0),
+                                'potongan_darmawanita' => (float) ($approved['potongan_darmawanita'] ?? 0),
+                                'potongan_ledeng' => (float) ($approved['potongan_ledeng'] ?? 0),
+                                'potongan_kas' => (float) ($approved['potongan_kas'] ?? 0),
+                                'potongan_bjb' => (float) ($approved['potongan_bjb'] ?? 0),
+                                'potongan_bank_bjb' => (float) ($approved['potongan_bjbs'] ?? 0),
+                                'potongan_asuransi' => (float) ($approved['potongan_asuransi'] ?? 0),
+                                'potongan_btn' => (float) ($approved['potongan_btn'] ?? 0),
+                                'potongan_bpr' => (float) ($approved['potongan_bpr'] ?? 0),
+                                'potongan_zakat' => (float) ($approved['potongan_zakat'] ?? 0),
+                                // Total
+                                'total_pendapatan' => (float) ($approved['total_pendapatan'] ?? 0),
+                                'total_potongan' => (float) ($approved['total_potongan'] ?? 0),
+                                'total_terima' => (float) ($approved['gaji_bersih'] ?? 0),
                                 'status' => 'DITERBITKAN',
                                 'updated_at' => now(),
                             ]
                         );
                     }
                 } catch (\Throwable $e) {
-                    // Fallback
+                    // Fallback — tabel payroll mungkin belum punya semua kolom
                 }
 
                 return $approved;
