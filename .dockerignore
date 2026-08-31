@@ -1,0 +1,14 @@
+.git
+node_modules
+vendor
+storage/logs/*
+storage/framework/cache/*
+storage/framework/sessions/*
+storage/framework/views/*
+storage/app/public/*
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+public/build
