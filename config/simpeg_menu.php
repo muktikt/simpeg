@@ -29,6 +29,7 @@ return [
             'roles' => ['1'],
             'items' => [
                 ['label' => 'SET Aplikasi', 'route_name' => 'setting-aplikasi.index'],
+                ['label' => 'Unggah Dokumen Surat', 'route_name' => 'dokumen-surat.index'],
                 ['label' => 'Kelola Pengumuman', 'route_name' => 'pengumuman.index'],
                 ['label' => 'Pengaturan Akun Pengguna', 'route_name' => 'user-akses.index'],
                 ['label' => 'Perubahan NIK', 'route_name' => 'perubahan-nik.index'],

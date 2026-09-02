@@ -110,14 +110,7 @@
 
     <div class="main">
         <header class="topbar">
-            <div class="search-box">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-                <input type="text" placeholder="Cari NIK atau nama pegawai...">
-            </div>
-            <div class="topbar-right">
-                <div class="icon-btn">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
-                </div>
+            <div class="topbar-right" style="margin-left: auto;">
                 <div class="profile">
                     @if (session('simpeg_user.userlevel') === '5')
                         <a href="{{ route('profile.show') }}" style="display:flex; align-items:center; gap:10px; text-decoration:none; color:inherit;">

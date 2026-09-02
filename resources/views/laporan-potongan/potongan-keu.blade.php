@@ -8,8 +8,8 @@
     <h1>{{ strtoupper($judul) }}</h1>
 </div>
 
-<div class="filter-card" style="background:#fff; padding:16px; border-radius:8px; border:1px solid var(--border-color); margin-bottom:16px;">
-    <form method="GET" style="display:flex; gap:16px; align-items:flex-end;">
+<div class="filter-card" style="background:#fff; padding:16px; border-radius:8px; border:1px solid var(--border-color); margin-bottom:16px; display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:16px;">
+    <form method="GET" style="display:flex; gap:16px; align-items:flex-end; flex-wrap:wrap;">
         <div class="form-group" style="margin:0;">
             <label for="bulan">Bulan</label>
             <select id="bulan" name="bulan">
@@ -26,6 +26,11 @@
         </div>
         <button type="submit" class="btn btn-primary">Filter</button>
     </form>
+
+    <button type="button" class="btn btn-outline" onclick="window.print()" style="font-weight:600; display:inline-flex; align-items:center; gap:6px;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="16" height="16"><path d="M6 9V3h12v6"/><path d="M6 18h12v4H6z"/><rect x="4" y="9" width="16" height="9" rx="1"/></svg>
+        Cetak
+    </button>
 </div>
 
 <div class="table-card">

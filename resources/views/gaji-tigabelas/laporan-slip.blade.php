@@ -13,7 +13,7 @@
     @endif
 </div>
 
-<div class="toolbar">
+<div class="toolbar" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
     <form method="GET" action="{{ route('gaji-tigabelas.laporan-slip') }}" style="display:flex; gap:10px;">
         @if(request('my'))<input type="hidden" name="my" value="1">@endif
         <select name="tahun" onchange="this.form.submit()" style="padding:9px 12px; border-radius:9px; border:1px solid var(--border); font-size:13px;">
@@ -22,6 +22,11 @@
             @endfor
         </select>
     </form>
+
+    <button type="button" class="btn btn-outline" onclick="window.print()" style="font-weight:600; display:inline-flex; align-items:center; gap:6px;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="16" height="16"><path d="M6 9V3h12v6"/><path d="M6 18h12v4H6z"/><rect x="4" y="9" width="16" height="9" rx="1"/></svg>
+        Cetak
+    </button>
 </div>
 
 @if (session('simpeg_user.userlevel') === '5' || request('my'))
@@ -29,92 +34,171 @@
         $item = $data->first();
         $totalNominal = !empty($rincianAnak) ? collect($rincianAnak)->sum('nominal') : ($item['gaji13_diterima'] ?? 0);
         $tahunAjaran = ($tahun - 1) . '/' . $tahun;
+        $totalPotongan = ($item['total_potongan_pendapatan'] ?? 0) + ($item['total_potongan_non_pendapatan'] ?? 0);
     @endphp
 
-    <!-- Banner Tunjangan Pendidikan (Matching Theme SIMPEG: Navy & Sky Blue) -->
-    <div style="background: linear-gradient(135deg, var(--navy) 0%, var(--teal-dark) 100%); color: white; padding: 24px 28px; border-radius: 16px; margin-bottom: 24px; box-shadow: var(--shadow-md); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
-        <div>
-            <div style="font-size: 14px; font-weight: 500; opacity: 0.85; margin-bottom: 4px;">Total Tunjangan &middot; Tahun {{ $tahun }}</div>
-            <div style="font-size: 32px; font-weight: 700; font-family: 'Space Grotesk', sans-serif;">
-                Rp {{ number_format($totalNominal, 0, ',', '.') }}
+    @if ($item)
+        <!-- OFFICIAL SLIP DOCUMENT CONTAINER (PRINT & SCREEN) -->
+        <div class="slip-doc-container">
+            <!-- Header KOP Resmi -->
+            <div class="slip-header-kop">
+                <div class="slip-kop-brand">
+                    <div class="slip-kop-company">PERUMDAM TIRTA MUKTI</div>
+                    <div class="slip-kop-sub">KABUPATEN CIANJUR &middot; JAWA BARAT</div>
+                    <div class="slip-kop-address">Jl. Pangeran Hidayatullah No. 123 Cianjur | Telp. (0263) 261158</div>
+                </div>
+                <div class="slip-kop-title-box">
+                    <div class="slip-title-text">SLIP TUNJANGAN PENDIDIKAN (GAJI 13)</div>
+                    <div class="slip-badge-periode">TAHUN AJARAN: {{ $tahunAjaran }}</div>
+                </div>
             </div>
-            <div style="font-size: 13px; opacity: 0.85; margin-top: 2px;">Tahun Ajaran {{ $tahunAjaran }}</div>
-        </div>
-        @if ($item)
-            <a href="{{ route('gaji-tigabelas.show', $item['id']) }}" class="btn" style="background: var(--surface); color: var(--teal-dark); font-weight: 700; padding: 12px 20px; border-radius: 10px; text-decoration: none; box-shadow: var(--shadow-sm);">
-                📄 Cek Detail (Slip Resmi)
-            </a>
-        @endif
-    </div>
 
-    <!-- Card Rincian Per Anak Responsif Desktop -->
-    <div style="background: white; border-radius: 16px; border: 1px solid #e2e8f0; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); margin-bottom: 24px;">
-        <div style="font-size: 13px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px; border-bottom: 1px solid #f1f5f9; padding-bottom: 8px;">
-            RINCIAN PER ANAK
+            <!-- Info Pegawai -->
+            <div class="slip-emp-box">
+                <div style="display:flex; flex-direction:column; gap:6px;">
+                    <div class="slip-emp-item"><span class="k">NIK</span><span class="sep">:</span><span class="v">{{ $item['nik'] }}</span></div>
+                    <div class="slip-emp-item"><span class="k">Nama Pegawai</span><span class="sep">:</span><span class="v" style="font-size:14px; color:#0F2A3D;">{{ $item['nama'] }}</span></div>
+                    <div class="slip-emp-item"><span class="k">Jabatan</span><span class="sep">:</span><span class="v">{{ $item['jabatan'] ?? 'Pegawai' }}</span></div>
+                </div>
+                <div style="display:flex; flex-direction:column; gap:6px;">
+                    <div class="slip-emp-item"><span class="k">Unit Kerja</span><span class="sep">:</span><span class="v">{{ $item['unit_kerja'] ?? '-' }}</span></div>
+                    <div class="slip-emp-item"><span class="k">Kategori</span><span class="sep">:</span><span class="v">{{ \App\Http\Controllers\GajiTigabelasController::KATEGORI[$item['kategori'] ?? 'pegawai'] ?? ($item['kategori'] ?? 'Pegawai Tetap') }}</span></div>
+                    <div class="slip-emp-item"><span class="k">Status Slip</span><span class="sep">:</span><span class="v" style="color:#16A34A;">Terbit & Final</span></div>
+                </div>
+            </div>
+
+            <!-- Rincian 2 Kolom Vertikal (Pendapatan & Potongan) -->
+            <div class="slip-columns-wrap">
+                <!-- Kolom Penerimaan -->
+                <div class="slip-col-card">
+                    <div class="slip-col-head" style="color:#0369A1; background:#F0F9FF; border-color:#BAE6FD;">
+                        I. PENERIMAAN TUNJ. PENDIDIKAN
+                    </div>
+                    <div class="slip-items-body">
+                        @if(($item['gapok'] ?? 0) > 0)
+                            <div class="slip-row-item"><span class="item-label">Gaji Pokok (Dasar)</span><span class="item-val">Rp {{ number_format($item['gapok'], 0, ',', '.') }}</span></div>
+                        @endif
+                        @if(($item['tunjangan_jabatan'] ?? 0) > 0)
+                            <div class="slip-row-item"><span class="item-label">Tunjangan Jabatan</span><span class="item-val">Rp {{ number_format($item['tunjangan_jabatan'], 0, ',', '.') }}</span></div>
+                        @endif
+                        @if(($item['tunjangan_transport'] ?? 0) > 0)
+                            <div class="slip-row-item"><span class="item-label">Tunjangan Transport</span><span class="item-val">Rp {{ number_format($item['tunjangan_transport'], 0, ',', '.') }}</span></div>
+                        @endif
+                    </div>
+                    <div class="slip-col-total" style="background:#F0F9FF; border-color:#BAE6FD;">
+                        <span>TOTAL PENDAPATAN (A)</span>
+                        <span class="tot-val" style="color:#0369A1;">Rp {{ number_format($item['total_pendapatan'] ?? $item['gapok'], 0, ',', '.') }}</span>
+                    </div>
+                </div>
+
+                <!-- Kolom Potongan -->
+                <div class="slip-col-card">
+                    <div class="slip-col-head" style="color:#B91C1C; background:#FEF2F2; border-color:#FECACA;">
+                        II. POTONGAN
+                    </div>
+                    <div class="slip-items-body">
+                        @if(($item['potongan_pajak'] ?? 0) > 0)
+                            <div class="slip-row-item"><span class="item-label">Potongan Pajak (PPh21)</span><span class="item-val" style="color:#DC2626;">Rp {{ number_format($item['potongan_pajak'], 0, ',', '.') }}</span></div>
+                        @endif
+                        @if(($item['potongan_kas'] ?? 0) > 0)
+                            <div class="slip-row-item"><span class="item-label">Potongan Kas / Pinjaman</span><span class="item-val" style="color:#DC2626;">Rp {{ number_format($item['potongan_kas'], 0, ',', '.') }}</span></div>
+                        @endif
+                        @if(($item['potongan_keu_minus'] ?? 0) > 0)
+                            <div class="slip-row-item"><span class="item-label">Potongan Keuangan</span><span class="item-val" style="color:#DC2626;">Rp {{ number_format($item['potongan_keu_minus'], 0, ',', '.') }}</span></div>
+                        @endif
+                    </div>
+                    <div class="slip-col-total" style="background:#FEF2F2; border-color:#FECACA;">
+                        <span>TOTAL POTONGAN (B)</span>
+                        <span class="tot-val" style="color:#DC2626;">Rp {{ number_format($totalPotongan, 0, ',', '.') }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Box Take Home Pay (Gaji 13 Bersih) -->
+            <div class="slip-thp-wrapper">
+                <div>
+                    <div class="slip-thp-title">TOTAL DITERIMA (BERSIH = A - B)</div>
+                    <div class="slip-thp-terbilang">Terbilang: # {{ terbilang($totalNominal) }} Rupiah #</div>
+                </div>
+                <div class="slip-thp-nominal">
+                    Rp {{ number_format($totalNominal, 0, ',', '.') }}
+                </div>
+            </div>
+
+            <!-- Tanda Tangan Pengesahan Resmi -->
+            <div class="slip-signatures-grid">
+                <div class="slip-sig-box">
+                    <div class="slip-sig-role">Penerima / Pegawai,</div>
+                    <div class="slip-sig-spacer"></div>
+                    <div class="slip-sig-name">{{ $item['nama'] }}</div>
+                    <div class="slip-sig-nip">NIK. {{ $item['nik'] }}</div>
+                </div>
+                <div class="slip-sig-box">
+                    <div class="slip-sig-role">Cianjur, {{ \Carbon\Carbon::now()->translatedFormat('d F Y') }}<br>Bagian Keuangan & Penggajian,</div>
+                    <div class="slip-sig-spacer"></div>
+                    <div class="slip-sig-name">PERUMDAM TIRTA MUKTI</div>
+                    <div class="slip-sig-nip">Kasubag / Staf Keuangan</div>
+                </div>
+            </div>
         </div>
 
-        <div style="display: flex; flex-direction: column; gap: 16px; margin-bottom: 20px;">
-            @forelse ($rincianAnak as $anak)
-                <div style="border: 1px solid #e2e8f0; border-radius: 12px; padding: 18px 20px; background: #fff;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 10px;">
-                        <div style="display: flex; align-items: center; gap: 12px;">
-                            <div style="width: 42px; height: 42px; border-radius: 50%; background: #2563eb; color: #fff; font-weight: 700; font-size: 15px; display: flex; align-items: center; justify-content: center;">
-                                {{ $anak['inisial'] }}
-                            </div>
-                            <div>
-                                <div style="font-weight: 700; color: #0f172a; font-size: 16px; display: flex; align-items: center; gap: 8px;">
-                                    {{ $anak['nama'] }}
-                                    <span style="font-size: 11px; font-weight: 600; padding: 2px 8px; background: #eff6ff; color: #1d4ed8; border-radius: 6px;">{{ $anak['jenjang_singkat'] }}</span>
+        <!-- Card Rincian Per Anak -->
+        @if (!empty($rincianAnak) && count($rincianAnak) > 0)
+            <div class="panel" style="max-width:840px; margin:0 auto 32px;">
+                <h3 style="margin-bottom:16px; font-size:15px;">Rincian Tanggungan Anak Sekolah</h3>
+                <div style="display:flex; flex-direction:column; gap:12px;">
+                    @foreach ($rincianAnak as $anak)
+                        <div style="display:flex; justify-content:space-between; align-items:center; padding:14px 18px; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:12px; flex-wrap:wrap; gap:10px;">
+                            <div style="display:flex; align-items:center; gap:12px;">
+                                <div style="width:38px; height:38px; border-radius:50%; background:#2563EB; color:#fff; font-weight:700; font-size:14px; display:flex; align-items:center; justify-content:center;">
+                                    {{ $anak['inisial'] }}
+                                </div>
+                                <div>
+                                    <div style="font-weight:700; color:#0F172A; font-size:14px;">{{ $anak['nama'] }} &middot; <span style="font-weight:500; color:#64748B;">{{ $anak['jenjang_detail'] }}</span></div>
+                                    <div style="font-size:12px; color:#1D4ED8; font-weight:600; margin-top:2px;">Status: {{ $anak['status'] }}</div>
                                 </div>
                             </div>
+                            <div style="font-weight:700; color:#0F172A; font-size:15px; font-family:'IBM Plex Mono',monospace;">
+                                Rp {{ number_format($anak['nominal'], 0, ',', '.') }}
+                            </div>
                         </div>
-                        <div style="font-weight: 700; color: #0f172a; font-size: 17px;">
-                            Rp {{ number_format($anak['nominal'], 0, ',', '.') }}
-                        </div>
-                    </div>
-
-                    <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px dashed #f1f5f9; padding-top: 10px; font-size: 13px;">
-                        <div>
-                            <span style="color: #64748b; text-transform: uppercase; font-size: 11px; font-weight: 600; display: block; margin-bottom: 2px;">JENJANG</span>
-                            <span style="font-weight: 600; color: #334155;">{{ $anak['jenjang_detail'] }}</span>
-                        </div>
-                        <div style="text-align: right;">
-                            <span style="color: #64748b; text-transform: uppercase; font-size: 11px; font-weight: 600; display: block; margin-bottom: 2px;">STATUS</span>
-                            <span style="font-weight: 600; font-size: 12px; padding: 4px 10px; border-radius: 6px; background: {{ $anak['status_bg'] }}; color: {{ $anak['status_color'] }};">
-                                {{ $anak['status'] }}
-                            </span>
-                        </div>
-                    </div>
+                    @endforeach
                 </div>
-            @empty
-                <div style="padding: 24px; text-align: center; color: #64748b; font-size: 13px; background: #f8fafc; border-radius: 10px; border: 1px dashed #cbd5e1;">
-                    Belum ada data anak yang tercatat pada database kepegawaian untuk akun ini.
-                </div>
-            @endforelse
-        </div>
+            </div>
+        @endif
 
-        <div style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; background: var(--teal-soft); border-radius: 12px; border: 1px solid var(--border);">
-            <span style="font-weight: 700; color: var(--teal-dark); font-size: 15px;">Total Diterima</span>
-            <span style="font-weight: 700; color: var(--teal); font-size: 18px;">Rp {{ number_format($totalNominal, 0, ',', '.') }}</span>
+    @else
+        <div class="table-card" style="padding: 40px; text-align: center; margin-top: 16px;">
+            <div class="table-empty">Belum ada data Tunjangan Pendidikan yang terbit untuk Anda pada tahun {{ $tahun }}. Silakan pilih tahun lain di atas.</div>
         </div>
-    </div>
+    @endif
 
 @else
     <!-- Tampilan Admin / Keuangan -->
-    <p class="report-note">Menampilkan Gaji 13 yang sudah terbit. Klik "Lihat Slip" untuk detail lengkap per pegawai.</p>
+    <p class="report-note">Menampilkan daftar slip Tunjangan Pendidikan yang sudah terbit. Klik "Cetak Slip Resmi" pada pegawai yang ingin dicetak.</p>
 
     <div class="table-card">
         <table class="data-table">
             <thead>
-                <tr><th>NIK</th><th>Nama</th><th>Gaji 13 Diterima</th><th style="width:1%"></th></tr>
+                <tr>
+                    <th>NIK</th>
+                    <th>Nama Pegawai</th>
+                    <th style="text-align:right;">Total Gaji 13 Bersih</th>
+                    <th style="width:1%; text-align:center;">Aksi</th>
+                </tr>
             </thead>
             <tbody>
                 @forelse ($data as $d)
                     <tr>
                         <td class="cell-nik">{{ $d['nik'] }}</td>
                         <td class="cell-name">{{ $d['nama'] }}</td>
-                        <td>Rp {{ number_format($d['gaji13_diterima'], 0, ',', '.') }}</td>
-                        <td><a href="{{ route('gaji-tigabelas.show', $d['id']) }}" class="btn btn-outline btn-sm">Lihat Slip</a></td>
+                        <td style="text-align:right; font-weight:700; color:#0F172A;">Rp {{ number_format($d['gaji13_diterima'], 0, ',', '.') }}</td>
+                        <td style="white-space:nowrap; text-align:center;">
+                            <a href="{{ route('gaji-tigabelas.show', $d['id']) }}" class="btn btn-outline btn-sm" style="font-weight:600; display:inline-flex; align-items:center; gap:6px;">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="14" height="14"><path d="M6 9V3h12v6"/><path d="M6 18h12v4H6z"/><rect x="4" y="9" width="16" height="9" rx="1"/></svg>
+                                Cetak Slip Resmi
+                            </a>
+                        </td>
                     </tr>
                 @empty
                     <tr><td colspan="4"><div class="table-empty">Belum ada Gaji 13 yang terbit untuk tahun ini.</div></td></tr>

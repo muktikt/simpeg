@@ -29,6 +29,7 @@ use App\Http\Controllers\LaporanPotonganController;
 use App\Http\Controllers\SettingAplikasiController;
 use App\Http\Controllers\PengaduanController;
 use App\Http\Controllers\PengumumanController;
+use App\Http\Controllers\DokumenSuratController;
 
 Route::get('/', [LoginController::class, 'showLoginForm'])->name('login');
 Route::post('/login', [LoginController::class, 'login'])->name('login.attempt');
@@ -208,6 +209,13 @@ Route::middleware(['simpeg.auth'])->group(function () {
         Route::put('/', [SettingAplikasiController::class, 'update'])->name('update');
     });
 
+    // Dokumen Surat Pegawai (Unggah Dokumen untuk Admin SDM)
+    Route::prefix('dokumen-surat')->name('dokumen-surat.')->middleware(['simpeg.auth:1'])->group(function () {
+        Route::get('/', [DokumenSuratController::class, 'index'])->name('index');
+        Route::post('/upload', [DokumenSuratController::class, 'store'])->name('store');
+        Route::delete('/{pegawaiId}/{jenis}', [DokumenSuratController::class, 'destroy'])->name('destroy');
+    });
+
     // Perubahan NIK - Admin only.
     Route::prefix('perubahan-nik')->name('perubahan-nik.')->middleware(['simpeg.auth:1'])->group(function () {
         Route::get('/', [PerubahanNikController::class, 'index'])->name('index');
@@ -287,12 +295,16 @@ Route::middleware(['simpeg.auth'])->group(function () {
     // Hak akses: Role 2 (Keuangan) — sesuai menu_incl_keu.php lama
     // ══════════════════════════════════════════════════════════════
 
-    // Potongan Keuangan (Gaji / THR / Gaji 13) - CRUD + terbitkan + belum-masuk
+    // Potongan Keuangan (Gaji / THR / Gaji 13) - CRUD + terbitkan + belum-masuk + Import Excel + Realtime Status
     Route::prefix('potongan-keu')->name('potongan-keu.')->middleware(['simpeg.auth:2'])->group(function () {
         Route::get('/{tipe}', [PotonganKeuController::class, 'index'])->name('index')->where('tipe', 'gaji|thr|gaji13');
         Route::get('/{tipe}/terbit', [PotonganKeuController::class, 'terbitIndex'])->name('terbit')->where('tipe', 'gaji|thr|gaji13');
         Route::get('/{tipe}/create', [PotonganKeuController::class, 'create'])->name('create')->where('tipe', 'gaji|thr|gaji13');
         Route::post('/{tipe}', [PotonganKeuController::class, 'store'])->name('store')->where('tipe', 'gaji|thr|gaji13');
+        Route::get('/{tipe}/template', [PotonganKeuController::class, 'downloadTemplate'])->name('template')->where('tipe', 'gaji|thr|gaji13');
+        Route::post('/{tipe}/import', [PotonganKeuController::class, 'importExcel'])->name('import')->where('tipe', 'gaji|thr|gaji13');
+        Route::get('/{tipe}/realtime-status', [PotonganKeuController::class, 'realtimeStatus'])->name('realtime-status')->where('tipe', 'gaji|thr|gaji13');
+        Route::post('/{tipe}/setujui-kepegawaian', [PotonganKeuController::class, 'setujuiKepegawaian'])->name('setujui-kepegawaian')->where('tipe', 'gaji|thr|gaji13');
         Route::get('/{tipe}/{id}/edit', [PotonganKeuController::class, 'edit'])->name('edit')->where('tipe', 'gaji|thr|gaji13')->whereNumber('id');
         Route::put('/{tipe}/{id}', [PotonganKeuController::class, 'update'])->name('update')->where('tipe', 'gaji|thr|gaji13')->whereNumber('id');
         Route::delete('/{tipe}/{id}', [PotonganKeuController::class, 'destroy'])->name('destroy')->where('tipe', 'gaji|thr|gaji13')->whereNumber('id');

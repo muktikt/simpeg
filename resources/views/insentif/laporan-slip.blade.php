@@ -13,7 +13,7 @@
     @endif
 </div>
 
-<div class="toolbar">
+<div class="toolbar" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
     <form method="GET" action="{{ route('insentif.laporan-slip') }}" style="display:flex; gap:10px; flex-wrap:wrap;">
         @if(request('my'))<input type="hidden" name="my" value="1">@endif
         <select name="sumber" onchange="this.form.submit()" style="padding:9px 12px; border-radius:9px; border:1px solid var(--border); font-size:13px;">
@@ -33,6 +33,11 @@
             @endfor
         </select>
     </form>
+
+    <button type="button" class="btn btn-outline" onclick="window.print()" style="font-weight:600; display:inline-flex; align-items:center; gap:6px;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="16" height="16"><path d="M6 9V3h12v6"/><path d="M6 18h12v4H6z"/><rect x="4" y="9" width="16" height="9" rx="1"/></svg>
+        Cetak
+    </button>
 </div>
 
 @if (session('simpeg_user.userlevel') === '5' || request('my'))

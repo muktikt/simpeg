@@ -12,7 +12,7 @@
 
 @if (session('success'))
     <div class="alert alert-success" style="margin-bottom: 20px; padding: 14px 18px; background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 8px; color: #065f46; font-weight: 500;">
-        ✓ {{ session('success') }}
+        {{ session('success') }}
     </div>
 @endif
 
@@ -22,7 +22,7 @@
         @method('PUT')
 
         <h3 style="font-size: 1.15rem; font-weight: 700; color: #1e293b; margin-bottom: 18px; border-bottom: 2px solid #f1f5f9; padding-bottom: 10px;">
-            🏢 Identitas Instansi / Perusahaan
+            Identitas Instansi / Perusahaan
         </h3>
 
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin-bottom: 24px;">
@@ -50,7 +50,7 @@
         </div>
 
         <h3 style="font-size: 1.15rem; font-weight: 700; color: #1e293b; margin-top: 32px; margin-bottom: 18px; border-bottom: 2px solid #f1f5f9; padding-bottom: 10px;">
-            ⏱️ Pengaturan Presensi & Periode Kerja
+            Pengaturan Presensi & Periode Kerja
         </h3>
 
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 24px;">
@@ -83,7 +83,7 @@
 
         <div style="margin-top: 30px; display: flex; justify-content: flex-end;">
             <button type="submit" class="btn btn-primary" style="background: #1e3a8a; color: #fff; padding: 12px 24px; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; box-shadow: 0 2px 4px rgba(30,58,138,0.2);">
-                💾 Simpan Perubahan Pengaturan
+                Simpan Perubahan Pengaturan
             </button>
         </div>
     </form>
