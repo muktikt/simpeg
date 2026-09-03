@@ -207,37 +207,44 @@ class PegawaiController extends Controller
             return static::$memoryCache;
         }
 
-        try {
-            $dbPegawai = \Illuminate\Support\Facades\DB::table('pegawai')->get();
-            if ($dbPegawai->isNotEmpty()) {
-                $list = [];
-                $index = 1;
-                foreach ($dbPegawai as $sp) {
-                    $list[] = [
-                        'id' => $index++,
-                        'db_id' => $sp->id,
-                        'nik' => (string) $sp->nik,
-                        'nama' => $sp->name ?? 'Pegawai',
-                        'gelar' => $sp->gelar ?? '',
-                        'jabatan' => $sp->jabatan ?? 'Staf',
-                        'unit_kerja' => $sp->unit_kerja ?? 'Kantor Pusat',
-                        'status_peg' => $sp->status ?? 'PT',
-                        'tgl_masuk' => date('Y-m-d'),
-                        'telp' => $sp->no_telp ?? '-',
-                        'alamat' => $sp->alamat ?? '-',
-                        'keluarga' => [],
-                        'golongan' => [],
-                        'jabatan_riwayat' => [],
-                        'pendidikan' => [],
-                        'prestasi' => [],
-                    ];
+        $list = \Illuminate\Support\Facades\Cache::remember('simpeg_all_pegawai_list', 120, function () {
+            try {
+                $dbPegawai = \Illuminate\Support\Facades\DB::table('pegawai')->select('id', 'nik', 'name', 'gelar', 'jabatan', 'unit_kerja', 'status', 'no_telp', 'alamat')->get();
+                if ($dbPegawai->isNotEmpty()) {
+                    $res = [];
+                    $index = 1;
+                    foreach ($dbPegawai as $sp) {
+                        $res[] = [
+                            'id' => $index++,
+                            'db_id' => $sp->id,
+                            'nik' => (string) $sp->nik,
+                            'nama' => $sp->name ?? 'Pegawai',
+                            'gelar' => $sp->gelar ?? '',
+                            'jabatan' => $sp->jabatan ?? 'Staf',
+                            'unit_kerja' => $sp->unit_kerja ?? 'Kantor Pusat',
+                            'status_peg' => $sp->status ?? 'PT',
+                            'tgl_masuk' => date('Y-m-d'),
+                            'telp' => $sp->no_telp ?? '-',
+                            'alamat' => $sp->alamat ?? '-',
+                            'keluarga' => [],
+                            'golongan' => [],
+                            'jabatan_riwayat' => [],
+                            'pendidikan' => [],
+                            'prestasi' => [],
+                        ];
+                    }
+                    return $res;
                 }
-                session()->put('dummy_pegawai', $list);
-                static::$memoryCache = $list;
-                return $list;
+            } catch (\Throwable $e) {
+                // Fallback to session defaults
             }
-        } catch (\Throwable $e) {
-            // Fallback to session defaults
+
+            return [];
+        });
+
+        if (! empty($list)) {
+            static::$memoryCache = $list;
+            return $list;
         }
 
         $this->seedIfEmpty();
@@ -249,6 +256,8 @@ class PegawaiController extends Controller
     protected function save(array $data): void
     {
         static::$memoryCache = $data;
+        \Illuminate\Support\Facades\Cache::forget('simpeg_all_pegawai_list');
+        \Illuminate\Support\Facades\Cache::forget('simpeg_dashboard_stats');
         session()->put('dummy_pegawai', $data);
     }
 
