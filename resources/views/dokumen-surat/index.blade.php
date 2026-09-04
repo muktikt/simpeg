@@ -313,28 +313,38 @@
 
 /* Modal styling */
 .ds-modal-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(15, 42, 61, 0.5);
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
-    z-index: 9999;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    background: rgba(15, 23, 42, 0.6) !important;
+    backdrop-filter: blur(6px) !important;
+    -webkit-backdrop-filter: blur(6px) !important;
+    z-index: 999999 !important;
     display: none;
-    align-items: center;
-    justify-content: center;
-    padding: 20px;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 24px 16px !important;
+    overflow-y: auto !important;
+    box-sizing: border-box !important;
 }
 .ds-modal-box {
-    background: #ffffff;
-    width: 100%;
-    max-width: 520px;
-    border-radius: 18px;
-    box-shadow: 0 20px 40px rgba(0,0,0,0.25);
-    overflow: hidden;
-    animation: modalIn 0.2s ease-out;
+    background: #ffffff !important;
+    width: 100% !important;
+    max-width: 540px !important;
+    margin: auto !important;
+    border-radius: 20px !important;
+    box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.35) !important;
+    position: relative !important;
+    overflow: visible !important;
+    animation: dsModalIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) both !important;
+    z-index: 1000000 !important;
 }
-@keyframes modalIn {
-    from { opacity: 0; transform: scale(0.95) translateY(10px); }
+@keyframes dsModalIn {
+    from { opacity: 0; transform: scale(0.95) translateY(12px); }
     to { opacity: 1; transform: scale(1) translateY(0); }
 }
 .ds-modal-header {
@@ -403,7 +413,7 @@
     </div>
     <button type="button" class="ds-btn-primary" onclick="openUploadModal()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="17" height="17"><path d="M12 5v14M5 12h14"/></svg>
-        + Unggah Dokumen Baru
+        Unggah Dokumen Baru
     </button>
 </div>
 
@@ -501,14 +511,21 @@
                             <div style="font-weight: 700; color: #0F2A3D; font-size: 13px;">{{ $sk['judul'] ?? 'Surat Keputusan' }}</div>
                             <div style="font-size: 12px; color: #64748B; font-family: 'IBM Plex Mono', monospace; margin: 2px 0 8px 0;">No: {{ $sk['nomor'] }}</div>
                             <div style="display: flex; gap: 6px; flex-wrap: wrap;">
-                                <button type="button" class="ds-btn-action ds-btn-view" onclick="viewFileModal('{{ addslashes($sk['judul'] ?? 'Surat Kerja') }}', '{{ addslashes($sk['file_name'] ?? 'SK.pdf') }}')">
+                                <button type="button" class="ds-btn-action ds-btn-view" onclick="viewFileModal('{{ addslashes($sk['judul'] ?? 'Surat Kerja') }}', '{{ addslashes($sk['file_name'] ?? 'SK.pdf') }}', '{{ addslashes($sk['file_url'] ?? '#') }}')">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                                     View File
                                 </button>
-                                <button type="button" class="ds-btn-action ds-btn-download" onclick="showCustomAlert('Mengunduh berkas {{ addslashes($sk['file_name'] ?? 'SK.pdf') }}', 'Download File', 'download')">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                                    Download
-                                </button>
+                                @if (!empty($sk['file_url']) && $sk['file_url'] !== '#')
+                                    <a href="{{ $sk['file_url'] }}" target="_blank" class="ds-btn-action ds-btn-download" style="text-decoration:none;">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                                        Download
+                                    </a>
+                                @else
+                                    <button type="button" class="ds-btn-action ds-btn-download" onclick="showCustomAlert('Dokumen tersimpan sebagai draft resmi.', 'Informasi Berkas', 'info')">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                                        Draft
+                                    </button>
+                                @endif
                                 <button type="button" class="ds-btn-action ds-btn-upload-sm" onclick="openUploadModal({{ $p['id'] }}, 'surat_kerja', '{{ addslashes($sk['nomor']) }}', '{{ addslashes($sk['judul']) }}', '{{ $sk['tgl_terbit'] }}')">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
                                     Ganti SK
@@ -534,14 +551,21 @@
                             <div style="font-weight: 700; color: #0F2A3D; font-size: 13px;">{{ $diklat['judul'] ?? 'Sertifikat Diklat' }}</div>
                             <div style="font-size: 12px; color: #64748B; font-family: 'IBM Plex Mono', monospace; margin: 2px 0 8px 0;">No: {{ $diklat['nomor'] }}</div>
                             <div style="display: flex; gap: 6px; flex-wrap: wrap;">
-                                <button type="button" class="ds-btn-action ds-btn-view" onclick="viewFileModal('{{ addslashes($diklat['judul'] ?? 'Sertifikat Diklat') }}', '{{ addslashes($diklat['file_name'] ?? 'Diklat.pdf') }}')">
+                                <button type="button" class="ds-btn-action ds-btn-view" onclick="viewFileModal('{{ addslashes($diklat['judul'] ?? 'Sertifikat Diklat') }}', '{{ addslashes($diklat['file_name'] ?? 'Diklat.pdf') }}', '{{ addslashes($diklat['file_url'] ?? '#') }}')">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                                     View File
                                 </button>
-                                <button type="button" class="ds-btn-action ds-btn-download" onclick="showCustomAlert('Mengunduh berkas {{ addslashes($diklat['file_name'] ?? 'Diklat.pdf') }}', 'Download File', 'download')">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                                    Download
-                                </button>
+                                @if (!empty($diklat['file_url']) && $diklat['file_url'] !== '#')
+                                    <a href="{{ $diklat['file_url'] }}" target="_blank" class="ds-btn-action ds-btn-download" style="text-decoration:none;">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                                        Download
+                                    </a>
+                                @else
+                                    <button type="button" class="ds-btn-action ds-btn-download" onclick="showCustomAlert('Dokumen tersimpan sebagai draft resmi.', 'Informasi Berkas', 'info')">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                                        Draft
+                                    </button>
+                                @endif
                                 <button type="button" class="ds-btn-action ds-btn-upload-sm" onclick="openUploadModal({{ $p['id'] }}, 'surat_diklat', '{{ addslashes($diklat['nomor']) }}', '{{ addslashes($diklat['judul']) }}', '{{ $diklat['tgl_terbit'] }}')">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
                                     Ganti Diklat
@@ -574,7 +598,9 @@
         </tbody>
     </table>
 </div>
+@endsection
 
+@section('modals')
 <!-- Modal Upload Dokumen SDM -->
 <div id="ds-modal-upload" class="ds-modal-overlay">
     <div class="ds-modal-box">
@@ -582,14 +608,14 @@
             <h3 class="ds-modal-title" id="upload-modal-title">Unggah Dokumen Pegawai (SDM)</h3>
             <button type="button" onclick="closeUploadModal()" style="background:none; border:none; font-size:22px; cursor:pointer; color:#64748B;">&times;</button>
         </div>
-        <form method="POST" action="{{ route('dokumen-surat.store') }}" enctype="multipart/form-data" class="ds-modal-body">
+        <form method="POST" action="{{ route('dokumen-surat.store') }}" enctype="multipart/form-data" class="ds-modal-body" id="upload-dokumen-form" onsubmit="return handleDokumenSubmit(event, this)">
             @csrf
             <div class="ds-form-group">
                 <label class="ds-form-label">Pilih Pegawai <span style="color:#DC2626;">*</span></label>
-                <select name="pegawai_id" id="modal-pegawai-id" required class="ds-form-select">
-                    <option value="">-- Pilih Pegawai --</option>
+                <select name="pegawai_id" id="modal-pegawai-id" class="ds-form-select">
+                    <option value="">-- Cari / Pilih Pegawai --</option>
                     @foreach ($allPegawaiOptions as $opt)
-                        <option value="{{ $opt['id'] }}">{{ $opt['nama'] }} (NIK: {{ $opt['nik'] }}) - {{ $opt['jabatan'] }}</option>
+                        <option value="{{ $opt['id'] }}">{{ $opt['nik'] }} - {{ $opt['nama'] }} ({{ $opt['jabatan'] }})</option>
                     @endforeach
                 </select>
             </div>
@@ -618,18 +644,18 @@
             </div>
 
             <div class="ds-form-group">
-                <label class="ds-form-label">Lampiran Berkas (PDF / Gambar) <span style="color:#64748B; font-weight:normal;">(Maks 10MB)</span></label>
+                <label class="ds-form-label">Lampiran Berkas (PDF / Gambar) <span style="color:#64748B; font-weight:normal;">(Maks 15MB)</span></label>
                 <div class="ds-file-drop" onclick="document.getElementById('modal-file-input').click()">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="32" height="32" style="color:#0284C7; margin-bottom:6px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                     <div style="font-weight:600; color:#334155; font-size:13px;" id="file-drop-label">Klik untuk memilih file dokumen (PDF/JPG/PNG)</div>
-                    <div style="font-size:11.5px; color:#64748B; margin-top:2px;">Format didukung: .pdf, .jpg, .jpeg, .png</div>
+                    <div style="font-size:11.5px; color:#64748B; margin-top:2px;">Format didukung: .pdf, .jpg, .jpeg, .png, .webp, .doc, .docx</div>
                 </div>
-                <input type="file" name="file" id="modal-file-input" accept=".pdf,.png,.jpg,.jpeg" style="display:none;" onchange="handleFileSelected(this)">
+                <input type="file" name="file" id="modal-file-input" accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx" style="display:none;" onchange="handleFileSelected(this)">
             </div>
 
             <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; padding-top: 16px; border-top: 1px solid #E2E8F0;">
                 <button type="button" class="ds-btn-action ds-btn-view" style="padding:10px 18px;" onclick="closeUploadModal()">Batal</button>
-                <button type="submit" class="ds-btn-primary" style="padding:10px 22px;">Simpan & Unggah</button>
+                <button type="submit" id="btn-submit-dokumen" class="ds-btn-primary" style="padding:10px 22px;">Simpan & Unggah</button>
             </div>
         </form>
     </div>
@@ -652,7 +678,7 @@
             </div>
             <div style="display:flex; justify-content:space-between; align-items:center;">
                 <button type="button" class="ds-btn-action ds-btn-view" style="padding:10px 18px;" onclick="closeViewModal()">Tutup</button>
-                <button type="button" class="ds-btn-primary" style="padding:10px 20px;" onclick="showCustomAlert('Mengunduh berkas...', 'Download Berkas', 'download')">
+                <button type="button" id="view-modal-action-btn" class="ds-btn-primary" style="padding:10px 20px;">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                     Buka / Unduh File
                 </button>
@@ -662,19 +688,33 @@
 </div>
 
 <script>
+let currentViewFileUrl = '#';
+
 function openUploadModal(pegawaiId = null, jenis = 'surat_kerja', nomor = '', judul = '', tglTerbit = '') {
     const modal = document.getElementById('ds-modal-upload');
+    const select = document.getElementById('modal-pegawai-id');
+    
     if (pegawaiId) {
-        document.getElementById('modal-pegawai-id').value = pegawaiId;
+        select.value = pegawaiId;
     } else {
-        document.getElementById('modal-pegawai-id').value = '';
+        select.value = '';
     }
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    
     document.getElementById('modal-jenis-dokumen').value = jenis || 'surat_kerja';
     document.getElementById('modal-nomor').value = nomor || '';
     document.getElementById('modal-judul').value = judul || (jenis === 'surat_kerja' ? 'Surat Keputusan Pengangkatan Pegawai' : 'Sertifikat Diklat Manajemen Pegawai');
     document.getElementById('modal-tgl-terbit').value = tglTerbit || '{{ date('Y-m-d') }}';
     document.getElementById('file-drop-label').textContent = 'Klik untuk memilih file dokumen (PDF/JPG/PNG)';
     document.getElementById('modal-file-input').value = '';
+
+    const submitBtn = document.getElementById('btn-submit-dokumen');
+    if (submitBtn) {
+        submitBtn.innerHTML = `Simpan & Unggah`;
+        submitBtn.style.pointerEvents = 'auto';
+        submitBtn.style.opacity = '1';
+        submitBtn.disabled = false;
+    }
 
     modal.style.display = 'flex';
 }
@@ -683,15 +723,71 @@ function closeUploadModal() {
     document.getElementById('ds-modal-upload').style.display = 'none';
 }
 
+function handleDokumenSubmit(e, form) {
+    const pegawaiSelect = document.getElementById('modal-pegawai-id');
+    if (!pegawaiSelect.value) {
+        e.preventDefault();
+        if (typeof showCustomAlert === 'function') {
+            showCustomAlert('Silakan pilih pegawai terlebih dahulu sebelum mengunggah.', 'Peringatan', 'warning');
+        } else {
+            alert('Silakan pilih pegawai terlebih dahulu.');
+        }
+        return false;
+    }
+    const nomor = document.getElementById('modal-nomor').value.trim();
+    if (!nomor) {
+        e.preventDefault();
+        if (typeof showCustomAlert === 'function') {
+            showCustomAlert('Nomor surat / sertifikat wajib diisi.', 'Peringatan', 'warning');
+        } else {
+            alert('Nomor surat / sertifikat wajib diisi.');
+        }
+        return false;
+    }
+    const judul = document.getElementById('modal-judul').value.trim();
+    if (!judul) {
+        e.preventDefault();
+        if (typeof showCustomAlert === 'function') {
+            showCustomAlert('Judul / keterangan dokumen wajib diisi.', 'Peringatan', 'warning');
+        } else {
+            alert('Judul / keterangan dokumen wajib diisi.');
+        }
+        return false;
+    }
+
+    const submitBtn = document.getElementById('btn-submit-dokumen');
+    if (submitBtn) {
+        submitBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="display:inline-block; vertical-align:middle; margin-right:6px;"><circle cx="12" cy="12" r="10" stroke-opacity="0.25"/><path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"/></svg> Mengunggah...`;
+        submitBtn.style.pointerEvents = 'none';
+        submitBtn.style.opacity = '0.85';
+    }
+    return true;
+}
+
 function handleFileSelected(input) {
     if (input.files && input.files[0]) {
         document.getElementById('file-drop-label').textContent = 'File Terpilih: ' + input.files[0].name;
     }
 }
 
-function viewFileModal(judul, filename) {
+function viewFileModal(judul, filename, fileUrl = '#') {
     document.getElementById('view-file-title').textContent = 'Preview: ' + judul;
     document.getElementById('view-file-name').textContent = filename;
+    currentViewFileUrl = fileUrl;
+    const downloadBtn = document.getElementById('view-modal-action-btn');
+    if (fileUrl && fileUrl !== '#') {
+        downloadBtn.onclick = function() { window.open(fileUrl, '_blank'); };
+        downloadBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Buka / Unduh File`;
+    } else {
+        downloadBtn.onclick = function() { 
+            if (typeof showCustomAlert === 'function') {
+                showCustomAlert('Dokumen resmi tercatat di sistem.', 'Informasi Berkas', 'info');
+            } else {
+                alert('Dokumen resmi tercatat di sistem.');
+            }
+        };
+        downloadBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Berkas Resmi`;
+    }
     document.getElementById('ds-modal-view-file').style.display = 'flex';
 }
 

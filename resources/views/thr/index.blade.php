@@ -1,17 +1,23 @@
 @extends('layouts.app')
 
-@section('title', 'Proses THR')
+@section('title', $pageTitle ?? 'Proses THR')
 
 @section('content')
 @php $myRole = session('simpeg_user.userlevel'); $bisaKelola = in_array($myRole, ['1', '2']); @endphp
 
 <div class="page-head">
-    <div class="breadcrumb">Home / Pengaturan THR / Proses THR</div>
-    <h1>Proses THR</h1>
+    <div class="breadcrumb">Home / Pengaturan THR / {{ $pageTitle ?? 'Proses THR' }}</div>
+    <h1>{{ $pageTitle ?? 'Proses THR' }}</h1>
 </div>
 
 <div class="toolbar">
     <form method="GET" action="{{ route('thr.index') }}" style="display:flex; gap:10px;">
+        @if (!empty($kategori))
+            <input type="hidden" name="kategori" value="{{ $kategori }}">
+        @endif
+        @if (!empty($status))
+            <input type="hidden" name="status" value="{{ $status }}">
+        @endif
         <select name="tahun" onchange="this.form.submit()" style="padding:9px 12px; border-radius:9px; border:1px solid var(--border); font-size:13px;">
             @for ($y = now()->year; $y >= now()->year - 3; $y--)
                 <option value="{{ $y }}" @selected($tahun === $y)>{{ $y }}</option>
@@ -19,10 +25,10 @@
         </select>
     </form>
 
-    @if ($bisaKelola)
-        <a href="{{ route('thr.create') }}" class="btn btn-primary">
+    @if ($bisaKelola && $status !== 'terbit')
+        <a href="{{ route('thr.create', !empty($kategori) ? ['kategori' => $kategori] : []) }}" class="btn btn-primary">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
-            Proses THR Pegawai
+            {{ !empty($kategori) && isset(\App\Http\Controllers\ThrController::KATEGORI[$kategori]) ? 'Proses ' . \App\Http\Controllers\ThrController::KATEGORI[$kategori] : 'Proses THR Pegawai' }}
         </a>
     @endif
 </div>

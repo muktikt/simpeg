@@ -1,17 +1,23 @@
 @extends('layouts.app')
 
-@section('title', 'Gaji 13 / Tunjangan Pendidikan')
+@section('title', $pageTitle ?? 'Gaji 13 / Tunjangan Pendidikan')
 
 @section('content')
 @php $myRole = session('simpeg_user.userlevel'); $bisaKelola = in_array($myRole, ['1', '2']); @endphp
 
 <div class="page-head">
-    <div class="breadcrumb">Home / Pengaturan Gaji 13 / Proses Gaji 13</div>
-    <h1>Gaji 13 / Tunjangan Pendidikan</h1>
+    <div class="breadcrumb">Home / Pengaturan Gaji 13 / {{ $pageTitle ?? 'Gaji 13 / Tunjangan Pendidikan' }}</div>
+    <h1>{{ $pageTitle ?? 'Gaji 13 / Tunjangan Pendidikan' }}</h1>
 </div>
 
 <div class="toolbar">
     <form method="GET" action="{{ route('gaji-tigabelas.index') }}" style="display:flex; gap:10px;">
+        @if (!empty($kategori))
+            <input type="hidden" name="kategori" value="{{ $kategori }}">
+        @endif
+        @if (!empty($status))
+            <input type="hidden" name="status" value="{{ $status }}">
+        @endif
         <select name="tahun" onchange="this.form.submit()" style="padding:9px 12px; border-radius:9px; border:1px solid var(--border); font-size:13px;">
             @for ($y = now()->year; $y >= now()->year - 3; $y--)
                 <option value="{{ $y }}" @selected($tahun === $y)>{{ $y }}</option>
@@ -19,10 +25,10 @@
         </select>
     </form>
 
-    @if ($bisaKelola)
-        <a href="{{ route('gaji-tigabelas.create') }}" class="btn btn-primary">
+    @if ($bisaKelola && $status !== 'terbit')
+        <a href="{{ route('gaji-tigabelas.create', !empty($kategori) ? ['kategori' => $kategori] : []) }}" class="btn btn-primary">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
-            Proses Gaji 13 Pegawai
+            {{ !empty($kategori) && isset(\App\Http\Controllers\GajiTigabelasController::KATEGORI[$kategori]) ? 'Proses ' . \App\Http\Controllers\GajiTigabelasController::KATEGORI[$kategori] : 'Proses Gaji 13 Pegawai' }}
         </a>
     @endif
 </div>

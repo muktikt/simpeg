@@ -158,10 +158,18 @@ class GajiProsesController extends Controller
     {
         $bulan = (int) $request->get('bulan', now()->month);
         $tahun = (int) $request->get('tahun', now()->year);
+        $kategori = $request->get('kategori');
+        $status = $request->get('status');
 
         $gaji = collect($this->all())
             ->where('bulan', $bulan)
             ->where('tahun', $tahun)
+            ->when(!empty($kategori), function ($collection) use ($kategori) {
+                return $collection->where('kategori', $kategori);
+            })
+            ->when(!empty($status), function ($collection) use ($status) {
+                return $collection->where('status', $status);
+            })
             ->map(function ($row) {
                 $row['bisa_approve'] = $this->canUserApprove($row['status']);
 
@@ -170,19 +178,38 @@ class GajiProsesController extends Controller
             ->sortBy('nama')
             ->values();
 
+        $pageTitle = 'Proses Gaji Bulanan';
+        if ($status === 'terbit') {
+            $pageTitle = 'Proses Penerbitan Gaji';
+        } elseif ($kategori === 'satuan') {
+            $pageTitle = 'Proses Cek Gaji Pegawai';
+        } elseif ($kategori === 'dirut') {
+            $pageTitle = 'Proses Cek Gaji Dirut';
+        } elseif ($kategori === 'dirum') {
+            $pageTitle = 'Proses Cek Gaji Dirum';
+        } elseif ($kategori === 'dirtek') {
+            $pageTitle = 'Proses Cek Gaji Dirtek';
+        }
+
         return view('gaji-proses.index', [
             'gaji' => $gaji,
             'bulan' => $bulan,
             'tahun' => $tahun,
+            'kategori' => $kategori,
+            'status' => $status,
+            'pageTitle' => $pageTitle,
             'bulanList' => AbsensiController::BULAN,
         ]);
     }
 
-    public function create()
+    public function create(Request $request)
     {
+        $kategori = $request->get('kategori', 'satuan');
+
         return view('gaji-proses.create', [
             'pegawaiList' => $this->pegawaiList(),
             'kategoriList' => self::KATEGORI,
+            'selectedKategori' => $kategori,
             'komponenPendapatan' => self::KOMPONEN_PENDAPATAN,
             'komponenPotongan' => self::KOMPONEN_POTONGAN,
             'gapokList' => session('dummy_gapok', []),

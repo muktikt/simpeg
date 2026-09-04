@@ -70,22 +70,7 @@ class CutiController extends Controller
 
             $cuti = array_merge($pengajuan, $cutiPrestasi);
         } catch (\Throwable $e) {
-            // Fallback ke dummy prestasi jika database connection offline
-            $cuti = collect(session('dummy_prestasi_gaji', []))
-                ->filter(fn ($row) => ($row['cuti'] ?? 0) > 0)
-                ->map(function ($row) {
-                    return [
-                        'id' => $row['id'] ?? 1,
-                        'nik' => $row['nik'] ?? '3000000003',
-                        'nama' => $row['nama'] ?? 'Pegawai',
-                        'unit_kerja' => $row['unit_kerja'] ?? 'PDAM',
-                        'jenis' => 'Cuti Tahunan',
-                        'tanggal_mulai' => $row['tanggal'] ?? now()->toDateString(),
-                        'tanggal_selesai' => $row['tanggal'] ?? now()->toDateString(),
-                        'alasan' => $row['alasan_cuti'] ?? 'Cuti Tahunan',
-                        'status' => 'DISETUJUI',
-                    ];
-                })->values()->all();
+            $cuti = [];
         }
 
         return view('cuti.index', compact('cuti', 'tahun', 'myRole'));

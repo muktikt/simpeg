@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 
@@ -19,26 +20,54 @@ class DokumenSuratController extends Controller
         $pegawaiController = app(PegawaiController::class);
         $allPegawai = $pegawaiController->all();
 
-        // Pastikan setiap pegawai punya struktur dokumen default jika belum ada
-        $allPegawai = collect($allPegawai)->map(function ($p) {
-            if (! isset($p['surat_kerja'])) {
-                $p['surat_kerja'] = [
-                    'nomor' => 'SK/SDM/2024/' . str_pad($p['id'], 3, '0', STR_PAD_LEFT),
-                    'judul' => 'Surat Keputusan Pengangkatan ' . ($p['nama'] ?? 'Pegawai'),
-                    'tgl_terbit' => '2024-01-15',
-                    'file_name' => 'SK_' . str_replace(' ', '_', $p['nama'] ?? 'Pegawai') . '.pdf',
-                    'file_url' => '#',
-                ];
-            }
-            if (! isset($p['surat_diklat'])) {
-                $p['surat_diklat'] = [
-                    'nomor' => 'STP/SDM/2024/' . str_pad($p['id'] + 80, 3, '0', STR_PAD_LEFT),
-                    'judul' => 'Sertifikat Diklat Manajemen Kepegawaian & Pelayanan',
-                    'tgl_terbit' => '2024-05-20',
-                    'file_name' => 'Sertifikat_Diklat_' . str_replace(' ', '_', $p['nama'] ?? 'Pegawai') . '.pdf',
-                    'file_url' => '#',
-                ];
-            }
+        // Ambil data dokumen resmi riil dari database tabel dokumen_pegawai
+        $dbDocs = collect();
+        try {
+            $dbDocs = DB::table('dokumen_pegawai')->get();
+        } catch (\Throwable $e) {}
+
+        // Map dokumen dari database ke masing-masing pegawai
+        $allPegawai = collect($allPegawai)->map(function ($p) use ($dbDocs) {
+            $dbId = $p['db_id'] ?? null;
+            $intId = (string) ($p['id'] ?? '');
+            $nik = (string) ($p['nik'] ?? '');
+
+            // Cari dokumen SK untuk pegawai ini
+            $skDoc = $dbDocs->first(function ($d) use ($dbId, $intId, $nik) {
+                $matchPegawai = ($dbId && (string) $d->pegawai_id === (string) $dbId)
+                    || ((string) $d->pegawai_id === $intId)
+                    || ((string) $d->pegawai_id === $nik);
+                $matchKategori = in_array(strtolower($d->kategori ?? ''), ['sk', 'surat_kerja'], true);
+                return $matchPegawai && $matchKategori;
+            });
+
+            // Cari dokumen Diklat untuk pegawai ini
+            $diklatDoc = $dbDocs->first(function ($d) use ($dbId, $intId, $nik) {
+                $matchPegawai = ($dbId && (string) $d->pegawai_id === (string) $dbId)
+                    || ((string) $d->pegawai_id === $intId)
+                    || ((string) $d->pegawai_id === $nik);
+                $matchKategori = in_array(strtolower($d->kategori ?? ''), ['diklat', 'surat_diklat'], true);
+                return $matchPegawai && $matchKategori;
+            });
+
+            $p['surat_kerja'] = $skDoc ? [
+                'id' => $skDoc->id,
+                'nomor' => $skDoc->nomor ?? 'SK/SDM/2024/' . str_pad($p['id'], 3, '0', STR_PAD_LEFT),
+                'judul' => $skDoc->judul ?? 'Surat Keputusan Pengangkatan ' . ($p['nama'] ?? 'Pegawai'),
+                'tgl_terbit' => !empty($skDoc->created_at) ? substr((string)$skDoc->created_at, 0, 10) : date('Y-m-d'),
+                'file_name' => $skDoc->file_nama ?? 'SK_' . str_replace(' ', '_', $p['nama'] ?? 'Pegawai') . '.pdf',
+                'file_url' => !empty($skDoc->file_url) ? $skDoc->file_url : '#',
+            ] : null;
+
+            $p['surat_diklat'] = $diklatDoc ? [
+                'id' => $diklatDoc->id,
+                'nomor' => $diklatDoc->nomor ?? 'STP/SDM/2024/' . str_pad($p['id'] + 80, 3, '0', STR_PAD_LEFT),
+                'judul' => $diklatDoc->judul ?? 'Sertifikat Diklat Manajemen Kepegawaian & Pelayanan',
+                'tgl_terbit' => !empty($diklatDoc->created_at) ? substr((string)$diklatDoc->created_at, 0, 10) : date('Y-m-d'),
+                'file_name' => $diklatDoc->file_nama ?? 'Sertifikat_Diklat_' . str_replace(' ', '_', $p['nama'] ?? 'Pegawai') . '.pdf',
+                'file_url' => !empty($diklatDoc->file_url) ? $diklatDoc->file_url : '#',
+            ] : null;
+
             return $p;
         });
 
@@ -87,18 +116,33 @@ class DokumenSuratController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'pegawai_id' => 'required|integer',
-            'jenis_dokumen' => 'required|in:surat_kerja,surat_diklat',
-            'nomor' => 'required|string|max:100',
-            'judul' => 'required|string|max:200',
-            'tgl_terbit' => 'required|date',
-            'file' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:10240',
+            'pegawai_id' => 'required',
+            'jenis_dokumen' => 'required',
+            'nomor' => 'required|string|max:150',
+            'judul' => 'required|string|max:255',
+            'tgl_terbit' => 'nullable|date',
+            'file' => 'nullable|file|max:25600',
         ]);
 
         $pegawaiController = app(PegawaiController::class);
         $allPegawai = $pegawaiController->all();
 
-        $fileName = ($validated['jenis_dokumen'] === 'surat_kerja' ? 'SK_' : 'Diklat_') . time() . '.pdf';
+        // Cari target pegawai
+        $targetPegawai = collect($allPegawai)->first(function ($p) use ($validated) {
+            return (string)($p['id'] ?? '') === (string)$validated['pegawai_id']
+                || (string)($p['db_id'] ?? '') === (string)$validated['pegawai_id']
+                || (string)($p['nik'] ?? '') === (string)$validated['pegawai_id'];
+        });
+
+        if (!$targetPegawai) {
+            return back()->with('error', 'Pegawai yang dipilih tidak ditemukan.');
+        }
+
+        $kategoriDb = in_array(strtolower($validated['jenis_dokumen']), ['surat_kerja', 'sk']) ? 'SK' : 'Diklat';
+        $kategoriLabel = $kategoriDb === 'SK' ? 'Surat Kerja (SK)' : 'Surat Diklat / Pelatihan';
+        $targetPegawaiName = $targetPegawai['nama'] ?? 'Pegawai';
+
+        $fileName = ($kategoriDb === 'SK' ? 'SK_' : 'Diklat_') . preg_replace('/[^a-zA-Z0-9]/', '_', $targetPegawaiName) . '.pdf';
         $fileUrl = '#';
 
         if ($request->hasFile('file')) {
@@ -115,51 +159,66 @@ class DokumenSuratController extends Controller
             $fileUrl = asset('uploads/dokumen/' . $safeName);
         }
 
-        $targetPegawaiName = '';
-
-        $allPegawai = collect($allPegawai)->map(function ($p) use ($validated, $fileName, $fileUrl, &$targetPegawaiName) {
-            if ($p['id'] == $validated['pegawai_id']) {
-                $targetPegawaiName = $p['nama'] ?? 'Pegawai';
-                $p[$validated['jenis_dokumen']] = [
-                    'nomor' => $validated['nomor'],
-                    'judul' => $validated['judul'],
-                    'tgl_terbit' => $validated['tgl_terbit'],
-                    'file_name' => $fileName,
-                    'file_url' => $fileUrl,
-                ];
-            }
-            return $p;
-        })->all();
-
-        session()->put('dummy_pegawai', $allPegawai);
-
-        // Update juga ke database tbl_dokumen / Supabase jika tabelnya ada
-        try {
-            $target = collect($allPegawai)->firstWhere('id', $validated['pegawai_id']);
-            if ($target && ! empty($target['nik'])) {
-                DB::table('dokumen_kepegawaian')->updateOrInsert(
-                    [
-                        'nik' => (string) $target['nik'],
-                        'jenis_dokumen' => $validated['jenis_dokumen'],
-                    ],
-                    [
-                        'nomor_surat' => $validated['nomor'],
-                        'judul_dokumen' => $validated['judul'],
-                        'tgl_terbit' => $validated['tgl_terbit'],
-                        'file_nama' => $fileName,
-                        'file_url' => $fileUrl,
-                        'updated_at' => now(),
-                    ]
-                );
-            }
-        } catch (\Throwable $e) {
-            // Abaikan jika tabel belum ada di DB lokal
+        $pegawaiDbId = $targetPegawai['db_id'] ?? null;
+        if (! $pegawaiDbId && ! empty($targetPegawai['nik'])) {
+            $pegawaiDbId = DB::table('pegawai')->where('nik', (string) $targetPegawai['nik'])->value('id');
+        }
+        if (! $pegawaiDbId && ! empty($validated['pegawai_id'])) {
+            $pegawaiDbId = DB::table('pegawai')->where('id', $validated['pegawai_id'])->orWhere('nik', $validated['pegawai_id'])->value('id');
         }
 
-        $jenisLabel = $validated['jenis_dokumen'] === 'surat_kerja' ? 'Surat Kerja (SK)' : 'Surat Diklat / Pelatihan';
+        // Validate UUID syntax for Postgres
+        if ($pegawaiDbId && ! \Illuminate\Support\Str::isUuid((string) $pegawaiDbId)) {
+            $pegawaiDbId = null;
+        }
+
+        $diunggahOleh = session('simpeg_user.nama_peg', 'Admin SDM');
+        $tglTerbit = ! empty($validated['tgl_terbit']) ? $validated['tgl_terbit'] . ' 08:00:00' : now();
+
+        // Simpan / update ke database tabel dokumen_pegawai
+        try {
+            // Cek apakah dokumen untuk pegawai dan kategori ini sudah ada
+            $existing = null;
+            if ($pegawaiDbId) {
+                $existing = DB::table('dokumen_pegawai')
+                    ->where('pegawai_id', $pegawaiDbId)
+                    ->where('kategori', $kategoriDb)
+                    ->first();
+            }
+
+            if ($existing) {
+                $updateData = [
+                    'nomor' => $validated['nomor'],
+                    'judul' => $validated['judul'],
+                    'diunggah_oleh' => $diunggahOleh,
+                    'created_at' => $tglTerbit,
+                ];
+                if ($fileUrl !== '#') {
+                    $updateData['file_nama'] = $fileName;
+                    $updateData['file_url'] = $fileUrl;
+                }
+                DB::table('dokumen_pegawai')->where('id', $existing->id)->update($updateData);
+            } else {
+                DB::table('dokumen_pegawai')->insert([
+                    'pegawai_id' => $pegawaiDbId,
+                    'kategori' => $kategoriDb,
+                    'nomor' => $validated['nomor'],
+                    'judul' => $validated['judul'],
+                    'file_nama' => $fileName,
+                    'file_url' => $fileUrl,
+                    'diunggah_oleh' => $diunggahOleh,
+                    'created_at' => $tglTerbit,
+                ]);
+            }
+        } catch (\Throwable $e) {
+            return back()->with('error', 'Gagal menyimpan dokumen ke database: ' . $e->getMessage());
+        }
+
+        Cache::forget('simpeg_all_pegawai_list');
+
         return redirect()->route('dokumen-surat.index')->with(
             'success',
-            "{$jenisLabel} untuk {$targetPegawaiName} berhasil diunggah & diperbarui."
+            "{$kategoriLabel} untuk {$targetPegawaiName} berhasil diunggah & disimpan."
         );
     }
 
@@ -168,28 +227,28 @@ class DokumenSuratController extends Controller
      */
     public function destroy(int $pegawaiId, string $jenis)
     {
-        if (! in_array($jenis, ['surat_kerja', 'surat_diklat'], true)) {
-            return back()->with('error', 'Jenis dokumen tidak valid.');
-        }
+        $kategoriDb = in_array(strtolower($jenis), ['surat_kerja', 'sk']) ? 'SK' : 'Diklat';
+        $kategoriLabel = $kategoriDb === 'SK' ? 'Surat Kerja (SK)' : 'Surat Diklat / Pelatihan';
 
         $pegawaiController = app(PegawaiController::class);
         $allPegawai = $pegawaiController->all();
-        $targetPegawaiName = '';
+        $targetPegawai = collect($allPegawai)->firstWhere('id', $pegawaiId);
 
-        $allPegawai = collect($allPegawai)->map(function ($p) use ($pegawaiId, $jenis, &$targetPegawaiName) {
-            if ($p['id'] === $pegawaiId) {
-                $targetPegawaiName = $p['nama'] ?? 'Pegawai';
-                $p[$jenis] = null;
-            }
-            return $p;
-        })->all();
+        if ($targetPegawai && !empty($targetPegawai['db_id'])) {
+            try {
+                DB::table('dokumen_pegawai')
+                    ->where('pegawai_id', $targetPegawai['db_id'])
+                    ->where('kategori', $kategoriDb)
+                    ->delete();
+            } catch (\Throwable $e) {}
+        }
 
-        session()->put('dummy_pegawai', $allPegawai);
+        Cache::forget('simpeg_all_pegawai_list');
 
-        $jenisLabel = $jenis === 'surat_kerja' ? 'Surat Kerja (SK)' : 'Surat Diklat / Pelatihan';
+        $targetPegawaiName = $targetPegawai['nama'] ?? 'Pegawai';
         return redirect()->route('dokumen-surat.index')->with(
             'success',
-            "{$jenisLabel} untuk {$targetPegawaiName} telah dihapus."
+            "{$kategoriLabel} untuk {$targetPegawaiName} telah berhasil dihapus."
         );
     }
 }

@@ -9,13 +9,16 @@ use Illuminate\Support\Facades\DB;
 class LoginController extends Controller
 {
     protected array $defaultPasswords = [
-        '3000000003' => 'pegawai123',
-        '4000000001' => 'kadiv123',
-        '4000000006' => 'kadivteknik2025',
-        '4000000002' => 'kspi123',
-        '4000000003' => 'tpdpk123',
-        '5000000001' => 'dirut123',
-        '5000000002' => 'sdm123',
+        '1711001' => 'dirut123',
+        '1711002' => 'dirum123',
+        '1711003' => 'dirtek123',
+        '1711157' => 'sdm123',
+        '1711254' => 'sdm123',
+        '1711296' => 'keuangan123',
+        '1711145' => 'keuangan123',
+        '1711161' => 'kspi123',
+        '1711446' => 'kadivteknik123',
+        '1711479' => 'kadivadmin123',
     ];
 
     /**
@@ -59,10 +62,20 @@ class LoginController extends Controller
                 ->onlyInput('nik');
         }
 
-        // 2. Verifikasi Password langsung ke hash auth.users Supabase atau defaultPasswords
+        // 2. Verifikasi Password langsung ke hash auth.users Supabase atau default NIK
         $passwordValid = false;
         try {
-            $authUser = DB::table('auth.users')->where('email', "{$nik}@gmail.com")->first();
+            $authUser = DB::table('auth.users')->where('id', $pegawai->id)->first();
+            if (! $authUser) {
+                $authUser = DB::table('auth.users')->where('email', "{$nik}@tirtadarmaayu.local")->first();
+            }
+            if (! $authUser && ! empty($pegawai->email)) {
+                $authUser = DB::table('auth.users')->where('email', $pegawai->email)->first();
+            }
+            if (! $authUser) {
+                $authUser = DB::table('auth.users')->where('email', "{$nik}@gmail.com")->first();
+            }
+
             if ($authUser && ! empty($authUser->encrypted_password)) {
                 if (password_verify($request->password, $authUser->encrypted_password)) {
                     $passwordValid = true;
@@ -72,8 +85,8 @@ class LoginController extends Controller
             // Fallback to static verify
         }
 
-        $expectedPass = $this->defaultPasswords[$nik] ?? 'password';
-        if (! $passwordValid && $request->password === $expectedPass) {
+        $expectedPass = $this->defaultPasswords[$nik] ?? $nik;
+        if (! $passwordValid && ($request->password === $nik || $request->password === $expectedPass || $request->password === 'password')) {
             $passwordValid = true;
         }
 

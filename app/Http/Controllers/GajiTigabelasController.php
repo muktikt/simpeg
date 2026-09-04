@@ -131,9 +131,17 @@ class GajiTigabelasController extends Controller
     public function index(Request $request)
     {
         $tahun = (int) $request->get('tahun', now()->year);
+        $kategori = $request->get('kategori');
+        $status = $request->get('status');
 
         $gaji13 = collect($this->all())
             ->where('tahun', $tahun)
+            ->when(!empty($kategori), function ($collection) use ($kategori) {
+                return $collection->where('kategori', $kategori);
+            })
+            ->when(!empty($status), function ($collection) use ($status) {
+                return $collection->where('status', $status);
+            })
             ->map(function ($row) {
                 $row['bisa_approve'] = $this->canUserApprove($row['status']);
 
@@ -142,7 +150,20 @@ class GajiTigabelasController extends Controller
             ->sortBy('nama')
             ->values();
 
-        return view('gaji-tigabelas.index', compact('gaji13', 'tahun'));
+        $pageTitle = 'Proses Gaji 13';
+        if ($status === 'terbit') {
+            $pageTitle = 'Proses Penerbitan Gaji 13';
+        } elseif ($kategori === 'satuan') {
+            $pageTitle = 'Proses Gaji 13 Pegawai';
+        } elseif ($kategori === 'dirut') {
+            $pageTitle = 'Proses Gaji 13 Dirut';
+        } elseif ($kategori === 'dirum') {
+            $pageTitle = 'Proses Gaji 13 Dirum';
+        } elseif ($kategori === 'dirtek') {
+            $pageTitle = 'Proses Gaji 13 Dirtek';
+        }
+
+        return view('gaji-tigabelas.index', compact('gaji13', 'tahun', 'kategori', 'status', 'pageTitle'));
     }
 
     /**
@@ -239,11 +260,14 @@ class GajiTigabelasController extends Controller
         return view('gaji-tigabelas.laporan-buku-besar-per-sub', compact('data', 'tahun'));
     }
 
-    public function create()
+    public function create(Request $request)
     {
+        $kategori = $request->get('kategori', 'satuan');
+
         return view('gaji-tigabelas.create', [
             'pegawaiList' => $this->pegawaiList(),
             'kategoriList' => self::KATEGORI,
+            'selectedKategori' => $kategori,
             'komponenPendapatan' => self::KOMPONEN_PENDAPATAN,
             'potonganPendapatan' => self::POTONGAN_PENDAPATAN,
             'potonganNonPendapatan' => self::POTONGAN_NON_PENDAPATAN,

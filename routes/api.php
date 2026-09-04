@@ -40,4 +40,11 @@ Route::prefix('v1')->group(function () {
     // Pengaduan Pegawai
     Route::get('/pengaduan', [ApiPegawaiController::class, 'pengaduan']);
     Route::post('/pengaduan', [ApiPegawaiController::class, 'storePengaduan']);
+
+    // Dokumen Resmi Kepegawaian (SK & Diklat dari SDM)
+    Route::get('/dokumen', [ApiPegawaiController::class, 'dokumenResmi']);
+
+    // Pengumuman Perusahaan
+    Route::get('/pengumuman', [ApiPegawaiController::class, 'pengumuman']);
+    Route::post('/pengumuman/{id}/baca', [ApiPegawaiController::class, 'markPengumumanRead']);
 });

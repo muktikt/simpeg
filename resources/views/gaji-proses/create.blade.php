@@ -29,7 +29,7 @@
                 <select id="kategori" name="kategori" required>
                     <option value="">-- Pilih Kategori --</option>
                     @foreach ($kategoriList as $val => $label)
-                        <option value="{{ $val }}" @selected(old('kategori') === $val)>{{ $label }}</option>
+                        <option value="{{ $val }}" @selected(old('kategori', $selectedKategori ?? 'satuan') === $val)>{{ $label }}</option>
                     @endforeach
                 </select>
                 @error('kategori') <div class="form-error">{{ $message }}</div> @enderror

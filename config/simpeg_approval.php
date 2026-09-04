@@ -10,7 +10,7 @@
 
 return [
     'kepegawaian' => '1711254', // Mukti Kurniawan (Admin/Staf SDM)
-    'dirum' => '1800005',        // Direktur Umum (lihat akun dummy baru)
-    'dirut' => '1800004',        // Bambang Wijaya (Direktur Utama)
-    'keuangan' => '1800001',     // Dewi Anggraini (Staf Keuangan) — approver terbit potongan
+    'dirum' => '1711002',        // Dr. Sunaryo, S.T., MT. (Direktur Umum)
+    'dirut' => '1711001',        // Nurpan, S.E., M.Si. (Direktur Utama)
+    'keuangan' => '1711296',     // Yayah Khaeriyah, S.T. (Manajer Keuangan)
 ];

@@ -1,15 +1,21 @@
 @extends('layouts.app')
 
-@section('title', 'Proses Gaji Bulanan')
+@section('title', $pageTitle ?? 'Proses Gaji Bulanan')
 
 @section('content')
 <div class="page-head">
-    <div class="breadcrumb">Home / Pengaturan Proses Gaji / Proses Gaji Bulanan</div>
-    <h1>Proses Gaji Bulanan</h1>
+    <div class="breadcrumb">Home / Pengaturan Proses Gaji / {{ $pageTitle ?? 'Proses Gaji Bulanan' }}</div>
+    <h1>{{ $pageTitle ?? 'Proses Gaji Bulanan' }}</h1>
 </div>
 
 <div class="toolbar">
     <form method="GET" action="{{ route('gaji-proses.index') }}" style="display:flex; gap:10px;">
+        @if (!empty($kategori))
+            <input type="hidden" name="kategori" value="{{ $kategori }}">
+        @endif
+        @if (!empty($status))
+            <input type="hidden" name="status" value="{{ $status }}">
+        @endif
         <select name="bulan" onchange="this.form.submit()" style="padding:9px 12px; border-radius:9px; border:1px solid var(--border); font-size:13px;">
             @foreach ($bulanList as $val => $label)
                 <option value="{{ $val }}" @selected($bulan === $val)>{{ $label }}</option>
@@ -22,10 +28,12 @@
         </select>
     </form>
 
-    <a href="{{ route('gaji-proses.create') }}" class="btn btn-primary">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
-        Proses Gaji Pegawai
-    </a>
+    @if ($status !== 'terbit')
+        <a href="{{ route('gaji-proses.create', !empty($kategori) ? ['kategori' => $kategori] : []) }}" class="btn btn-primary">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+            {{ !empty($kategori) && isset(\App\Http\Controllers\GajiProsesController::KATEGORI[$kategori]) ? 'Proses ' . \App\Http\Controllers\GajiProsesController::KATEGORI[$kategori] : 'Proses Gaji Pegawai' }}
+        </a>
+    @endif
 </div>
 
 <div class="table-card">

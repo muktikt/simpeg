@@ -128,9 +128,17 @@ class ThrController extends Controller
     public function index(Request $request)
     {
         $tahun = (int) $request->get('tahun', now()->year);
+        $kategori = $request->get('kategori');
+        $status = $request->get('status');
 
         $thr = collect($this->all())
             ->where('tahun', $tahun)
+            ->when(!empty($kategori), function ($collection) use ($kategori) {
+                return $collection->where('kategori', $kategori);
+            })
+            ->when(!empty($status), function ($collection) use ($status) {
+                return $collection->where('status', $status);
+            })
             ->map(function ($row) {
                 $row['bisa_approve'] = $this->canUserApprove($row['status']);
 
@@ -139,7 +147,20 @@ class ThrController extends Controller
             ->sortBy('nama')
             ->values();
 
-        return view('thr.index', compact('thr', 'tahun'));
+        $pageTitle = 'Proses THR';
+        if ($status === 'terbit') {
+            $pageTitle = 'Proses Penerbitan THR';
+        } elseif ($kategori === 'satuan') {
+            $pageTitle = 'Proses THR Pegawai';
+        } elseif ($kategori === 'dirut') {
+            $pageTitle = 'Proses THR Dirut';
+        } elseif ($kategori === 'dirum') {
+            $pageTitle = 'Proses THR Dirum';
+        } elseif ($kategori === 'dirtek') {
+            $pageTitle = 'Proses THR Dirtek';
+        }
+
+        return view('thr.index', compact('thr', 'tahun', 'kategori', 'status', 'pageTitle'));
     }
 
     /**
@@ -205,11 +226,14 @@ class ThrController extends Controller
         return view('thr.laporan-buku-besar-per-sub', compact('data', 'tahun'));
     }
 
-    public function create()
+    public function create(Request $request)
     {
+        $kategori = $request->get('kategori', 'satuan');
+
         return view('thr.create', [
             'pegawaiList' => $this->pegawaiList(),
             'kategoriList' => self::KATEGORI,
+            'selectedKategori' => $kategori,
             'komponenPendapatan' => self::KOMPONEN_PENDAPATAN,
             'potonganPendapatan' => self::POTONGAN_PENDAPATAN,
             'potonganNonPendapatan' => self::POTONGAN_NON_PENDAPATAN,

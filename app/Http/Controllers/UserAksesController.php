@@ -24,33 +24,37 @@ class UserAksesController extends Controller
         $allPegawai = app(PegawaiController::class)->all();
 
         $defaultRoles = [
-            '5000000001' => '7', // H. Dedi Supriadi - Direksi (DIRUT)
-            '5000000002' => '1', // Victoria Usang - SDM
-            '6000000001' => '2', // Antony Loyal - Keuangan
-            '4000000001' => '5', // Siti Rahmawati - Pegawai (Kadiv Admin)
-            '4000000005' => '5', // Nur Aisyah Lestari - Pegawai (Kadiv Admin)
-            '4000000006' => '5', // Agus Setiawan - Pegawai (Kadiv Teknik)
-            '4000000002' => '5', // Ahmad Fauzi - Pegawai (KSPI)
-            '4000000003' => '5', // Dedi Kurniawan - Pegawai (TPDPK)
-            '3000000003' => '5', // Budi Santoso - Pegawai
+            '1711001' => '7', // Nurpan - Direktur Utama
+            '1711002' => '7', // Dr. Sunaryo - Direktur Umum
+            '1711003' => '7', // Jojo Sutarjo - Direktur Teknik
+            '1711157' => '1', // Cahrudin - SDM
+            '1711254' => '1', // Mukti Kurniawan - SDM
+            '1711296' => '2', // Yayah Khaeriyah - Keuangan
+            '1711145' => '2', // Ari Hendrayati - Keuangan
+            '1711161' => '5', // Dodi Sudrajat - KSPI
+            '1711446' => '5', // Edy Ratno Dirjo - Kadiv Teknik
+            '1711479' => '5', // Candra Dewi Prihatiningsih - Kadiv Administrasi
         ];
 
         $defaultPasswords = [
-            '3000000003' => 'pegawai123',
-            '4000000001' => 'kadiv123',
-            '4000000006' => 'kadivteknik2025',
-            '4000000005' => 'kadivadmin2025',
-            '4000000002' => 'kspi123',
-            '4000000003' => 'tpdpk123',
-            '5000000001' => 'dirut123',
-            '5000000002' => 'sdm123',
-            '6000000001' => 'keuangan123',
-            '2000000001' => 'admin123',
-            '2000000002' => 'keuangan123',
+            '1711001' => 'dirut123',
+            '1711002' => 'dirum123',
+            '1711003' => 'dirtek123',
+            '1711157' => 'sdm123',
+            '1711254' => 'sdm123',
+            '1711296' => 'keuangan123',
+            '1711145' => 'keuangan123',
+            '1711161' => 'kspi123',
+            '1711446' => 'kadivteknik123',
+            '1711479' => 'kadivadmin123',
         ];
 
         $existing = session('dummy_userakses', []);
-        $obsoleteNiks = ['4000000004', '1800004', '1800005', '1800003', '1711254', '1800001'];
+        $obsoleteNiks = [
+            '3000000003', '4000000001', '4000000002', '4000000003', 
+            '4000000005', '4000000006', '5000000001', '5000000002', 
+            '6000000001', '4000000004', '1800004', '1800005', '1800003', '1800001'
+        ];
 
         // Remove obsolete NIKs from userakses session
         $filtered = array_values(array_filter($existing, function ($item) use ($obsoleteNiks) {

@@ -19,26 +19,25 @@
 
     $isItemActive = function($item) use ($slugify, $currentRouteName) {
         if (!empty($item['route_name'])) {
-            if ($currentRouteName === $item['route_name']) {
-                if (!empty($item['params'])) {
-                    foreach ($item['params'] as $pk => $pv) {
-                        if (request()->query($pk) !== (string)$pv && request($pk) !== (string)$pv) {
+            $isRouteMatch = ($currentRouteName === $item['route_name']);
+            if (!$isRouteMatch && str_ends_with($item['route_name'], '.index')) {
+                $baseName = substr($item['route_name'], 0, -6);
+                $isRouteMatch = str_starts_with($currentRouteName, $baseName . '.');
+            }
+
+            if ($isRouteMatch) {
+                $itemParams = $item['params'] ?? [];
+                if (!empty($itemParams)) {
+                    foreach ($itemParams as $pk => $pv) {
+                        $reqVal = request()->query($pk) ?? request($pk);
+                        if ((string)$reqVal !== (string)$pv) {
                             return false;
                         }
                     }
-                }
-                return true;
-            }
-
-            if (str_ends_with($item['route_name'], '.index')) {
-                $baseName = substr($item['route_name'], 0, -6);
-                if (str_starts_with($currentRouteName, $baseName . '.')) {
-                    if (!empty($item['params'])) {
-                        foreach ($item['params'] as $pk => $pv) {
-                            if (request()->query($pk) !== (string)$pv && request($pk) !== (string)$pv) {
-                                return false;
-                            }
-                        }
+                    return true;
+                } else {
+                    if (request()->has('kategori') || request()->has('status') || request()->has('tipe')) {
+                        return false;
                     }
                     return true;
                 }

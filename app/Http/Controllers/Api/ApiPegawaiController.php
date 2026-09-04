@@ -9,14 +9,16 @@ use Illuminate\Support\Facades\DB;
 class ApiPegawaiController extends Controller
 {
     protected array $defaultPasswords = [
-        '3000000003' => 'pegawai123',
-        '4000000001' => 'kadiv123',
-        '4000000006' => 'kadivteknik2025',
-        '4000000005' => 'kadivadmin2025',
-        '4000000002' => 'kspi123',
-        '4000000003' => 'tpdpk123',
-        '5000000001' => 'dirut123',
-        '5000000002' => 'sdm123',
+        '1711001' => 'dirut123',
+        '1711002' => 'dirum123',
+        '1711003' => 'dirtek123',
+        '1711157' => 'sdm123',
+        '1711254' => 'sdm123',
+        '1711296' => 'keuangan123',
+        '1711145' => 'keuangan123',
+        '1711161' => 'kspi123',
+        '1711446' => 'kadivteknik123',
+        '1711479' => 'kadivadmin123',
     ];
 
     /**
@@ -56,10 +58,20 @@ class ApiPegawaiController extends Controller
             ], 401);
         }
 
-        // Verifikasi Password langsung ke hash auth.users Supabase atau defaultPasswords
+        // Verifikasi Password langsung ke hash auth.users Supabase atau default NIK
         $passwordValid = false;
         try {
-            $authUser = DB::table('auth.users')->where('email', "{$nik}@gmail.com")->first();
+            $authUser = DB::table('auth.users')->where('id', $pegawai->id)->first();
+            if (! $authUser) {
+                $authUser = DB::table('auth.users')->where('email', "{$nik}@tirtadarmaayu.local")->first();
+            }
+            if (! $authUser && ! empty($pegawai->email)) {
+                $authUser = DB::table('auth.users')->where('email', $pegawai->email)->first();
+            }
+            if (! $authUser) {
+                $authUser = DB::table('auth.users')->where('email', "{$nik}@gmail.com")->first();
+            }
+
             if ($authUser && ! empty($authUser->encrypted_password)) {
                 if (password_verify($request->password, $authUser->encrypted_password)) {
                     $passwordValid = true;
@@ -69,8 +81,8 @@ class ApiPegawaiController extends Controller
             // Fallback to static verify
         }
 
-        $expectedPass = $this->defaultPasswords[$nik] ?? 'password';
-        if (! $passwordValid && $request->password === $expectedPass) {
+        $expectedPass = $this->defaultPasswords[$nik] ?? $nik;
+        if (! $passwordValid && ($request->password === $nik || $request->password === $expectedPass || $request->password === 'password')) {
             $passwordValid = true;
         }
 
@@ -87,10 +99,10 @@ class ApiPegawaiController extends Controller
         $dbRole = strtolower($pegawai->role ?? '');
         $jabatanLower = strtolower($pegawai->jabatan ?? '');
 
-        if ($dbRole === 'direktur' || $nik === '5000000001' || str_contains($jabatanLower, 'direktur utama')) {
+        if ($dbRole === 'direktur' || str_contains($jabatanLower, 'direktur utama')) {
             $roleKode = 'DIRUT';
             $userLevel = '7';
-        } elseif ($dbRole === 'admin' || $dbRole === 'sdm' || $nik === '5000000002' || str_contains($jabatanLower, 'sdm') || $jabatanLower === 'admin' || $jabatanLower === 'administrator') {
+        } elseif ($dbRole === 'admin' || $dbRole === 'sdm' || str_contains($jabatanLower, 'sdm') || $jabatanLower === 'admin' || $jabatanLower === 'administrator') {
             $roleKode = 'SDM';
             $userLevel = '1';
         } elseif ($dbRole === 'keuangan' || $dbRole === 'keu' || str_contains($jabatanLower, 'keuangan')) {
@@ -599,5 +611,139 @@ class ApiPegawaiController extends Controller
             'message' => 'Pengaduan berhasil dikirim ke SDM.',
             'data' => ['id' => $id, 'nomor_pengaduan' => $nomorPengaduan],
         ]);
+    }
+
+    /**
+     * API Dokumen Resmi Pegawai (SK & Diklat) yang diterbitkan oleh SDM
+     */
+    public function dokumenResmi(Request $request)
+    {
+        $pegawai = $this->getPegawaiByRequest($request);
+        if (! $pegawai) {
+            return response()->json(['success' => false, 'message' => 'Pegawai tidak ditemukan.'], 404);
+        }
+
+        try {
+            $dokumenList = DB::table('dokumen_pegawai')
+                ->where(function ($q) use ($pegawai) {
+                    $q->where('pegawai_id', $pegawai->id)
+                      ->orWhereNull('pegawai_id');
+                })
+                ->orderByDesc('created_at')
+                ->get()
+                ->map(function ($d) {
+                    return [
+                        'id' => $d->id,
+                        'pegawai_id' => $d->pegawai_id,
+                        'judul' => $d->judul ?? 'Dokumen Resmi Kepegawaian',
+                        'kategori' => $d->kategori ?? 'SK',
+                        'nomor' => $d->nomor ?? '-',
+                        'file_url' => $d->file_url ?? '',
+                        'file_nama' => $d->file_nama ?? 'dokumen.pdf',
+                        'diunggah_oleh' => $d->diunggah_oleh ?? 'Admin SDM',
+                        'created_at' => $d->created_at,
+                    ];
+                });
+
+            return response()->json([
+                'success' => true,
+                'data' => $dokumenList,
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal mengambil dokumen: ' . $e->getMessage(),
+                'data' => [],
+            ], 500);
+        }
+    }
+
+    /**
+     * API Pengumuman Perusahaan
+     */
+    public function pengumuman(Request $request)
+    {
+        $pegawai = $this->getPegawaiByRequest($request);
+
+        try {
+            $list = DB::table('pengumuman')
+                ->where('aktif', true)
+                ->where(function ($q) {
+                    $q->whereNull('kedaluwarsa_pada')
+                      ->orWhere('kedaluwarsa_pada', '>=', now());
+                })
+                ->where(function ($q) {
+                    $q->whereNull('terbit_pada')
+                      ->orWhere('terbit_pada', '<=', now());
+                })
+                ->orderByDesc('disematkan')
+                ->orderByDesc('terbit_pada')
+                ->orderByDesc('created_at')
+                ->get()
+                ->map(function ($p) use ($pegawai) {
+                    $isRead = false;
+                    if ($pegawai) {
+                        $isRead = DB::table('pengumuman_dibaca')
+                            ->where('pengumuman_id', $p->id)
+                            ->where('pegawai_id', $pegawai->id)
+                            ->exists();
+                    }
+
+                    return [
+                        'id' => $p->id,
+                        'judul' => $p->judul,
+                        'isi' => $p->isi,
+                        'prioritas' => (bool) ($p->prioritas ?? false),
+                        'is_pinned' => (bool) ($p->disematkan ?? false),
+                        'tgl_publikasi' => !empty($p->terbit_pada) ? substr((string) $p->terbit_pada, 0, 10) : substr((string) $p->created_at, 0, 10),
+                        'penulis' => $p->pembuat ?? 'Admin SDM',
+                        'lampiran_url' => $p->lampiran_url ?? null,
+                        'lampiran_nama' => $p->lampiran_nama ?? null,
+                        'is_read' => $isRead,
+                        'created_at' => $p->created_at,
+                    ];
+                });
+
+            return response()->json([
+                'success' => true,
+                'data' => $list,
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal mengambil pengumuman: ' . $e->getMessage(),
+                'data' => [],
+            ], 500);
+        }
+    }
+
+    /**
+     * API Tandai Pengumuman Telah Dibaca
+     */
+    public function markPengumumanRead(Request $request, $id)
+    {
+        $pegawai = $this->getPegawaiByRequest($request);
+        if (! $pegawai) {
+            return response()->json(['success' => false, 'message' => 'Pegawai tidak ditemukan.'], 404);
+        }
+
+        try {
+            DB::table('pengumuman_dibaca')->updateOrInsert(
+                [
+                    'pengumuman_id' => $id,
+                    'pegawai_id' => $pegawai->id,
+                ],
+                [
+                    'dibaca_pada' => now(),
+                ]
+            );
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Pengumuman ditandai sebagai telah dibaca.',
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
     }
 }

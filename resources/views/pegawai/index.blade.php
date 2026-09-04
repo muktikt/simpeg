@@ -19,7 +19,7 @@
 <div class="toolbar">
     <form method="GET" action="{{ route('pegawai.index') }}" class="search-box">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-        <input type="text" name="q" value="{{ $keyword }}" placeholder="Cari NIK, nama, atau unit kerja...">
+        <input type="text" name="q" value="{{ $keyword }}" placeholder="Cari NIK, nama, jabatan, atau unit kerja...">
     </form>
 
     @if ($myRole === '1')
