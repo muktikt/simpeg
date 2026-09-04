@@ -404,6 +404,148 @@
     border-color: #0284C7;
     background: #F0F9FF;
 }
+
+/* Document Sheet Preview Styling */
+.ds-doc-paper {
+    background: #ffffff;
+    border: 1px solid #E2E8F0;
+    border-radius: 12px;
+    padding: 28px 32px;
+    box-shadow: 0 4px 18px rgba(0,0,0,0.06);
+    font-family: 'Times New Roman', Times, serif;
+    color: #0F172A;
+    line-height: 1.5;
+    position: relative;
+    max-height: 60vh;
+    overflow-y: auto;
+}
+.ds-kop-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 6px;
+}
+.ds-kop-logo {
+    width: 65px;
+    text-align: center;
+    vertical-align: middle;
+}
+.ds-kop-logo-box {
+    width: 54px;
+    height: 54px;
+    border-radius: 50%;
+    border: 2px solid #0D2C6E;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-weight: 800;
+    font-size: 13px;
+    color: #0D2C6E;
+    background: #F0F7FF;
+}
+.ds-kop-text {
+    text-align: center;
+    vertical-align: middle;
+    padding: 0 10px;
+}
+.ds-kop-text h4 {
+    font-size: 11pt;
+    font-weight: bold;
+    margin: 0 0 2px 0;
+    text-transform: uppercase;
+}
+.ds-kop-text h3 {
+    font-size: 13pt;
+    font-weight: bold;
+    color: #0D2C6E;
+    margin: 0 0 2px 0;
+    text-transform: uppercase;
+}
+.ds-kop-text p {
+    font-size: 8pt;
+    font-family: Arial, sans-serif;
+    color: #475569;
+    margin: 0;
+    line-height: 1.25;
+}
+.ds-kop-line {
+    border-top: 2.5px solid #000;
+    border-bottom: 1px solid #000;
+    height: 3px;
+    margin: 6px 0 16px 0;
+}
+.ds-doc-head {
+    text-align: center;
+    margin-bottom: 16px;
+}
+.ds-doc-head-title {
+    font-size: 12.5pt;
+    font-weight: bold;
+    text-decoration: underline;
+    text-transform: uppercase;
+}
+.ds-doc-head-nomor {
+    font-size: 10pt;
+    font-family: 'IBM Plex Mono', monospace;
+    color: #334155;
+    margin-top: 2px;
+}
+.ds-doc-head-about {
+    font-size: 10.5pt;
+    font-weight: bold;
+    text-transform: uppercase;
+    margin-top: 4px;
+    color: #0F2A3D;
+}
+.ds-doc-meta {
+    width: 100%;
+    margin: 10px 0 14px 0;
+    border-collapse: collapse;
+    font-size: 10.5pt;
+}
+.ds-doc-meta td {
+    padding: 3px 6px;
+    vertical-align: top;
+}
+.ds-doc-meta td.lbl {
+    width: 150px;
+    font-weight: 600;
+}
+.ds-doc-meta td.sep {
+    width: 12px;
+    text-align: center;
+}
+.ds-doc-meta td.val {
+    font-weight: bold;
+}
+.ds-doc-p {
+    font-size: 10.5pt;
+    text-align: justify;
+    text-indent: 28px;
+    margin-bottom: 10px;
+    line-height: 1.55;
+}
+.ds-doc-ttd-row {
+    margin-top: 24px;
+    display: flex;
+    justify-content: flex-end;
+}
+.ds-doc-ttd-box {
+    width: 240px;
+    text-align: center;
+    font-size: 10pt;
+}
+.ds-doc-ttd-role {
+    font-weight: bold;
+    margin-top: 4px;
+    margin-bottom: 45px;
+    text-transform: uppercase;
+}
+.ds-doc-ttd-name {
+    font-weight: bold;
+    text-decoration: underline;
+    text-transform: uppercase;
+}
 </style>
 
 <div class="ds-header">
@@ -502,6 +644,23 @@
                     </td>
                     <td>
                         @if ($sk && !empty($sk['nomor']))
+                            @php
+                                $skPayload = [
+                                    'id' => $sk['id'] ?? null,
+                                    'kategori' => 'SK',
+                                    'nomor' => $sk['nomor'],
+                                    'judul' => $sk['judul'] ?? 'Surat Keputusan Pengangkatan ' . $p['nama'],
+                                    'tgl_terbit' => $sk['tgl_terbit'] ?? date('Y-m-d'),
+                                    'file_url' => $sk['file_url'] ?? '#',
+                                    'file_name' => $sk['file_name'] ?? 'SK.pdf',
+                                    'pegawai_id' => $p['id'],
+                                    'pegawai_nama' => $p['nama'],
+                                    'pegawai_nik' => $p['nik'],
+                                    'pegawai_jabatan' => $p['jabatan'] ?? 'Staf Pelaksana',
+                                    'pegawai_unit' => $p['unit_kerja'] ?? 'Kantor Pusat',
+                                    'status_peg' => $p['status_peg'] ?? 'Pegawai Tetap',
+                                ];
+                            @endphp
                             <div style="margin-bottom: 6px;">
                                 <span class="ds-badge ds-badge-sk">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
@@ -511,21 +670,14 @@
                             <div style="font-weight: 700; color: #0F2A3D; font-size: 13px;">{{ $sk['judul'] ?? 'Surat Keputusan' }}</div>
                             <div style="font-size: 12px; color: #64748B; font-family: 'IBM Plex Mono', monospace; margin: 2px 0 8px 0;">No: {{ $sk['nomor'] }}</div>
                             <div style="display: flex; gap: 6px; flex-wrap: wrap;">
-                                <button type="button" class="ds-btn-action ds-btn-view" onclick="viewFileModal('{{ addslashes($sk['judul'] ?? 'Surat Kerja') }}', '{{ addslashes($sk['file_name'] ?? 'SK.pdf') }}', '{{ addslashes($sk['file_url'] ?? '#') }}')">
+                                <button type="button" class="ds-btn-action ds-btn-view" onclick='openDocumentPreview(@json($skPayload))'>
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                                    View File
+                                    Lihat Isi Surat
                                 </button>
-                                @if (!empty($sk['file_url']) && $sk['file_url'] !== '#')
-                                    <a href="{{ $sk['file_url'] }}" target="_blank" class="ds-btn-action ds-btn-download" style="text-decoration:none;">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                                        Download
-                                    </a>
-                                @else
-                                    <button type="button" class="ds-btn-action ds-btn-download" onclick="showCustomAlert('Dokumen tersimpan sebagai draft resmi.', 'Informasi Berkas', 'info')">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                                        Draft
-                                    </button>
-                                @endif
+                                <a href="{{ route('dokumen-surat.download', ['id' => $sk['id'] ?? '', 'pegawai_id' => $p['id'], 'jenis' => 'sk']) }}" target="_blank" class="ds-btn-action ds-btn-download" style="text-decoration:none;">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                                    Unduh
+                                </a>
                                 <button type="button" class="ds-btn-action ds-btn-upload-sm" onclick="openUploadModal({{ $p['id'] }}, 'surat_kerja', '{{ addslashes($sk['nomor']) }}', '{{ addslashes($sk['judul']) }}', '{{ $sk['tgl_terbit'] }}')">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
                                     Ganti SK
@@ -542,6 +694,23 @@
                     </td>
                     <td>
                         @if ($diklat && !empty($diklat['nomor']))
+                            @php
+                                $diklatPayload = [
+                                    'id' => $diklat['id'] ?? null,
+                                    'kategori' => 'Diklat',
+                                    'nomor' => $diklat['nomor'],
+                                    'judul' => $diklat['judul'] ?? 'Sertifikat Diklat Manajemen Kepegawaian',
+                                    'tgl_terbit' => $diklat['tgl_terbit'] ?? date('Y-m-d'),
+                                    'file_url' => $diklat['file_url'] ?? '#',
+                                    'file_name' => $diklat['file_name'] ?? 'Diklat.pdf',
+                                    'pegawai_id' => $p['id'],
+                                    'pegawai_nama' => $p['nama'],
+                                    'pegawai_nik' => $p['nik'],
+                                    'pegawai_jabatan' => $p['jabatan'] ?? 'Staf Pelaksana',
+                                    'pegawai_unit' => $p['unit_kerja'] ?? 'Kantor Pusat',
+                                    'status_peg' => $p['status_peg'] ?? 'Pegawai Tetap',
+                                ];
+                            @endphp
                             <div style="margin-bottom: 6px;">
                                 <span class="ds-badge ds-badge-diklat">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
@@ -551,21 +720,14 @@
                             <div style="font-weight: 700; color: #0F2A3D; font-size: 13px;">{{ $diklat['judul'] ?? 'Sertifikat Diklat' }}</div>
                             <div style="font-size: 12px; color: #64748B; font-family: 'IBM Plex Mono', monospace; margin: 2px 0 8px 0;">No: {{ $diklat['nomor'] }}</div>
                             <div style="display: flex; gap: 6px; flex-wrap: wrap;">
-                                <button type="button" class="ds-btn-action ds-btn-view" onclick="viewFileModal('{{ addslashes($diklat['judul'] ?? 'Sertifikat Diklat') }}', '{{ addslashes($diklat['file_name'] ?? 'Diklat.pdf') }}', '{{ addslashes($diklat['file_url'] ?? '#') }}')">
+                                <button type="button" class="ds-btn-action ds-btn-view" onclick='openDocumentPreview(@json($diklatPayload))'>
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                                    View File
+                                    Lihat Sertifikat
                                 </button>
-                                @if (!empty($diklat['file_url']) && $diklat['file_url'] !== '#')
-                                    <a href="{{ $diklat['file_url'] }}" target="_blank" class="ds-btn-action ds-btn-download" style="text-decoration:none;">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                                        Download
-                                    </a>
-                                @else
-                                    <button type="button" class="ds-btn-action ds-btn-download" onclick="showCustomAlert('Dokumen tersimpan sebagai draft resmi.', 'Informasi Berkas', 'info')">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                                        Draft
-                                    </button>
-                                @endif
+                                <a href="{{ route('dokumen-surat.download', ['id' => $diklat['id'] ?? '', 'pegawai_id' => $p['id'], 'jenis' => 'diklat']) }}" target="_blank" class="ds-btn-action ds-btn-download" style="text-decoration:none;">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                                    Unduh
+                                </a>
                                 <button type="button" class="ds-btn-action ds-btn-upload-sm" onclick="openUploadModal({{ $p['id'] }}, 'surat_diklat', '{{ addslashes($diklat['nomor']) }}', '{{ addslashes($diklat['judul']) }}', '{{ $diklat['tgl_terbit'] }}')">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
                                     Ganti Diklat
@@ -661,34 +823,133 @@
     </div>
 </div>
 
-<!-- Modal View File Preview -->
+<!-- Modal View File / Document Preview -->
 <div id="ds-modal-view-file" class="ds-modal-overlay">
-    <div class="ds-modal-box" style="max-width:600px;">
-        <div class="ds-modal-header">
-            <h3 class="ds-modal-title" id="view-file-title">Preview Dokumen</h3>
+    <div class="ds-modal-box" style="max-width:840px;">
+        <div class="ds-modal-header" style="padding:18px 24px;">
+            <div style="display:flex; align-items:center; gap:10px;">
+                <h3 class="ds-modal-title" id="view-file-title">Pratinjau Dokumen Resmi</h3>
+                <span id="view-file-badge" class="ds-badge ds-badge-sk">Surat Kerja (SK)</span>
+            </div>
             <button type="button" onclick="closeViewModal()" style="background:none; border:none; font-size:22px; cursor:pointer; color:#64748B;">&times;</button>
         </div>
-        <div class="ds-modal-body" style="padding:28px 24px;">
-            <div style="background:#F8FAFC; border:2px dashed #CBD5E1; padding:36px 20px; text-align:center; border-radius:14px; margin-bottom:20px;">
-                <div style="width:64px; height:64px; border-radius:16px; background:#E0F2FE; color:#0284C7; display:inline-flex; align-items:center; justify-content:center; margin-bottom:12px;">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="34" height="34"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-                </div>
-                <h4 style="margin:0 0 6px 0; font-size:15px; color:#0F2A3D; font-weight:700;" id="view-file-name">Dokumen_Surat.pdf</h4>
-                <p style="font-size:12.5px; color:#64748B; margin:0;">File PDF / Gambar telah diverifikasi resmi oleh Admin SDM</p>
-            </div>
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-                <button type="button" class="ds-btn-action ds-btn-view" style="padding:10px 18px;" onclick="closeViewModal()">Tutup</button>
-                <button type="button" id="view-modal-action-btn" class="ds-btn-primary" style="padding:10px 20px;">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                    Buka / Unduh File
+
+        <div class="ds-modal-body" style="padding:20px 24px; background:#F8FAFC;">
+            <!-- Tab Switcher (jika ada file fisik yang diunggah) -->
+            <div id="view-tab-container" style="display:flex; gap:8px; margin-bottom:16px;">
+                <button type="button" id="tab-btn-sheet" class="ds-btn-action ds-btn-primary" style="padding:7px 14px; font-size:12.5px;" onclick="switchPreviewTab('sheet')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                    Lembar Surat Resmi
                 </button>
+                <button type="button" id="tab-btn-attachment" class="ds-btn-action ds-btn-view" style="padding:7px 14px; font-size:12.5px; display:none;" onclick="switchPreviewTab('attachment')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                    <span id="tab-attachment-name">File Lampiran Asli</span>
+                </button>
+            </div>
+
+            <!-- View Mode A: Lembar Dokumen Resmi Sheet -->
+            <div id="view-content-sheet" class="ds-doc-paper">
+                <!-- KOP SURAT -->
+                <table class="ds-kop-table">
+                    <tr>
+                        <td class="ds-kop-logo">
+                            <div class="ds-kop-logo-box">PDAM</div>
+                        </td>
+                        <td class="ds-kop-text">
+                            <h4>PEMERINTAH KABUPATEN INDRAMAYU</h4>
+                            <h3>PERUMDA AIR MINUM TIRTA DARMA AYU</h3>
+                            <p>Jalan Ki Bagus Rangin No. 01, Kelurahan Karanganyar, Kec. Indramayu, Kabupaten Indramayu, Jawa Barat 45214</p>
+                            <p>Telepon: (0234) 272183 | Fax: (0234) 274381 | Email: sekretariat@tirtadarmaayu.co.id</p>
+                        </td>
+                    </tr>
+                </table>
+                <div class="ds-kop-line"></div>
+
+                <!-- TITLE & NOMOR -->
+                <div class="ds-doc-head">
+                    <div class="ds-doc-head-title" id="doc-preview-heading">SURAT KEPUTUSAN DIREKSI</div>
+                    <div class="ds-doc-head-nomor" id="doc-preview-nomor">Nomor : SK/SDM/2024/001</div>
+                    <div class="ds-doc-head-about" id="doc-preview-about">TENTANG : PENGANGKATAN PEGAWAI TETAP</div>
+                </div>
+
+                <!-- BODY TEXT -->
+                <p class="ds-doc-p" id="doc-preview-p1">
+                    Direksi Perumda Air Minum Tirta Darma Ayu Kabupaten Indramayu, menimbang kebutuhan organisasi dan peningkatan kinerja pelayanan kepegawaian, dengan ini menetapkan:
+                </p>
+
+                <!-- TABEL DATA PEGAWAI -->
+                <table class="ds-doc-meta">
+                    <tr>
+                        <td class="lbl">Nama Pegawai</td>
+                        <td class="sep">:</td>
+                        <td class="val" id="doc-preview-nama">Nama Pegawai</td>
+                    </tr>
+                    <tr>
+                        <td class="lbl">Nomor Induk (NIK)</td>
+                        <td class="sep">:</td>
+                        <td class="val" id="doc-preview-nik">1711001</td>
+                    </tr>
+                    <tr>
+                        <td class="lbl">Jabatan</td>
+                        <td class="sep">:</td>
+                        <td class="val" id="doc-preview-jabatan">Staf Pelaksana</td>
+                    </tr>
+                    <tr>
+                        <td class="lbl">Unit Kerja / Cabang</td>
+                        <td class="sep">:</td>
+                        <td class="val" id="doc-preview-unit">Kantor Pusat</td>
+                    </tr>
+                    <tr>
+                        <td class="lbl">Status Kepegawaian</td>
+                        <td class="sep">:</td>
+                        <td class="val" id="doc-preview-status">Pegawai Tetap</td>
+                    </tr>
+                </table>
+
+                <p class="ds-doc-p" id="doc-preview-p2">
+                    Surat Keputusan / Keterangan resmi ini diterbitkan secara sah oleh Manajemen SDM Perumda Air Minum Tirta Darma Ayu untuk dipergunakan sebagaimana mestinya.
+                </p>
+
+                <!-- TTD & CAP -->
+                <div class="ds-doc-ttd-row">
+                    <div class="ds-doc-ttd-box">
+                        <div id="doc-preview-tgl">Indramayu, 04 September 2026</div>
+                        <div class="ds-doc-ttd-role">Direksi Perumda Air Minum<br>Tirta Darma Ayu</div>
+                        <div class="ds-doc-ttd-name">{{ session('simpeg_user.nama_peg', 'Nurpan, S.E., M.Si.') }}</div>
+                        <div style="font-size:8.5pt; color:#64748B;">Direktur Utama / Pembina SDM</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- View Mode B: File Lampiran Preview Frame -->
+            <div id="view-content-attachment" style="display:none; background:#ffffff; border-radius:12px; padding:16px; border:1px solid #E2E8F0; text-align:center;">
+                <div id="attachment-pdf-wrap" style="display:none;">
+                    <iframe id="attachment-iframe" src="" style="width:100%; height:520px; border:none; border-radius:8px;"></iframe>
+                </div>
+                <div id="attachment-img-wrap" style="display:none;">
+                    <img id="attachment-img" src="" alt="Lampiran Dokumen" style="max-width:100%; max-height:520px; border-radius:8px; box-shadow:0 4px 14px rgba(0,0,0,0.1); display:block; margin:0 auto;" />
+                </div>
+            </div>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:16px 24px; background:#ffffff; border-top:1px solid #E2E8F0;">
+            <button type="button" class="ds-btn-action ds-btn-view" style="padding:10px 18px;" onclick="closeViewModal()">Tutup</button>
+            <div style="display:flex; gap:10px;">
+                <button type="button" id="view-modal-print-btn" class="ds-btn-action ds-btn-view" style="padding:10px 18px; font-weight:600;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                    Cetak Surat (Print)
+                </button>
+                <a id="view-modal-download-btn" href="#" target="_blank" class="ds-btn-primary" style="padding:10px 20px; text-decoration:none;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    Unduh Dokumen (PDF)
+                </a>
             </div>
         </div>
     </div>
 </div>
 
 <script>
-let currentViewFileUrl = '#';
+let currentDocData = null;
 
 function openUploadModal(pegawaiId = null, jenis = 'surat_kerja', nomor = '', judul = '', tglTerbit = '') {
     const modal = document.getElementById('ds-modal-upload');
@@ -770,29 +1031,96 @@ function handleFileSelected(input) {
     }
 }
 
-function viewFileModal(judul, filename, fileUrl = '#') {
-    document.getElementById('view-file-title').textContent = 'Preview: ' + judul;
-    document.getElementById('view-file-name').textContent = filename;
-    currentViewFileUrl = fileUrl;
-    const downloadBtn = document.getElementById('view-modal-action-btn');
-    if (fileUrl && fileUrl !== '#') {
-        downloadBtn.onclick = function() { window.open(fileUrl, '_blank'); };
-        downloadBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Buka / Unduh File`;
+function openDocumentPreview(doc) {
+    currentDocData = doc;
+    const isDiklat = (doc.kategori || '').toLowerCase().includes('diklat');
+
+    // Title & Badge
+    document.getElementById('view-file-title').textContent = isDiklat ? 'Pratinjau Sertifikat Pelatihan' : 'Pratinjau Surat Keputusan';
+    const badge = document.getElementById('view-file-badge');
+    badge.textContent = isDiklat ? 'Sertifikat Diklat' : 'Surat Kerja (SK)';
+    badge.className = isDiklat ? 'ds-badge ds-badge-diklat' : 'ds-badge ds-badge-sk';
+
+    // Isi Sheet
+    document.getElementById('doc-preview-heading').textContent = isDiklat ? 'SURAT KETERANGAN / SERTIFIKAT PELATIHAN' : 'SURAT KEPUTUSAN DIREKSI';
+    document.getElementById('doc-preview-nomor').textContent = 'Nomor : ' + (doc.nomor || '-');
+    document.getElementById('doc-preview-about').textContent = 'TENTANG : ' + (doc.judul || '-').toUpperCase();
+    document.getElementById('doc-preview-nama').textContent = doc.pegawai_nama || '-';
+    document.getElementById('doc-preview-nik').textContent = doc.pegawai_nik || '-';
+    document.getElementById('doc-preview-jabatan').textContent = doc.pegawai_jabatan || '-';
+    document.getElementById('doc-preview-unit').textContent = doc.pegawai_unit || '-';
+    document.getElementById('doc-preview-status').textContent = doc.status_peg || 'Pegawai Tetap';
+    document.getElementById('doc-preview-tgl').textContent = 'Indramayu, ' + (doc.tgl_terbit || '{{ date('Y-m-d') }}');
+
+    if (isDiklat) {
+        document.getElementById('doc-preview-p1').textContent = 'Direksi Perumda Air Minum Tirta Darma Ayu Kabupaten Indramayu, berdasarkan hasil evaluasi program Pendidikan, Pelatihan dan Pengembangan Kompetensi SDM, dengan ini menerangkan secara resmi bahwa:';
+        document.getElementById('doc-preview-p2').textContent = 'Telah dinyatakan LULUS DAN MEMENUHI SYARAT KOMPETENSI dalam program Pelatihan & Pengembangan Manajemen Kepegawaian yang diselenggarakan oleh Perumda Air Minum Tirta Darma Ayu.';
     } else {
-        downloadBtn.onclick = function() { 
-            if (typeof showCustomAlert === 'function') {
-                showCustomAlert('Dokumen resmi tercatat di sistem.', 'Informasi Berkas', 'info');
-            } else {
-                alert('Dokumen resmi tercatat di sistem.');
-            }
-        };
-        downloadBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Berkas Resmi`;
+        document.getElementById('doc-preview-p1').textContent = 'Direksi Perumda Air Minum Tirta Darma Ayu Kabupaten Indramayu, menimbang kebutuhan organisasi dan peningkatan kinerja pelayanan prima kepada masyarakat, dengan ini:';
+        document.getElementById('doc-preview-p2').textContent = 'Memberikan kewenangan, hak, serta kewajiban kedinasan sesuai dengan jabatan dan penempatan kerja yang telah ditetapkan dengan penuh integritas dan tanggung jawab.';
     }
+
+    // Tab Attachment handling
+    const tabAttachmentBtn = document.getElementById('tab-btn-attachment');
+    const hasPhysicalFile = doc.file_url && doc.file_url !== '#' && !doc.file_url.endsWith('#');
+
+    if (hasPhysicalFile) {
+        tabAttachmentBtn.style.display = 'inline-flex';
+        document.getElementById('tab-attachment-name').textContent = doc.file_name ? 'File: ' + doc.file_name : 'File Lampiran Asli';
+        
+        const isPdf = doc.file_url.toLowerCase().endsWith('.pdf');
+        if (isPdf) {
+            document.getElementById('attachment-pdf-wrap').style.display = 'block';
+            document.getElementById('attachment-img-wrap').style.display = 'none';
+            document.getElementById('attachment-iframe').src = doc.file_url;
+        } else {
+            document.getElementById('attachment-pdf-wrap').style.display = 'none';
+            document.getElementById('attachment-img-wrap').style.display = 'block';
+            document.getElementById('attachment-img').src = doc.file_url;
+        }
+    } else {
+        tabAttachmentBtn.style.display = 'none';
+        document.getElementById('attachment-iframe').src = '';
+        document.getElementById('attachment-img').src = '';
+    }
+
+    // Default to sheet tab
+    switchPreviewTab('sheet');
+
+    // Download & Print Links
+    const downloadUrl = `{{ url('/dokumen-surat/download') }}?id=${doc.id || ''}&pegawai_id=${doc.pegawai_id || ''}&jenis=${isDiklat ? 'diklat' : 'sk'}`;
+    const cetakUrl = `{{ url('/dokumen-surat/cetak') }}?id=${doc.id || ''}&pegawai_id=${doc.pegawai_id || ''}&jenis=${isDiklat ? 'diklat' : 'sk'}`;
+
+    document.getElementById('view-modal-download-btn').href = downloadUrl;
+    document.getElementById('view-modal-print-btn').onclick = function() {
+        window.open(cetakUrl, '_blank');
+    };
+
     document.getElementById('ds-modal-view-file').style.display = 'flex';
+}
+
+function switchPreviewTab(tab) {
+    const tabSheetBtn = document.getElementById('tab-btn-sheet');
+    const tabAttachBtn = document.getElementById('tab-btn-attachment');
+    const sheetView = document.getElementById('view-content-sheet');
+    const attachView = document.getElementById('view-content-attachment');
+
+    if (tab === 'attachment') {
+        tabSheetBtn.className = 'ds-btn-action ds-btn-view';
+        tabAttachBtn.className = 'ds-btn-action ds-btn-primary';
+        sheetView.style.display = 'none';
+        attachView.style.display = 'block';
+    } else {
+        tabSheetBtn.className = 'ds-btn-action ds-btn-primary';
+        tabAttachBtn.className = 'ds-btn-action ds-btn-view';
+        sheetView.style.display = 'block';
+        attachView.style.display = 'none';
+    }
 }
 
 function closeViewModal() {
     document.getElementById('ds-modal-view-file').style.display = 'none';
+    document.getElementById('attachment-iframe').src = '';
 }
 
 // Close modals when clicking backdrop

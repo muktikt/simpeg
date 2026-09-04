@@ -251,4 +251,94 @@ class DokumenSuratController extends Controller
             "{$kategoriLabel} untuk {$targetPegawaiName} telah berhasil dihapus."
         );
     }
+
+    /**
+     * Unduh berkas fisik atau lembar resmi dokumen surat.
+     */
+    public function download(Request $request, $id = null)
+    {
+        $docId = $id ?: $request->get('id');
+
+        $doc = null;
+        if ($docId) {
+            $doc = DB::table('dokumen_pegawai')->where('id', $docId)->first();
+        }
+
+        if ($doc && ! empty($doc->file_url) && $doc->file_url !== '#') {
+            $parsedPath = parse_url($doc->file_url, PHP_URL_PATH);
+            $relativePath = ltrim($parsedPath ?? '', '/');
+            $fullPath = public_path($relativePath);
+
+            if (File::exists($fullPath)) {
+                return response()->download($fullPath, $doc->file_nama ?? 'Dokumen.pdf');
+            }
+        }
+
+        // Fallback: Tampilkan / cetak lembar resmi
+        return $this->cetak($request, $id);
+    }
+
+    /**
+     * Cetak / Tampilkan lembar resmi Surat Keputusan (SK) & Sertifikat Diklat.
+     */
+    public function cetak(Request $request, $id = null)
+    {
+        $pegawaiId = $request->get('pegawai_id');
+        $jenis = strtolower($request->get('jenis', 'sk'));
+        $docId = $id ?: $request->get('id');
+
+        $pegawaiController = app(PegawaiController::class);
+        $allPegawai = $pegawaiController->all();
+
+        $doc = null;
+        if ($docId) {
+            $doc = DB::table('dokumen_pegawai')->where('id', $docId)->first();
+        }
+
+        $targetPegawai = null;
+        if ($doc && ! empty($doc->pegawai_id)) {
+            $targetPegawai = collect($allPegawai)->first(function ($p) use ($doc) {
+                return (string) ($p['db_id'] ?? '') === (string) $doc->pegawai_id
+                    || (string) ($p['id'] ?? '') === (string) $doc->pegawai_id
+                    || (string) ($p['nik'] ?? '') === (string) $doc->pegawai_id;
+            });
+        }
+
+        if (! $targetPegawai && $pegawaiId) {
+            $targetPegawai = collect($allPegawai)->first(function ($p) use ($pegawaiId) {
+                return (string) ($p['id'] ?? '') === (string) $pegawaiId
+                    || (string) ($p['db_id'] ?? '') === (string) $pegawaiId
+                    || (string) ($p['nik'] ?? '') === (string) $pegawaiId;
+            });
+        }
+
+        if (! $targetPegawai) {
+            $first = collect($allPegawai)->first();
+            $targetPegawai = $first ?: [
+                'id' => 1,
+                'nik' => '1711001',
+                'nama' => 'Pegawai PDAM',
+                'jabatan' => 'Staf Pelaksana',
+                'unit_kerja' => 'Kantor Pusat',
+                'status_peg' => 'Pegawai Tetap',
+            ];
+        }
+
+        $isDiklat = ($doc && in_array(strtolower($doc->kategori ?? ''), ['diklat', 'surat_diklat'])) || in_array($jenis, ['diklat', 'surat_diklat']);
+
+        $docData = [
+            'id' => $doc->id ?? null,
+            'kategori' => $isDiklat ? 'Diklat' : 'SK',
+            'nomor' => $doc->nomor ?? ($isDiklat ? 'STP/SDM/2024/' . str_pad(($targetPegawai['id'] ?? 1) + 80, 3, '0', STR_PAD_LEFT) : 'SK/SDM/2024/' . str_pad($targetPegawai['id'] ?? 1, 3, '0', STR_PAD_LEFT)),
+            'judul' => $doc->judul ?? ($isDiklat ? 'Sertifikat Diklat Manajemen Kepegawaian & Pelayanan' : 'Surat Keputusan Pengangkatan ' . ($targetPegawai['nama'] ?? 'Pegawai')),
+            'tgl_terbit' => ! empty($doc->created_at) ? substr((string) $doc->created_at, 0, 10) : date('Y-m-d'),
+            'file_url' => $doc->file_url ?? '#',
+            'file_nama' => $doc->file_nama ?? 'Dokumen.pdf',
+        ];
+
+        return view('dokumen-surat.cetak', [
+            'doc' => $docData,
+            'pegawai' => $targetPegawai,
+        ]);
+    }
 }
