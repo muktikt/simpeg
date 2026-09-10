@@ -382,6 +382,14 @@ Route::middleware(['simpeg.auth'])->group(function () {
         Route::get('/', [ProfileController::class, 'show'])->name('show');
         Route::put('/password', [ProfileController::class, 'updatePassword'])->name('update-password');
         Route::post('/dokumen', [ProfileController::class, 'uploadDokumen'])->name('upload-dokumen');
+        
+        // Curriculum Vitae (CV) - diisi mandiri oleh pegawai yang login.
+        Route::put('/cv/biodata', [ProfileController::class, 'updateBiodata'])->name('cv.biodata');
+        Route::put('/cv/kompetensi', [ProfileController::class, 'updateKompetensi'])->name('cv.kompetensi');
+        Route::post('/cv/detail/{type}', [ProfileController::class, 'storeCvDetail'])->name('cv.detail.store');
+        Route::put('/cv/detail/{type}/{itemId}', [ProfileController::class, 'updateCvDetail'])->whereNumber('itemId')->name('cv.detail.update');
+        Route::delete('/cv/detail/{type}/{itemId}', [ProfileController::class, 'destroyCvDetail'])->whereNumber('itemId')->name('cv.detail.destroy');
+        Route::get('/cv/cetak', [ProfileController::class, 'cvCetak'])->name('cv.cetak');
     });
 
     // Semua modul lama yang belum dimigrasikan -> halaman placeholder.
