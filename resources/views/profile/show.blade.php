@@ -235,11 +235,11 @@
                         </div>
                         
                         <div class="doc-card-actions">
-                            <button type="button" class="btn-doc-view" onclick="viewFileModal('{{ $pegawai['surat_kerja']['judul'] ?? 'Surat Kerja' }}', '{{ $pegawai['surat_kerja']['file_name'] ?? 'SK.pdf' }}')">
+                            <button type="button" class="btn-doc-view" onclick="viewFileModal('{{ $pegawai['surat_kerja']['judul'] ?? 'Surat Kerja' }}', '{{ $pegawai['surat_kerja']['file_name'] ?? 'SK.pdf' }}', '{{ $pegawai['surat_kerja']['file_url'] ?? '#' }}')">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                                 View File
                             </button>
-                            <a href="#" class="btn-doc-download" onclick="showCustomAlert('Mengunduh file {{ $pegawai['surat_kerja']['file_name'] ?? 'SK.pdf' }}', 'Mengunduh File', 'download'); return false;">
+                            <a href="{{ route('profile.dokumen.download', 'sk') }}" class="btn-doc-download">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                                 Download
                             </a>
@@ -264,11 +264,11 @@
                         </div>
                         
                         <div class="doc-card-actions">
-                            <button type="button" class="btn-doc-view" onclick="viewFileModal('{{ $pegawai['surat_diklat']['judul'] ?? 'Surat Diklat' }}', '{{ $pegawai['surat_diklat']['file_name'] ?? 'Diklat.pdf' }}')">
+                            <button type="button" class="btn-doc-view" onclick="viewFileModal('{{ $pegawai['surat_diklat']['judul'] ?? 'Surat Diklat' }}', '{{ $pegawai['surat_diklat']['file_name'] ?? 'Diklat.pdf' }}', '{{ $pegawai['surat_diklat']['file_url'] ?? '#' }}')">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                                 View File
                             </button>
-                            <a href="#" class="btn-doc-download" onclick="showCustomAlert('Mengunduh file {{ $pegawai['surat_diklat']['file_name'] ?? 'Diklat.pdf' }}', 'Mengunduh File', 'download'); return false;">
+                            <a href="{{ route('profile.dokumen.download', 'diklat') }}" class="btn-doc-download">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                                 Download
                             </a>
@@ -604,13 +604,23 @@ function closeCvModal() {
             <h3 id="view-file-title" style="margin:0; font-size:16px;">Preview Dokumen</h3>
             <button type="button" onclick="document.getElementById('modal-view-file').style.display='none'" style="background:none; border:none; font-size:20px; cursor:pointer;">&times;</button>
         </div>
-        <div style="background:#f8fafc; border:1px dashed #cbd5e1; padding:40px 20px; text-align:center; border-radius:6px; margin-bottom:16px;">
+ 
+        {{-- Placeholder: dipakai kalau Admin SDM belum upload file fisik --}}
+        <div id="view-file-placeholder" style="background:#f8fafc; border:1px dashed #cbd5e1; padding:40px 20px; text-align:center; border-radius:6px; margin-bottom:16px;">
             <svg style="width:48px; height:48px; color:#64748b; margin-bottom:8px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
             <p style="font-weight:600; color:#334155; margin-bottom:4px;" id="view-file-name">Dokumen.pdf</p>
-            <p style="font-size:12px; color:#64748b;">File PDF / Gambar telah diverifikasi oleh Admin SDM</p>
+            <p id="view-file-note" style="font-size:12px; color:#64748b;">Berkas fisik belum diunggah oleh Admin SDM.</p>
         </div>
-        <div style="display:flex; justify-content:flex-end;">
-            <button type="button" class="btn-submit" onclick="document.getElementById('modal-view-file').style.display='none'">Tutup Preview</button>
+ 
+        {{-- Preview file asli: iframe untuk PDF, <img> untuk gambar --}}
+        <div id="view-file-real-preview" style="display:none; margin-bottom:16px;">
+            <iframe id="view-file-iframe" style="display:none; width:100%; height:420px; border:1px solid #e2e8f0; border-radius:6px;"></iframe>
+            <img id="view-file-img" style="display:none; width:100%; max-height:420px; object-fit:contain; border:1px solid #e2e8f0; border-radius:6px;">
+        </div>
+ 
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <a id="view-file-open-new-tab" href="#" target="_blank" style="display:none; font-size:13px; color:#0D2C6E; font-weight:600; text-decoration:none;">Buka di tab baru &rarr;</a>
+            <button type="button" class="btn-submit" style="margin-left:auto;" onclick="document.getElementById('modal-view-file').style.display='none'">Tutup Preview</button>
         </div>
     </div>
 </div>
@@ -621,9 +631,42 @@ function switchTab(type) {
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.dataset.panel === type));
 }
  
-function viewFileModal(judul, filename) {
+function viewFileModal(judul, filename, fileUrl) {
     document.getElementById('view-file-title').innerText = 'Preview: ' + judul;
     document.getElementById('view-file-name').innerText = filename;
+ 
+    const hasRealFile = fileUrl && fileUrl !== '#' && fileUrl.trim() !== '';
+    const placeholder = document.getElementById('view-file-placeholder');
+    const realPreview = document.getElementById('view-file-real-preview');
+    const iframe = document.getElementById('view-file-iframe');
+    const img = document.getElementById('view-file-img');
+    const openNewTab = document.getElementById('view-file-open-new-tab');
+ 
+    iframe.style.display = 'none';
+    img.style.display = 'none';
+    iframe.src = '';
+    img.src = '';
+ 
+    if (hasRealFile) {
+        placeholder.style.display = 'none';
+        realPreview.style.display = 'block';
+        openNewTab.style.display = 'inline-block';
+        openNewTab.href = fileUrl;
+ 
+        const isImage = /\.(png|jpe?g|gif|webp)$/i.test(fileUrl);
+        if (isImage) {
+            img.src = fileUrl;
+            img.style.display = 'block';
+        } else {
+            iframe.src = fileUrl;
+            iframe.style.display = 'block';
+        }
+    } else {
+        placeholder.style.display = 'block';
+        realPreview.style.display = 'none';
+        openNewTab.style.display = 'none';
+    }
+ 
     document.getElementById('modal-view-file').style.display = 'flex';
 }
 </script>
