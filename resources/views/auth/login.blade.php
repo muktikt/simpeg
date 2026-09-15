@@ -25,7 +25,7 @@
                 <div><p>99.8%</p><p>Uptime sistem</p></div>
             </div>
         </div>
-        <div class="foot-note">&copy; {{ date('Y') }} SIMPEG — PDAM Tirta Daya Amerta</div>
+        <div class="foot-note">&copy; {{ date('Y') }} SIMPEG — PERUMDAM Tirta Darma Ayu</div>
     </div>
 
     <div class="form-side">
