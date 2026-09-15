@@ -55,7 +55,7 @@
         </div>
         <div>
             <div class="brand-text-name">SIMPEG</div>
-            <div class="brand-text-sub">PDAM Tirta Daya</div>
+            <div class="brand-text-sub">PERUMDAM Tirta Darma Ayu</div>
         </div>
     </div>
     <nav class="nav-scroll">

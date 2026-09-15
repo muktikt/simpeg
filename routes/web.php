@@ -390,6 +390,11 @@ Route::middleware(['simpeg.auth'])->group(function () {
         Route::put('/cv/detail/{type}/{itemId}', [ProfileController::class, 'updateCvDetail'])->whereNumber('itemId')->name('cv.detail.update');
         Route::delete('/cv/detail/{type}/{itemId}', [ProfileController::class, 'destroyCvDetail'])->whereNumber('itemId')->name('cv.detail.destroy');
         Route::get('/cv/cetak', [ProfileController::class, 'cvCetak'])->name('cv.cetak');
+        
+        // Download berkas fisik Surat Kerja / Surat Diklat milik pegawai yang login.
+        Route::get('/dokumen/{jenis}/download', [ProfileController::class, 'downloadDokumen'])
+            ->where('jenis', 'sk|diklat')
+            ->name('dokumen.download');
     });
 
     // Semua modul lama yang belum dimigrasikan -> halaman placeholder.
