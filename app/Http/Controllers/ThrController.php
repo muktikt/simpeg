@@ -83,15 +83,7 @@ class ThrController extends Controller
         return storage_path('app/thr_proses.json');
     }
 
-    protected function seedIfEmpty(): void
-    {
-        $file = $this->storageFile();
-        if (! file_exists($file)) {
-            @file_put_contents($file, json_encode([], JSON_PRETTY_PRINT));
-        }
-    }
-
-    public function all(): array
+    protected function getLocalData(): array
     {
         $file = $this->storageFile();
         if (file_exists($file)) {
@@ -100,8 +92,33 @@ class ThrController extends Controller
                 return $data;
             }
         }
-
         return session('dummy_thr', []);
+    }
+
+    public function all(): array
+    {
+        try {
+            $rows = \Illuminate\Support\Facades\DB::table('thr')
+                ->leftJoin('pegawai', 'thr.pegawai_id', '=', 'pegawai.id')
+                ->select(
+                    'thr.*',
+                    'pegawai.nik as p_nik',
+                    'pegawai.name as p_name',
+                    'pegawai.jabatan as p_jabatan',
+                    'pegawai.unit_kerja as p_unit_kerja',
+                    'pegawai.golongan as p_golongan'
+                )
+                ->orderBy('thr.id', 'desc')
+                ->get();
+
+            if ($rows->isNotEmpty()) {
+                return $rows->map(fn ($r) => $this->mapThrRowToThrArray($r))->all();
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('DB thr read failed: ' . $e->getMessage());
+        }
+
+        return $this->getLocalData();
     }
 
     public function save(array $data): void
@@ -110,6 +127,131 @@ class ThrController extends Controller
         $clean = array_values($data);
         @file_put_contents($file, json_encode($clean, JSON_PRETTY_PRINT));
         session()->put('dummy_thr', $clean);
+    }
+
+    protected function mapThrRowToThrArray(object $r): array
+    {
+        $status = strtolower($r->status ?? 'draft');
+        if ($status === 'diterbitkan') {
+            $status = 'terbit';
+        }
+
+        $nik = (string) ($r->p_nik ?? $r->nik ?? '');
+        $nama = (string) ($r->p_name ?? $r->nama ?? '');
+
+        if (empty($nik) || empty($nama)) {
+            $p = $this->pegawaiById($r->pegawai_id);
+            if ($p) {
+                $nik = $p['nik'] ?? $nik;
+                $nama = $p['nama'] ?? $nama;
+            }
+        }
+
+        $totalPendapatan = (float) ($r->total_pendapatan ?? 0);
+        $totalPotonganPendapatan = (float) ($r->total_potongan_pendapatan ?? 0);
+        $totalPotonganNonPendapatan = (float) ($r->total_potongan_non_pendapatan ?? 0);
+        $thrDiterima = (float) ($r->thr_diterima ?? 0);
+
+        if ($totalPendapatan <= 0) {
+            $totalPendapatan = (float) ($r->gapok ?? 0)
+                + (float) ($r->tunjangan_istri ?? 0)
+                + (float) ($r->tunjangan_anak ?? 0)
+                + (float) ($r->tunjangan_prestasi ?? 0)
+                + (float) ($r->tunjangan_jabatan ?? 0)
+                + (float) ($r->tunjangan_transportasi ?? 0)
+                + (float) ($r->tunjangan_pangan ?? 0)
+                + (float) ($r->tunjangan_bpjs_tenaga_kerja ?? 0)
+                + (float) ($r->tunjangan_perumahan ?? 0)
+                + (float) ($r->tunjangan_perusahaan ?? 0)
+                + (float) ($r->tunjangan_air_minum ?? 0)
+                + (float) ($r->tunjangan_bpjs_kesehatan ?? 0)
+                + (float) ($r->tunjangan_komunikasi ?? 0)
+                + (float) ($r->tunjangan_pajak ?? 0)
+                + (float) ($r->lembur ?? 0);
+        }
+
+        if ($totalPotonganPendapatan <= 0) {
+            $totalPotonganPendapatan = (float) ($r->potongan_dapenma ?? 0)
+                + (float) ($r->potongan_bpjs_tenaga_kerja ?? 0)
+                + (float) ($r->potongan_bpjs_kesehatan ?? 0)
+                + (float) ($r->potongan_perumahan ?? 0)
+                + (float) ($r->potongan_pajak ?? 0)
+                + (float) ($r->potongan_korpri ?? 0)
+                + (float) ($r->potongan_tunjangan_perusahaan ?? 0)
+                + (float) ($r->potongan_trandist_pmi_lain ?? 0);
+        }
+
+        if ($totalPotonganNonPendapatan <= 0) {
+            $totalPotonganNonPendapatan = (float) ($r->potongan_koperasi ?? 0)
+                + (float) ($r->potongan_darma_wanita ?? 0)
+                + (float) ($r->potongan_rekening_air_minum ?? 0)
+                + (float) ($r->potongan_kas ?? 0)
+                + (float) ($r->potongan_bank_bjb ?? 0)
+                + (float) ($r->potongan_bank_bjbs ?? 0)
+                + (float) ($r->potongan_asuransi ?? 0)
+                + (float) ($r->potongan_bank_btn ?? 0)
+                + (float) ($r->potongan_bank_bpr ?? 0)
+                + (float) ($r->potongan_zakat_ramadhan ?? 0);
+        }
+
+        if ($thrDiterima <= 0) {
+            $thrDiterima = $totalPendapatan - ($totalPotonganPendapatan + $totalPotonganNonPendapatan);
+        }
+
+        return [
+            'id' => $r->id,
+            'pegawai_id' => $r->pegawai_id,
+            'nik' => $nik,
+            'nama' => $nama,
+            'jabatan' => $r->p_jabatan ?? 'Staf',
+            'unit_kerja' => $r->p_unit_kerja ?? 'Kantor Pusat',
+            'golongan' => $r->p_golongan ?? '',
+            'kategori' => $r->kategori ?? 'satuan',
+            'kode_ptkp' => $r->kode_ptkp ?? 'TK',
+            'tahun' => (int) ($r->tahun ?? now()->year),
+            'status' => $status,
+            'disetujui_oleh' => $r->disetujui_oleh ?? null,
+            'total_pendapatan' => $totalPendapatan,
+            'total_potongan_pendapatan' => $totalPotonganPendapatan,
+            'total_potongan_non_pendapatan' => $totalPotonganNonPendapatan,
+            'thr_diterima' => $thrDiterima,
+
+            'gapok' => (float) ($r->gapok ?? 0),
+            'tunjangan_istri' => (float) ($r->tunjangan_istri ?? 0),
+            'tunjangan_anak' => (float) ($r->tunjangan_anak ?? 0),
+            'tunjangan_prestasi' => (float) ($r->tunjangan_prestasi ?? 0),
+            'tunjangan_jabatan' => (float) ($r->tunjangan_jabatan ?? 0),
+            'tunjangan_transport' => (float) ($r->tunjangan_transportasi ?? 0),
+            'tunjangan_pangan' => (float) ($r->tunjangan_pangan ?? 0),
+            'tunjangan_bpjstk' => (float) ($r->tunjangan_bpjs_tenaga_kerja ?? 0),
+            'tunjangan_perumahan' => (float) ($r->tunjangan_perumahan ?? 0),
+            'tunjangan_perusahaan' => (float) ($r->tunjangan_perusahaan ?? 0),
+            'tunjangan_airminum' => (float) ($r->tunjangan_air_minum ?? 0),
+            'tunjangan_bpjskes' => (float) ($r->tunjangan_bpjs_kesehatan ?? 0),
+            'tunjangan_komunikasi' => (float) ($r->tunjangan_komunikasi ?? 0),
+            'tunjangan_pajak' => (float) ($r->tunjangan_pajak ?? 0),
+            'lembur' => (float) ($r->lembur ?? 0),
+
+            'potongan_dapenma' => (float) ($r->potongan_dapenma ?? 0),
+            'potongan_bpjstk' => (float) ($r->potongan_bpjs_tenaga_kerja ?? 0),
+            'potongan_bpjskes' => (float) ($r->potongan_bpjs_kesehatan ?? 0),
+            'potongan_perumahan' => (float) ($r->potongan_perumahan ?? 0),
+            'potongan_pajak' => (float) ($r->potongan_pajak ?? 0),
+            'potongan_korpri' => (float) ($r->potongan_korpri ?? 0),
+            'potongan_tperusahaan' => (float) ($r->potongan_tunjangan_perusahaan ?? 0),
+            'potongan_lain' => (float) ($r->potongan_trandist_pmi_lain ?? 0),
+
+            'potongan_koperasi' => (float) ($r->potongan_koperasi ?? 0),
+            'potongan_darmawanita' => (float) ($r->potongan_darma_wanita ?? 0),
+            'potongan_ledeng' => (float) ($r->potongan_rekening_air_minum ?? 0),
+            'potongan_kas' => (float) ($r->potongan_kas ?? 0),
+            'potongan_bjb' => (float) ($r->potongan_bank_bjb ?? 0),
+            'potongan_bjbs' => (float) ($r->potongan_bank_bjbs ?? 0),
+            'potongan_asuransi' => (float) ($r->potongan_asuransi ?? 0),
+            'potongan_btn' => (float) ($r->potongan_bank_btn ?? 0),
+            'potongan_bpr' => (float) ($r->potongan_bank_bpr ?? 0),
+            'potongan_zakat' => (float) ($r->potongan_zakat_ramadhan ?? 0),
+        ];
     }
 
     protected function pegawaiList(): array
@@ -286,55 +428,89 @@ class ThrController extends Controller
         $validated['status'] = 'draft';
         $validated['disetujui_oleh'] = 'Proses';
 
-        $data = $this->all();
-        $newId = $data ? max(array_column($data, 'id')) + 1 : 1;
-        $validated['id'] = $newId;
+        // Cari UUID pegawai di DB Supabase
+        $dbPegawaiId = $pegawai['db_id'] ?? null;
+        if (! $dbPegawaiId && ! empty($validated['nik'])) {
+            $dbPegawaiId = \Illuminate\Support\Facades\DB::table('pegawai')->where('nik', $validated['nik'])->value('id');
+        }
 
-        $data[] = $validated;
-        $this->save($data);
+        $insertedToDb = false;
+        if ($dbPegawaiId) {
+            try {
+                $newId = \Illuminate\Support\Facades\DB::table('thr')->insertGetId([
+                    'pegawai_id' => $dbPegawaiId,
+                    'tahun' => (int) $validated['tahun'],
+                    'status' => 'draft',
+                    'kategori' => $validated['kategori'],
+                    'kode_ptkp' => $validated['kode_ptkp'],
+                    'total_pendapatan' => (int) $totalPendapatan,
+                    'total_potongan_pendapatan' => (int) $totalPotonganPendapatan,
+                    'total_potongan_non_pendapatan' => (int) $totalPotonganNonPendapatan,
+                    'thr_diterima' => (int) ($totalPendapatan - ($totalPotonganPendapatan + $totalPotonganNonPendapatan)),
+                    'tanggal_cair' => date('Y-m-d'),
+
+                    // Komponen Pendapatan
+                    'gapok' => (int) ($validated['gapok'] ?? 0),
+                    'tunjangan_istri' => (int) ($validated['tunjangan_istri'] ?? 0),
+                    'tunjangan_anak' => (int) ($validated['tunjangan_anak'] ?? 0),
+                    'tunjangan_prestasi' => (int) ($validated['tunjangan_prestasi'] ?? 0),
+                    'tunjangan_jabatan' => (int) ($validated['tunjangan_jabatan'] ?? 0),
+                    'tunjangan_transportasi' => (int) ($validated['tunjangan_transport'] ?? 0),
+                    'tunjangan_pangan' => (int) ($validated['tunjangan_pangan'] ?? 0),
+                    'tunjangan_bpjs_tenaga_kerja' => (int) ($validated['tunjangan_bpjstk'] ?? 0),
+                    'tunjangan_perumahan' => (int) ($validated['tunjangan_perumahan'] ?? 0),
+                    'tunjangan_perusahaan' => (int) ($validated['tunjangan_perusahaan'] ?? 0),
+                    'tunjangan_air_minum' => (int) ($validated['tunjangan_airminum'] ?? 0),
+                    'tunjangan_bpjs_kesehatan' => (int) ($validated['tunjangan_bpjskes'] ?? 0),
+                    'tunjangan_komunikasi' => (int) ($validated['tunjangan_komunikasi'] ?? 0),
+                    'tunjangan_pajak' => (int) ($validated['tunjangan_pajak'] ?? 0),
+                    'lembur' => (int) ($validated['lembur'] ?? 0),
+
+                    // Potongan Pendapatan
+                    'potongan_dapenma' => (int) ($validated['potongan_dapenma'] ?? 0),
+                    'potongan_bpjs_tenaga_kerja' => (int) ($validated['potongan_bpjstk'] ?? 0),
+                    'potongan_bpjs_kesehatan' => (int) ($validated['potongan_bpjskes'] ?? 0),
+                    'potongan_perumahan' => (int) ($validated['potongan_perumahan'] ?? 0),
+                    'potongan_pajak' => (int) ($validated['potongan_pajak'] ?? 0),
+                    'potongan_korpri' => (int) ($validated['potongan_korpri'] ?? 0),
+                    'potongan_tunjangan_perusahaan' => (int) ($validated['potongan_tperusahaan'] ?? 0),
+                    'potongan_trandist_pmi_lain' => (int) ($validated['potongan_lain'] ?? 0),
+
+                    // Potongan Non-Pendapatan
+                    'potongan_koperasi' => (int) ($validated['potongan_koperasi'] ?? 0),
+                    'potongan_darma_wanita' => (int) ($validated['potongan_darmawanita'] ?? 0),
+                    'potongan_rekening_air_minum' => (int) ($validated['potongan_ledeng'] ?? 0),
+                    'potongan_kas' => (int) ($validated['potongan_kas'] ?? 0),
+                    'potongan_bank_bjb' => (int) ($validated['potongan_bjb'] ?? 0),
+                    'potongan_bank_bjbs' => (int) ($validated['potongan_bjbs'] ?? 0),
+                    'potongan_asuransi' => (int) ($validated['potongan_asuransi'] ?? 0),
+                    'potongan_bank_btn' => (int) ($validated['potongan_btn'] ?? 0),
+                    'potongan_bank_bpr' => (int) ($validated['potongan_bpr'] ?? 0),
+                    'potongan_zakat_ramadhan' => (int) ($validated['potongan_zakat'] ?? 0),
+                ]);
+
+                $insertedToDb = true;
+                $validated['id'] = $newId;
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('DB thr insert failed: ' . $e->getMessage());
+            }
+        }
+
+        $localData = $this->getLocalData();
+        if (! $insertedToDb) {
+            $newId = $localData ? max(array_column($localData, 'id')) + 1 : 1;
+            $validated['id'] = $newId;
+        }
+        $localData[] = $validated;
+        $this->save($localData);
 
         return redirect()->route('thr.index', ['tahun' => $validated['tahun']])
-            ->with('success', 'Proses THR untuk '.$validated['nama'].' berhasil disimpan sebagai draft.');
+            ->with('success', 'Proses THR untuk '.$validated['nama'].' berhasil disimpan dan masuk ke database.');
     }
 
     public function show(mixed $id)
     {
         $thr = collect($this->all())->first(fn ($r) => (string)($r['id'] ?? '') === (string)$id);
-
-        if (! $thr) {
-            $pegawai = $this->pegawaiById($id)
-                ?? collect($this->pegawaiList())->first(fn ($p) => (string)($p['nik'] ?? '') === (string)$id)
-                ?? collect($this->pegawaiList())->first(fn ($p) => (string)($p['id'] ?? '') === (string)(session('simpeg_user.id') ?? ''))
-                ?? collect($this->pegawaiList())->first(fn ($p) => (string)($p['nik'] ?? '') === (string)(session('simpeg_user.nik') ?? ''))
-                ?? collect($this->pegawaiList())->first();
-
-            if ($pegawai) {
-                $gapok = (float) ($pegawai['gaji_pokok'] ?? 4500000);
-                $totalPendapatan = $gapok + 500000 + 200000 + 100000;
-                $totalPotongan = 150000;
-                $thr = [
-                    'id' => $id,
-                    'pegawai_id' => $pegawai['id'],
-                    'nik' => $pegawai['nik'],
-                    'nama' => $pegawai['nama'],
-                    'jabatan' => $pegawai['jabatan'] ?? 'Staf Pegawai',
-                    'unit_kerja' => $pegawai['unit_kerja'] ?? 'PDAM Tirta Darma Ayu',
-                    'golongan' => $pegawai['golongan'] ?? 'III/a',
-                    'kategori' => 'satuan',
-                    'kode_ptkp' => 'K1',
-                    'tahun' => now()->year,
-                    'status' => 'terbit',
-                    'gapok' => $gapok,
-                    'tunjangan_istri' => 200000,
-                    'tunjangan_anak' => 100000,
-                    'tunjangan_jabatan' => 500000,
-                    'total_pendapatan' => $totalPendapatan,
-                    'total_potongan_pendapatan' => 150000,
-                    'total_potongan_non_pendapatan' => 0,
-                    'thr_diterima' => $totalPendapatan - $totalPotongan,
-                ];
-            }
-        }
 
         abort_if(! $thr, 404);
 
@@ -354,49 +530,43 @@ class ThrController extends Controller
      */
     public function terbitkan(int $id)
     {
-        $data = $this->all();
-        $row = collect($data)->firstWhere('id', $id);
+        $row = collect($this->all())->firstWhere('id', $id);
         abort_if(! $row, 404);
         abort_unless($this->canUserApprove($row['status']), 403, 'Kamu tidak berhak menyetujui tahap ini.');
 
-        $data = collect($data)->map(function ($r) use ($id) {
-            if ($r['id'] === $id) {
-                $approved = $this->applyApproval($r);
+        $stage = $this->nextStageFor($row['status']);
+        $nextStatus = ($stage === 'dirut') ? 'terbit' : $stage;
+        $approverNama = session('simpeg_user.nama_peg', 'Admin');
 
-                // Sinkronisasi langsung ke tabel thr di database Supabase
-                try {
-                    $pegawai = \Illuminate\Support\Facades\DB::table('pegawai')
-                        ->where('nik', $approved['nik'] ?? '')
-                        ->orWhere('id', $approved['pegawai_id'] ?? 0)
-                        ->first();
+        // Update langsung di tabel thr di database Supabase
+        try {
+            $dbStatus = ($nextStatus === 'terbit') ? 'DITERBITKAN' : $nextStatus;
+            \Illuminate\Support\Facades\DB::table('thr')
+                ->where('id', $id)
+                ->update([
+                    'status' => $dbStatus,
+                    'disetujui_oleh' => $approverNama,
+                    'tanggal_cair' => now()->toDateString(),
+                    'updated_at' => now(),
+                ]);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('DB thr update status failed: ' . $e->getMessage());
+        }
 
-                    if ($pegawai) {
-                        \Illuminate\Support\Facades\DB::table('thr')->updateOrInsert(
-                            [
-                                'pegawai_id' => $pegawai->id,
-                                'tahun' => (int) ($approved['tahun'] ?? now()->year),
-                            ],
-                            [
-                                'gapok' => (float) ($approved['thr_diterima'] ?? $approved['gapok'] ?? 4500000),
-                                'status' => 'DITERBITKAN',
-                                'tanggal_cair' => now()->toDateString(),
-                                'updated_at' => now(),
-                            ]
-                        );
-                    }
-                } catch (\Throwable $e) {
-                    // Fallback
+        // Update juga di file lokal
+        $localData = $this->getLocalData();
+        if (! empty($localData)) {
+            $updated = collect($localData)->map(function ($r) use ($id, $nextStatus, $approverNama) {
+                if ((int) ($r['id'] ?? 0) === $id) {
+                    $r['status'] = $nextStatus;
+                    $r['disetujui_oleh'] = $approverNama;
                 }
+                return $r;
+            })->all();
+            $this->save($updated);
+        }
 
-                return $approved;
-            }
-
-            return $r;
-        })->all();
-
-        $this->save($data);
-
-        return redirect()->back()->with('success', 'THR berhasil disetujui ke tahap berikutnya dan tersinkronisasi ke database.');
+        return redirect()->back()->with('success', 'THR berhasil disetujui dan tersimpan di database.');
     }
 
     public function destroy(int $id)
@@ -405,10 +575,19 @@ class ThrController extends Controller
         abort_if(! $thr, 404);
         abort_if($thr['status'] === 'terbit', 400, 'THR yang sudah terbit tidak bisa dihapus.');
 
-        $data = collect($this->all())->reject(fn ($row) => $row['id'] === $id)->values()->all();
-        $this->save($data);
+        try {
+            \Illuminate\Support\Facades\DB::table('thr')->where('id', $id)->delete();
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('DB thr delete failed: ' . $e->getMessage());
+        }
 
-        return redirect()->route('thr.index')->with('success', 'Draft THR berhasil dihapus.');
+        $localData = $this->getLocalData();
+        if (! empty($localData)) {
+            $filtered = collect($localData)->reject(fn ($row) => (int)($row['id'] ?? 0) === $id)->values()->all();
+            $this->save($filtered);
+        }
+
+        return redirect()->route('thr.index')->with('success', 'Draft THR berhasil dihapus dari database.');
     }
 
     protected function validateData(Request $request): array

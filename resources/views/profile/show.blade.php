@@ -218,7 +218,7 @@
  
                 <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap:20px;">
                     <!-- Card 1: Surat Kerja -->
-                    <div class="doc-card">
+                    <div class="doc-card" style="{{ empty($pegawai['surat_kerja']) ? 'opacity:0.85; border:1px dashed #CBD5E1;' : '' }}">
                         <div>
                             <div class="doc-card-header">
                                 <span class="doc-badge doc-badge-sk">
@@ -227,27 +227,36 @@
                                 </span>
                                 <span class="doc-date">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                                    {{ $pegawai['surat_kerja']['tgl_terbit'] ?? '-' }}
+                                    {{ $pegawai['surat_kerja']['tgl_terbit'] ?? 'Belum terbit' }}
                                 </span>
                             </div>
-                            <h3 class="doc-card-title">{{ $pegawai['surat_kerja']['judul'] ?? 'Surat Kerja / SK Pegawai' }}</h3>
-                            <p class="doc-card-sub">No: {{ $pegawai['surat_kerja']['nomor'] ?? '-' }}</p>
+                            @if (!empty($pegawai['surat_kerja']))
+                                <h3 class="doc-card-title">{{ $pegawai['surat_kerja']['judul'] }}</h3>
+                                <p class="doc-card-sub">No: {{ $pegawai['surat_kerja']['nomor'] ?? '-' }}</p>
+                            @else
+                                <h3 class="doc-card-title" style="color:var(--text-muted);">Belum Ada Dokumen SK</h3>
+                                <p class="doc-card-sub" style="margin-bottom:12px;">Surat Keputusan belum diterbitkan atau diunggah oleh SDM.</p>
+                            @endif
                         </div>
                         
                         <div class="doc-card-actions">
-                            <button type="button" class="btn-doc-view" onclick="viewFileModal('{{ $pegawai['surat_kerja']['judul'] ?? 'Surat Kerja' }}', '{{ $pegawai['surat_kerja']['file_name'] ?? 'SK.pdf' }}', '{{ $pegawai['surat_kerja']['file_url'] ?? '#' }}')">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                                View File
-                            </button>
-                            <a href="{{ route('profile.dokumen.download', 'sk') }}" class="btn-doc-download">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                                Download
-                            </a>
+                            @if (!empty($pegawai['surat_kerja']))
+                                <button type="button" class="btn-doc-view" onclick="viewFileModal('{{ $pegawai['surat_kerja']['judul'] }}', '{{ $pegawai['surat_kerja']['file_name'] }}', '{{ $pegawai['surat_kerja']['file_url'] ?? '#' }}')">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                    View File
+                                </button>
+                                <a href="{{ route('profile.dokumen.download', 'sk') }}" class="btn-doc-download">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                                    Download
+                                </a>
+                            @else
+                                <span style="font-size:12px; color:var(--text-muted); font-style:italic;">Belum Tersedia</span>
+                            @endif
                         </div>
                     </div>
  
                     <!-- Card 2: Surat Diklat -->
-                    <div class="doc-card">
+                    <div class="doc-card" style="{{ empty($pegawai['surat_diklat']) ? 'opacity:0.85; border:1px dashed #CBD5E1;' : '' }}">
                         <div>
                             <div class="doc-card-header">
                                 <span class="doc-badge doc-badge-diklat">
@@ -256,22 +265,31 @@
                                 </span>
                                 <span class="doc-date">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                                    {{ $pegawai['surat_diklat']['tgl_terbit'] ?? '-' }}
+                                    {{ $pegawai['surat_diklat']['tgl_terbit'] ?? 'Belum terbit' }}
                                 </span>
                             </div>
-                            <h3 class="doc-card-title">{{ $pegawai['surat_diklat']['judul'] ?? 'Sertifikat Diklat & Pelatihan' }}</h3>
-                            <p class="doc-card-sub">No: {{ $pegawai['surat_diklat']['nomor'] ?? '-' }}</p>
+                            @if (!empty($pegawai['surat_diklat']))
+                                <h3 class="doc-card-title">{{ $pegawai['surat_diklat']['judul'] }}</h3>
+                                <p class="doc-card-sub">No: {{ $pegawai['surat_diklat']['nomor'] ?? '-' }}</p>
+                            @else
+                                <h3 class="doc-card-title" style="color:var(--text-muted);">Belum Ada Dokumen Diklat</h3>
+                                <p class="doc-card-sub" style="margin-bottom:12px;">Sertifikat Diklat belum diterbitkan atau diunggah oleh SDM.</p>
+                            @endif
                         </div>
                         
                         <div class="doc-card-actions">
-                            <button type="button" class="btn-doc-view" onclick="viewFileModal('{{ $pegawai['surat_diklat']['judul'] ?? 'Surat Diklat' }}', '{{ $pegawai['surat_diklat']['file_name'] ?? 'Diklat.pdf' }}', '{{ $pegawai['surat_diklat']['file_url'] ?? '#' }}')">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                                View File
-                            </button>
-                            <a href="{{ route('profile.dokumen.download', 'diklat') }}" class="btn-doc-download">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                                Download
-                            </a>
+                            @if (!empty($pegawai['surat_diklat']))
+                                <button type="button" class="btn-doc-view" onclick="viewFileModal('{{ $pegawai['surat_diklat']['judul'] }}', '{{ $pegawai['surat_diklat']['file_name'] }}', '{{ $pegawai['surat_diklat']['file_url'] ?? '#' }}')">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                    View File
+                                </button>
+                                <a href="{{ route('profile.dokumen.download', 'diklat') }}" class="btn-doc-download">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                                    Download
+                                </a>
+                            @else
+                                <span style="font-size:12px; color:var(--text-muted); font-style:italic;">Belum Tersedia</span>
+                            @endif
                         </div>
                     </div>
                 </div>

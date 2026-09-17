@@ -11,17 +11,6 @@ class ApprovalController extends Controller
 
     public function index()
     {
-        // Pastikan dummy data ter-seed jika kosong dengan memanggil controller masing-masing
-        if (! session()->has('dummy_gaji_proses')) {
-            app(GajiProsesController::class)->index(new Request());
-        }
-        if (! session()->has('dummy_thr')) {
-            app(ThrController::class)->index(new Request());
-        }
-        if (! session()->has('dummy_gaji13')) {
-            app(GajiTigabelasController::class)->index(new Request());
-        }
-
         $userNik = session('simpeg_user.nik');
         $pending = [];
 

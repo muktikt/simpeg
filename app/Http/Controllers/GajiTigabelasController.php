@@ -90,15 +90,7 @@ class GajiTigabelasController extends Controller
         return storage_path('app/gaji13_proses.json');
     }
 
-    protected function seedIfEmpty(): void
-    {
-        $file = $this->storageFile();
-        if (! file_exists($file)) {
-            @file_put_contents($file, json_encode([], JSON_PRETTY_PRINT));
-        }
-    }
-
-    public function all(): array
+    protected function getLocalData(): array
     {
         $file = $this->storageFile();
         if (file_exists($file)) {
@@ -107,8 +99,33 @@ class GajiTigabelasController extends Controller
                 return $data;
             }
         }
-
         return session('dummy_gaji13', []);
+    }
+
+    public function all(): array
+    {
+        try {
+            $rows = \Illuminate\Support\Facades\DB::table('gaji_13')
+                ->leftJoin('pegawai', 'gaji_13.pegawai_id', '=', 'pegawai.id')
+                ->select(
+                    'gaji_13.*',
+                    'pegawai.nik as p_nik',
+                    'pegawai.name as p_name',
+                    'pegawai.jabatan as p_jabatan',
+                    'pegawai.unit_kerja as p_unit_kerja',
+                    'pegawai.golongan as p_golongan'
+                )
+                ->orderBy('gaji_13.id', 'desc')
+                ->get();
+
+            if ($rows->isNotEmpty()) {
+                return $rows->map(fn ($r) => $this->mapGaji13RowToArray($r))->all();
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('DB gaji_13 read failed: ' . $e->getMessage());
+        }
+
+        return $this->getLocalData();
     }
 
     public function save(array $data): void
@@ -117,6 +134,49 @@ class GajiTigabelasController extends Controller
         $clean = array_values($data);
         @file_put_contents($file, json_encode($clean, JSON_PRETTY_PRINT));
         session()->put('dummy_gaji13', $clean);
+    }
+
+    protected function mapGaji13RowToArray(object $r): array
+    {
+        $status = strtolower($r->status ?? 'draft');
+        if ($status === 'diterbitkan') {
+            $status = 'terbit';
+        }
+
+        $nik = (string) ($r->p_nik ?? $r->nik ?? '');
+        $nama = (string) ($r->p_name ?? $r->nama ?? '');
+
+        if (empty($nik) || empty($nama)) {
+            $p = $this->pegawaiById($r->pegawai_id);
+            if ($p) {
+                $nik = $p['nik'] ?? $nik;
+                $nama = $p['nama'] ?? $nama;
+            }
+        }
+
+        $jumlah = (float) ($r->jumlah ?? 0);
+        $totalPendapatan = (float) ($r->total_pendapatan ?? $jumlah);
+        $totalPotongan = (float) ($r->total_potongan ?? 0);
+
+        return [
+            'id' => $r->id,
+            'pegawai_id' => $r->pegawai_id,
+            'nik' => $nik,
+            'nama' => $nama,
+            'jabatan' => $r->p_jabatan ?? 'Staf',
+            'unit_kerja' => $r->p_unit_kerja ?? 'Kantor Pusat',
+            'golongan' => $r->p_golongan ?? '',
+            'kategori' => $r->kategori ?? 'satuan',
+            'kode_ptkp' => $r->kode_ptkp ?? 'TK',
+            'tahun' => (int) ($r->tahun ?? now()->year),
+            'status' => $status,
+            'disetujui_oleh' => $r->disetujui_oleh ?? null,
+            'gapok' => $jumlah > 0 ? $jumlah : 4500000,
+            'total_pendapatan' => $totalPendapatan > 0 ? $totalPendapatan : $jumlah,
+            'total_potongan_pendapatan' => $totalPotongan,
+            'total_potongan_non_pendapatan' => 0,
+            'gaji13_diterima' => $jumlah > 0 ? $jumlah : ($totalPendapatan - $totalPotongan),
+        ];
     }
 
     protected function pegawaiList(): array
@@ -310,65 +370,62 @@ class GajiTigabelasController extends Controller
         $totalPotonganNonPendapatan = collect(array_keys(self::POTONGAN_NON_PENDAPATAN))
             ->sum(fn ($key) => (float) ($validated[$key] ?? 0));
 
+        $totalPotongan = $totalPotonganPendapatan + $totalPotonganNonPendapatan;
+        $gaji13Diterima = $totalPendapatan - $totalPotongan;
+
         $validated['nik'] = $pegawai['nik'] ?? '-';
         $validated['nama'] = $pegawai['nama'] ?? '-';
         $validated['kode_ptkp'] = $keluargaCalc['kode_ptkp'];
         $validated['total_pendapatan'] = $totalPendapatan;
         $validated['total_potongan_pendapatan'] = $totalPotonganPendapatan;
         $validated['total_potongan_non_pendapatan'] = $totalPotonganNonPendapatan;
-        $validated['gaji13_diterima'] = $totalPendapatan - ($totalPotonganPendapatan + $totalPotonganNonPendapatan);
+        $validated['gaji13_diterima'] = $gaji13Diterima;
         $validated['status'] = 'draft';
         $validated['disetujui_oleh'] = 'Proses';
 
-        $data = $this->all();
-        $newId = $data ? max(array_column($data, 'id')) + 1 : 1;
-        $validated['id'] = $newId;
+        // Cari UUID pegawai di DB Supabase
+        $dbPegawaiId = $pegawai['db_id'] ?? null;
+        if (! $dbPegawaiId && ! empty($validated['nik'])) {
+            $dbPegawaiId = \Illuminate\Support\Facades\DB::table('pegawai')->where('nik', $validated['nik'])->value('id');
+        }
 
-        $data[] = $validated;
-        $this->save($data);
+        $insertedToDb = false;
+        if ($dbPegawaiId) {
+            try {
+                $newId = \Illuminate\Support\Facades\DB::table('gaji_13')->insertGetId([
+                    'pegawai_id' => $dbPegawaiId,
+                    'tahun' => (int) $validated['tahun'],
+                    'jumlah' => (int) $gaji13Diterima,
+                    'status' => 'draft',
+                    'kategori' => $validated['kategori'],
+                    'kode_ptkp' => $validated['kode_ptkp'],
+                    'total_pendapatan' => (int) $totalPendapatan,
+                    'total_potongan' => (int) $totalPotongan,
+                    'tanggal_cair' => date('Y-m-d'),
+                ]);
+
+                $insertedToDb = true;
+                $validated['id'] = $newId;
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('DB gaji_13 insert failed: ' . $e->getMessage());
+            }
+        }
+
+        $localData = $this->getLocalData();
+        if (! $insertedToDb) {
+            $newId = $localData ? max(array_column($localData, 'id')) + 1 : 1;
+            $validated['id'] = $newId;
+        }
+        $localData[] = $validated;
+        $this->save($localData);
 
         return redirect()->route('gaji-tigabelas.index', ['tahun' => $validated['tahun']])
-            ->with('success', 'Proses Gaji 13 untuk '.$validated['nama'].' berhasil disimpan sebagai draft.');
+            ->with('success', 'Proses Gaji 13 untuk '.$validated['nama'].' berhasil disimpan dan masuk ke database.');
     }
 
     public function show(mixed $id)
     {
         $gaji13 = collect($this->all())->first(fn ($r) => (string)($r['id'] ?? '') === (string)$id);
-
-        if (! $gaji13) {
-            $pegawai = $this->pegawaiById($id)
-                ?? collect($this->pegawaiList())->first(fn ($p) => (string)($p['nik'] ?? '') === (string)$id)
-                ?? collect($this->pegawaiList())->first(fn ($p) => (string)($p['id'] ?? '') === (string)(session('simpeg_user.id') ?? ''))
-                ?? collect($this->pegawaiList())->first(fn ($p) => (string)($p['nik'] ?? '') === (string)(session('simpeg_user.nik') ?? ''))
-                ?? collect($this->pegawaiList())->first();
-
-            if ($pegawai) {
-                $gapok = (float) ($pegawai['gaji_pokok'] ?? 4500000);
-                $totalPendapatan = $gapok + 500000 + 200000 + 100000;
-                $totalPotongan = 150000;
-                $gaji13 = [
-                    'id' => $id,
-                    'pegawai_id' => $pegawai['id'],
-                    'nik' => $pegawai['nik'],
-                    'nama' => $pegawai['nama'],
-                    'jabatan' => $pegawai['jabatan'] ?? 'Staf Pegawai',
-                    'unit_kerja' => $pegawai['unit_kerja'] ?? 'PDAM Tirta Darma Ayu',
-                    'golongan' => $pegawai['golongan'] ?? 'III/a',
-                    'kategori' => 'satuan',
-                    'kode_ptkp' => 'K1',
-                    'tahun' => now()->year,
-                    'status' => 'terbit',
-                    'gapok' => $gapok,
-                    'tunjangan_istri' => 200000,
-                    'tunjangan_anak' => 100000,
-                    'tunjangan_jabatan' => 500000,
-                    'total_pendapatan' => $totalPendapatan,
-                    'total_potongan_pendapatan' => 150000,
-                    'total_potongan_non_pendapatan' => 0,
-                    'gaji13_diterima' => $totalPendapatan - $totalPotongan,
-                ];
-            }
-        }
 
         abort_if(! $gaji13, 404);
 
@@ -388,49 +445,43 @@ class GajiTigabelasController extends Controller
      */
     public function terbitkan(int $id)
     {
-        $data = $this->all();
-        $row = collect($data)->firstWhere('id', $id);
+        $row = collect($this->all())->firstWhere('id', $id);
         abort_if(! $row, 404);
         abort_unless($this->canUserApprove($row['status']), 403, 'Kamu tidak berhak menyetujui tahap ini.');
 
-        $data = collect($data)->map(function ($r) use ($id) {
-            if ($r['id'] === $id) {
-                $approved = $this->applyApproval($r);
+        $stage = $this->nextStageFor($row['status']);
+        $nextStatus = ($stage === 'dirut') ? 'terbit' : $stage;
+        $approverNama = session('simpeg_user.nama_peg', 'Admin');
 
-                // Sinkronisasi langsung ke tabel gaji_13 di database Supabase
-                try {
-                    $pegawai = \Illuminate\Support\Facades\DB::table('pegawai')
-                        ->where('nik', $approved['nik'] ?? '')
-                        ->orWhere('id', $approved['pegawai_id'] ?? 0)
-                        ->first();
+        // Update langsung di tabel gaji_13 di database Supabase
+        try {
+            $dbStatus = ($nextStatus === 'terbit') ? 'DITERBITKAN' : $nextStatus;
+            \Illuminate\Support\Facades\DB::table('gaji_13')
+                ->where('id', $id)
+                ->update([
+                    'status' => $dbStatus,
+                    'disetujui_oleh' => $approverNama,
+                    'tanggal_cair' => now()->toDateString(),
+                    'updated_at' => now(),
+                ]);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('DB gaji_13 update status failed: ' . $e->getMessage());
+        }
 
-                    if ($pegawai) {
-                        \Illuminate\Support\Facades\DB::table('gaji_13')->updateOrInsert(
-                            [
-                                'pegawai_id' => $pegawai->id,
-                                'tahun' => (int) ($approved['tahun'] ?? now()->year),
-                            ],
-                            [
-                                'jumlah' => (float) ($approved['gaji13_diterima'] ?? $approved['jumlah'] ?? 4500000),
-                                'status' => 'DITERBITKAN',
-                                'tanggal_cair' => now()->toDateString(),
-                                'updated_at' => now(),
-                            ]
-                        );
-                    }
-                } catch (\Throwable $e) {
-                    // Fallback
+        // Update juga di file lokal
+        $localData = $this->getLocalData();
+        if (! empty($localData)) {
+            $updated = collect($localData)->map(function ($r) use ($id, $nextStatus, $approverNama) {
+                if ((int) ($r['id'] ?? 0) === $id) {
+                    $r['status'] = $nextStatus;
+                    $r['disetujui_oleh'] = $approverNama;
                 }
+                return $r;
+            })->all();
+            $this->save($updated);
+        }
 
-                return $approved;
-            }
-
-            return $r;
-        })->all();
-
-        $this->save($data);
-
-        return redirect()->back()->with('success', 'Gaji 13 berhasil disetujui ke tahap berikutnya dan tersinkronisasi ke database.');
+        return redirect()->back()->with('success', 'Gaji 13 berhasil disetujui dan tersimpan di database.');
     }
 
     public function destroy(int $id)
@@ -439,10 +490,19 @@ class GajiTigabelasController extends Controller
         abort_if(! $gaji13, 404);
         abort_if($gaji13['status'] === 'terbit', 400, 'Gaji 13 yang sudah terbit tidak bisa dihapus.');
 
-        $data = collect($this->all())->reject(fn ($row) => $row['id'] === $id)->values()->all();
-        $this->save($data);
+        try {
+            \Illuminate\Support\Facades\DB::table('gaji_13')->where('id', $id)->delete();
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('DB gaji_13 delete failed: ' . $e->getMessage());
+        }
 
-        return redirect()->route('gaji-tigabelas.index')->with('success', 'Draft Gaji 13 berhasil dihapus.');
+        $localData = $this->getLocalData();
+        if (! empty($localData)) {
+            $filtered = collect($localData)->reject(fn ($row) => (int)($row['id'] ?? 0) === $id)->values()->all();
+            $this->save($filtered);
+        }
+
+        return redirect()->route('gaji-tigabelas.index')->with('success', 'Draft Gaji 13 berhasil dihapus dari database.');
     }
 
     protected function validateData(Request $request): array

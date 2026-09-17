@@ -103,14 +103,39 @@ class UserAksesController extends Controller
 
     protected function all(): array
     {
-        $this->seedIfEmpty();
+        try {
+            $dbPegawai = \Illuminate\Support\Facades\DB::table('pegawai')
+                ->select('id', 'nik', 'name', 'jabatan', 'role')
+                ->orderBy('name')
+                ->get();
+
+            if ($dbPegawai->isNotEmpty()) {
+                $users = [];
+                $index = 1;
+                foreach ($dbPegawai as $p) {
+                    $roleLower = strtolower($p->role ?? '');
+                    $userlevel = match ($roleLower) {
+                        'direktur' => '7',
+                        'sdm', 'admin' => '1',
+                        'keuangan', 'keu' => '2',
+                        default => '5',
+                    };
+                    $users[] = [
+                        'id' => $index++,
+                        'db_id' => $p->id,
+                        'username' => (string) $p->nik,
+                        'password' => $this->defaultPasswords[$p->nik] ?? 'password',
+                        'nama' => $p->name ?? 'Pegawai',
+                        'userlevel' => $userlevel,
+                    ];
+                }
+                return $users;
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('DB userakses read failed: ' . $e->getMessage());
+        }
 
         return session('dummy_userakses', []);
-    }
-
-    protected function save(array $data): void
-    {
-        session()->put('dummy_userakses', $data);
     }
 
     public function index()
@@ -137,20 +162,25 @@ class UserAksesController extends Controller
             'userlevel' => 'required|string',
         ]);
 
-        // Validasi username unik manual (tidak pakai Rule::unique karena data di session, bukan DB).
-        $sudahAda = collect($this->all())->contains('username', $validated['username']);
-        if ($sudahAda) {
-            return back()->withErrors(['username' => 'Username (NIK) ini sudah dipakai akun lain.'])->withInput();
+        $dbRole = match ($validated['userlevel']) {
+            '1' => 'sdm',
+            '2' => 'keuangan',
+            '7' => 'direktur',
+            default => 'pegawai',
+        };
+
+        try {
+            \Illuminate\Support\Facades\DB::table('pegawai')
+                ->where('nik', $validated['username'])
+                ->update(['role' => $dbRole]);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('DB userakses update role failed: ' . $e->getMessage());
         }
 
-        $data = $this->all();
-        $newId = $data ? max(array_column($data, 'id')) + 1 : 1;
-        $validated['id'] = $newId;
+        \Illuminate\Support\Facades\Cache::forget('pegawai_master_cache');
+        \Illuminate\Support\Facades\Cache::forget('simpeg_all_pegawai_list');
 
-        $data[] = $validated;
-        $this->save($data);
-
-        return redirect()->route('user-akses.index')->with('success', 'Akun pengguna berhasil ditambahkan.');
+        return redirect()->route('user-akses.index')->with('success', 'Akun pengguna berhasil ditambahkan/diperbarui di database.');
     }
 
     public function edit(int $id)
@@ -173,35 +203,41 @@ class UserAksesController extends Controller
             'userlevel' => 'required|string',
         ]);
 
-        $sudahAda = collect($this->all())->contains(fn ($u) => $u['username'] === $validated['username'] && $u['id'] !== $id);
-        if ($sudahAda) {
-            return back()->withErrors(['username' => 'Username (NIK) ini sudah dipakai akun lain.'])->withInput();
+        $dbRole = match ($validated['userlevel']) {
+            '1' => 'sdm',
+            '2' => 'keuangan',
+            '7' => 'direktur',
+            default => 'pegawai',
+        };
+
+        try {
+            \Illuminate\Support\Facades\DB::table('pegawai')
+                ->where('nik', $validated['username'])
+                ->update(['role' => $dbRole]);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('DB userakses update role failed: ' . $e->getMessage());
         }
 
-        $data = collect($this->all())->map(function ($u) use ($id, $validated) {
-            if ($u['id'] === $id) {
-                // Password opsional saat edit - kosongkan berarti tetap pakai yang lama.
-                if (empty($validated['password'])) {
-                    $validated['password'] = $u['password'];
-                }
-                $validated['id'] = $id;
+        \Illuminate\Support\Facades\Cache::forget('pegawai_master_cache');
+        \Illuminate\Support\Facades\Cache::forget('simpeg_all_pegawai_list');
 
-                return $validated;
-            }
-
-            return $u;
-        })->all();
-
-        $this->save($data);
-
-        return redirect()->route('user-akses.index')->with('success', 'Akun pengguna berhasil diperbarui.');
+        return redirect()->route('user-akses.index')->with('success', 'Hak akses akun berhasil diperbarui di database.');
     }
 
     public function destroy(int $id)
     {
-        $data = collect($this->all())->reject(fn ($u) => $u['id'] === $id)->values()->all();
-        $this->save($data);
+        $user = collect($this->all())->firstWhere('id', $id);
+        if ($user) {
+            try {
+                \Illuminate\Support\Facades\DB::table('pegawai')
+                    ->where('nik', $user['username'])
+                    ->update(['role' => 'pegawai']);
+            } catch (\Throwable $e) {}
+        }
 
-        return redirect()->route('user-akses.index')->with('success', 'Akun pengguna berhasil dihapus.');
+        \Illuminate\Support\Facades\Cache::forget('pegawai_master_cache');
+        \Illuminate\Support\Facades\Cache::forget('simpeg_all_pegawai_list');
+
+        return redirect()->route('user-akses.index')->with('success', 'Hak akses akun berhasil direset ke Pegawai biasa.');
     }
 }

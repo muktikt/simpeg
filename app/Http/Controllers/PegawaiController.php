@@ -131,23 +131,40 @@ class PegawaiController extends Controller
                 } catch (\Throwable $e) {}
             }
 
-            if (! isset($pegawai['surat_kerja'])) {
-                $pegawai['surat_kerja'] = [
-                    'nomor' => 'SK/SDM/2024/001',
-                    'judul' => 'Surat Keputusan Pengangkatan Pegawai Tetap',
-                    'tgl_terbit' => '2024-01-15',
-                    'file_name' => 'SK_Pengangkatan_Pegawai.pdf',
-                    'file_url' => '#',
-                ];
-            }
-            if (! isset($pegawai['surat_diklat'])) {
-                $pegawai['surat_diklat'] = [
-                    'nomor' => 'STP/SDM/2024/088',
-                    'judul' => 'Sertifikat Diklat & Pelatihan Manajemen Kepegawaian',
-                    'tgl_terbit' => '2024-05-20',
-                    'file_name' => 'Sertifikat_Diklat_SDM.pdf',
-                    'file_url' => '#',
-                ];
+            // Muat dokumen resmi riil dari database (tabel dokumen_pegawai)
+            if (!empty($pegawai['db_id'])) {
+                try {
+                    $docs = \Illuminate\Support\Facades\DB::table('dokumen_pegawai')
+                        ->where('pegawai_id', $pegawai['db_id'])
+                        ->get();
+
+                    $skDoc = $docs->first(fn ($d) => in_array(strtolower($d->kategori ?? ''), ['sk', 'surat_kerja'], true));
+                    $diklatDoc = $docs->first(fn ($d) => in_array(strtolower($d->kategori ?? ''), ['diklat', 'surat_diklat'], true));
+
+                    $pegawai['surat_kerja'] = $skDoc ? [
+                        'id' => $skDoc->id,
+                        'nomor' => $skDoc->nomor,
+                        'judul' => $skDoc->judul,
+                        'tgl_terbit' => !empty($skDoc->created_at) ? substr((string)$skDoc->created_at, 0, 10) : null,
+                        'file_name' => $skDoc->file_nama,
+                        'file_url' => $skDoc->file_url ?: '#',
+                    ] : null;
+
+                    $pegawai['surat_diklat'] = $diklatDoc ? [
+                        'id' => $diklatDoc->id,
+                        'nomor' => $diklatDoc->nomor,
+                        'judul' => $diklatDoc->judul,
+                        'tgl_terbit' => !empty($diklatDoc->created_at) ? substr((string)$diklatDoc->created_at, 0, 10) : null,
+                        'file_name' => $diklatDoc->file_nama,
+                        'file_url' => $diklatDoc->file_url ?: '#',
+                    ] : null;
+                } catch (\Throwable $e) {
+                    $pegawai['surat_kerja'] = null;
+                    $pegawai['surat_diklat'] = null;
+                }
+            } else {
+                $pegawai['surat_kerja'] = null;
+                $pegawai['surat_diklat'] = null;
             }
         }
         return $pegawai;
@@ -182,36 +199,33 @@ class PegawaiController extends Controller
     {
         $validated = $this->validateData($request);
 
-        $data = $this->all();
+        $newUuid = (string) Str::uuid();
 
-        $newId = $data ? max(array_column($data, 'id')) + 1 : 1;
-
-        $validated['id'] = $newId;
-        $validated['keluarga'] = [];
-        $validated['golongan'] = [];
-        $validated['jabatan_riwayat'] = [];
-        $validated['pendidikan'] = [];
-        $validated['prestasi'] = [];
-
-        $data[] = $validated;
-        $this->save($data);
-
-        // Auto-sync ke user-akses agar bisa langsung di-set role/akses di Web
-        $userAkses = session('dummy_userakses', []);
-        $alreadyInUa = collect($userAkses)->contains('username', $validated['nik']);
-        if (! $alreadyInUa) {
-            $maxUaId = $userAkses ? max(array_column($userAkses, 'id')) + 1 : 1;
-            $userAkses[] = [
-                'id' => $maxUaId,
-                'username' => $validated['nik'],
-                'password' => 'password',
-                'nama' => $validated['nama'],
-                'userlevel' => '5',
-            ];
-            session()->put('dummy_userakses', $userAkses);
+        // 1. Simpan ke database Supabase PostgreSQL
+        try {
+            \Illuminate\Support\Facades\DB::table('pegawai')->insert([
+                'id' => $newUuid,
+                'nik' => $validated['nik'],
+                'name' => $validated['nama'],
+                'jabatan' => $validated['jabatan'],
+                'unit_kerja' => $validated['unit_kerja'],
+                'status' => $validated['status_peg'],
+                'no_telp' => $validated['telp'] ?? null,
+                'alamat' => $validated['alamat'] ?? null,
+                'role' => 'pegawai',
+                'created_at' => now(),
+            ]);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('DB pegawai insert failed: ' . $e->getMessage());
         }
 
-        return redirect()->route('pegawai.index')->with('success', 'Data pegawai "'.$validated['nama'].'" berhasil ditambahkan.');
+        // 2. Bersihkan cache agar segera terupdate di seluruh laptop dan aplikasi mobile
+        static::$memoryCache = null;
+        \Illuminate\Support\Facades\Cache::forget('simpeg_all_pegawai_list');
+        \Illuminate\Support\Facades\Cache::forget('simpeg_dashboard_stats');
+        \Illuminate\Support\Facades\Cache::forget('pegawai_master_cache');
+
+        return redirect()->route('pegawai.index')->with('success', 'Data pegawai "'.$validated['nama'].'" berhasil ditambahkan ke database.');
     }
 
     public function show(int $id)
@@ -245,27 +259,54 @@ class PegawaiController extends Controller
     public function update(Request $request, int $id)
     {
         $validated = $this->validateData($request, $id);
+        $pegawai = $this->find($id);
+        abort_if(! $pegawai, 404);
 
-        $data = collect($this->all())->map(function ($p) use ($id, $validated) {
-            if ($p['id'] === $id) {
-                return array_merge($p, $validated);
+        $dbId = $pegawai['db_id'] ?? null;
+        if ($dbId) {
+            try {
+                \Illuminate\Support\Facades\DB::table('pegawai')->where('id', $dbId)->update([
+                    'nik' => $validated['nik'],
+                    'name' => $validated['nama'],
+                    'jabatan' => $validated['jabatan'],
+                    'unit_kerja' => $validated['unit_kerja'],
+                    'status' => $validated['status_peg'],
+                    'no_telp' => $validated['telp'] ?? null,
+                    'alamat' => $validated['alamat'] ?? null,
+                ]);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('DB pegawai update failed: ' . $e->getMessage());
             }
+        }
 
-            return $p;
-        })->all();
+        static::$memoryCache = null;
+        \Illuminate\Support\Facades\Cache::forget('simpeg_all_pegawai_list');
+        \Illuminate\Support\Facades\Cache::forget('simpeg_dashboard_stats');
+        \Illuminate\Support\Facades\Cache::forget('pegawai_master_cache');
 
-        $this->save($data);
-
-        return redirect()->route('pegawai.show', $id)->with('success', 'Data pegawai berhasil diperbarui.');
+        return redirect()->route('pegawai.show', $id)->with('success', 'Data pegawai berhasil diperbarui di database.');
     }
 
     public function destroy(int $id)
     {
-        $data = collect($this->all())->reject(fn ($p) => $p['id'] === $id)->values()->all();
+        $pegawai = $this->find($id);
+        abort_if(! $pegawai, 404);
 
-        $this->save($data);
+        $dbId = $pegawai['db_id'] ?? null;
+        if ($dbId) {
+            try {
+                \Illuminate\Support\Facades\DB::table('pegawai')->where('id', $dbId)->delete();
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('DB pegawai delete failed: ' . $e->getMessage());
+            }
+        }
 
-        return redirect()->route('pegawai.index')->with('success', 'Data pegawai berhasil dihapus.');
+        static::$memoryCache = null;
+        \Illuminate\Support\Facades\Cache::forget('simpeg_all_pegawai_list');
+        \Illuminate\Support\Facades\Cache::forget('simpeg_dashboard_stats');
+        \Illuminate\Support\Facades\Cache::forget('pegawai_master_cache');
+
+        return redirect()->route('pegawai.index')->with('success', 'Data pegawai berhasil dihapus dari database.');
     }
 
     /**
@@ -282,16 +323,20 @@ class PegawaiController extends Controller
             'nik_baru' => 'required|string|max:20',
         ]);
 
-        $data = collect($this->all())->map(function ($p) use ($id, $validated) {
-            if ($p['id'] === $id) {
-                $p['nik'] = $validated['nik_baru'];
-                $p['status_peg'] = 'PT';
-            }
+        $dbId = $pegawai['db_id'] ?? null;
+        if ($dbId) {
+            try {
+                \Illuminate\Support\Facades\DB::table('pegawai')->where('id', $dbId)->update([
+                    'nik' => $validated['nik_baru'],
+                    'status' => 'PT',
+                ]);
+            } catch (\Throwable $e) {}
+        }
 
-            return $p;
-        })->all();
-
-        $this->save($data);
+        static::$memoryCache = null;
+        \Illuminate\Support\Facades\Cache::forget('simpeg_all_pegawai_list');
+        \Illuminate\Support\Facades\Cache::forget('simpeg_dashboard_stats');
+        \Illuminate\Support\Facades\Cache::forget('pegawai_master_cache');
 
         return redirect()->route('pegawai.show', $id)->with('success', 'Pegawai berhasil diangkat menjadi Pegawai Tetap dengan NIK baru: '.$validated['nik_baru']);
     }

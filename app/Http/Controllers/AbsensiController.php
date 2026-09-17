@@ -22,11 +22,7 @@ class AbsensiController extends Controller
     protected function seedIfEmpty(): void
     {
         if (! session()->has('dummy_absensi')) {
-            session()->put('dummy_absensi', [
-                ['id' => 1, 'pegawai_id' => 1, 'bulan' => 7, 'tahun' => 2026, 'hari_kerja' => 23, 'hadir' => 22, 'sakit' => 1, 'izin' => 0, 'alpha' => 0, 'keterangan' => ''],
-                ['id' => 2, 'pegawai_id' => 2, 'bulan' => 7, 'tahun' => 2026, 'hari_kerja' => 23, 'hadir' => 20, 'sakit' => 0, 'izin' => 2, 'alpha' => 1, 'keterangan' => 'Izin keperluan keluarga'],
-                ['id' => 3, 'pegawai_id' => 3, 'bulan' => 7, 'tahun' => 2026, 'hari_kerja' => 23, 'hadir' => 23, 'sakit' => 0, 'izin' => 0, 'alpha' => 0, 'keterangan' => ''],
-            ]);
+            session()->put('dummy_absensi', []);
         }
     }
 

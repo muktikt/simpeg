@@ -257,22 +257,9 @@ class ApiPegawaiController extends Controller
 
         $payroll = DB::table('payroll')->where('pegawai_id', $pegawai->id)->orderByDesc('created_at')->first();
 
-        if (! $payroll) {
-            $payroll = [
-                'periode' => date('F Y'),
-                'gapok' => 4500000,
-                'tunjangan_jabatan' => 1200000,
-                'tunjangan_istri' => 450000,
-                'tunjangan_anak' => 200000,
-                'potongan_dapenma' => 150000,
-                'potongan_bank_bjb' => 200000,
-                'total_terima' => 6000000,
-            ];
-        }
-
         return response()->json([
             'success' => true,
-            'message' => 'Data slip gaji berhasil diambil',
+            'message' => $payroll ? 'Data slip gaji berhasil diambil' : 'Belum ada slip gaji yang diterbitkan.',
             'data' => [
                 'nik' => $pegawai->nik,
                 'nama' => $pegawai->name,
@@ -296,16 +283,11 @@ class ApiPegawaiController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Data slip THR berhasil diambil',
+            'message' => $thr ? 'Data slip THR berhasil diambil' : 'Belum ada slip THR yang diterbitkan.',
             'data' => [
                 'nik' => $pegawai->nik,
                 'nama' => $pegawai->name,
-                'thr' => $thr ?? [
-                    'tahun' => date('Y'),
-                    'gapok' => 4500000,
-                    'status' => 'DITERBITKAN',
-                    'tanggal_cair' => date('Y') . '-04-10',
-                ],
+                'thr' => $thr,
             ],
         ]);
     }
@@ -324,16 +306,11 @@ class ApiPegawaiController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Data Gaji 13 berhasil diambil',
+            'message' => $gaji13 ? 'Data Gaji 13 berhasil diambil' : 'Belum ada data Gaji 13 yang diterbitkan.',
             'data' => [
                 'nik' => $pegawai->nik,
                 'nama' => $pegawai->name,
-                'gaji_13' => $gaji13 ?? [
-                    'tahun' => date('Y'),
-                    'jumlah' => 4500000,
-                    'status' => 'DITERBITKAN',
-                    'tanggal_cair' => date('Y') . '-06-15',
-                ],
+                'gaji_13' => $gaji13,
             ],
         ]);
     }
@@ -352,15 +329,11 @@ class ApiPegawaiController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Data insentif berhasil diambil',
+            'message' => $insentif ? 'Data insentif berhasil diambil' : 'Belum ada data insentif.',
             'data' => [
                 'nik' => $pegawai->nik,
                 'nama' => $pegawai->name,
-                'insentif' => $insentif ?? [
-                    'periode' => date('F Y'),
-                    'judul' => 'Insentif Kinerja Bulanan',
-                    'insentif_jabatan' => 850000,
-                ],
+                'insentif' => $insentif,
             ],
         ]);
     }
