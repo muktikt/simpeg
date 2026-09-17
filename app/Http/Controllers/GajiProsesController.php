@@ -117,14 +117,12 @@ class GajiProsesController extends Controller
                 ->orderBy('payroll.id', 'desc')
                 ->get();
 
-            if ($rows->isNotEmpty()) {
-                return $rows->map(fn ($r) => $this->mapPayrollRowToGajiArray($r))->all();
-            }
+            return $rows->map(fn ($r) => $this->mapPayrollRowToGajiArray($r))->all();
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::warning('DB payroll read failed, fallback to local: ' . $e->getMessage());
         }
 
-        return $this->getLocalData();
+        return [];
     }
 
     public function save(array $data): void
@@ -281,7 +279,7 @@ class GajiProsesController extends Controller
             }
         } catch (\Throwable $e) {}
 
-        return collect($this->getLocalData())->first(fn ($r) => (string)($r['id'] ?? '') === (string)$id);
+        return null;
     }
 
     protected function pegawaiList(): array

@@ -131,11 +131,12 @@ class UserAksesController extends Controller
                 }
                 return $users;
             }
+            return [];
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::warning('DB userakses read failed: ' . $e->getMessage());
         }
 
-        return session('dummy_userakses', []);
+        return [];
     }
 
     public function index()

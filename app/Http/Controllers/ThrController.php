@@ -111,14 +111,12 @@ class ThrController extends Controller
                 ->orderBy('thr.id', 'desc')
                 ->get();
 
-            if ($rows->isNotEmpty()) {
-                return $rows->map(fn ($r) => $this->mapThrRowToThrArray($r))->all();
-            }
+            return $rows->map(fn ($r) => $this->mapThrRowToThrArray($r))->all();
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::warning('DB thr read failed: ' . $e->getMessage());
         }
 
-        return $this->getLocalData();
+        return [];
     }
 
     public function save(array $data): void

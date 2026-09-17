@@ -118,14 +118,12 @@ class GajiTigabelasController extends Controller
                 ->orderBy('gaji_13.id', 'desc')
                 ->get();
 
-            if ($rows->isNotEmpty()) {
-                return $rows->map(fn ($r) => $this->mapGaji13RowToArray($r))->all();
-            }
+            return $rows->map(fn ($r) => $this->mapGaji13RowToArray($r))->all();
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::warning('DB gaji_13 read failed: ' . $e->getMessage());
         }
 
-        return $this->getLocalData();
+        return [];
     }
 
     public function save(array $data): void
@@ -171,7 +169,7 @@ class GajiTigabelasController extends Controller
             'tahun' => (int) ($r->tahun ?? now()->year),
             'status' => $status,
             'disetujui_oleh' => $r->disetujui_oleh ?? null,
-            'gapok' => $jumlah > 0 ? $jumlah : 4500000,
+            'gapok' => $jumlah > 0 ? $jumlah : 0,
             'total_pendapatan' => $totalPendapatan > 0 ? $totalPendapatan : $jumlah,
             'total_potongan_pendapatan' => $totalPotongan,
             'total_potongan_non_pendapatan' => 0,
