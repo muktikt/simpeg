@@ -89,15 +89,7 @@ class GajiProsesController extends Controller
         return storage_path('app/gaji_proses.json');
     }
 
-    protected function seedIfEmpty(): void
-    {
-        $file = $this->storageFile();
-        if (! file_exists($file)) {
-            @file_put_contents($file, json_encode([], JSON_PRETTY_PRINT));
-        }
-    }
-
-    public function all(): array
+    protected function getLocalData(): array
     {
         $file = $this->storageFile();
         if (file_exists($file)) {
@@ -106,8 +98,33 @@ class GajiProsesController extends Controller
                 return $data;
             }
         }
-
         return session('dummy_gaji_proses', []);
+    }
+
+    public function all(): array
+    {
+        try {
+            $rows = \Illuminate\Support\Facades\DB::table('payroll')
+                ->leftJoin('pegawai', 'payroll.pegawai_id', '=', 'pegawai.id')
+                ->select(
+                    'payroll.*',
+                    'pegawai.nik as p_nik',
+                    'pegawai.name as p_name',
+                    'pegawai.jabatan as p_jabatan',
+                    'pegawai.unit_kerja as p_unit_kerja',
+                    'pegawai.golongan as p_golongan'
+                )
+                ->orderBy('payroll.id', 'desc')
+                ->get();
+
+            if ($rows->isNotEmpty()) {
+                return $rows->map(fn ($r) => $this->mapPayrollRowToGajiArray($r))->all();
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('DB payroll read failed, fallback to local: ' . $e->getMessage());
+        }
+
+        return $this->getLocalData();
     }
 
     public function save(array $data): void
@@ -116,6 +133,155 @@ class GajiProsesController extends Controller
         $clean = array_values($data);
         @file_put_contents($file, json_encode($clean, JSON_PRETTY_PRINT));
         session()->put('dummy_gaji_proses', $clean);
+    }
+
+    protected function mapPayrollRowToGajiArray(object $r): array
+    {
+        $status = strtolower($r->status ?? 'draft');
+        if ($status === 'diterbitkan') {
+            $status = 'terbit';
+        }
+
+        $nik = (string) ($r->p_nik ?? $r->nik ?? '');
+        $nama = (string) ($r->p_name ?? $r->nama ?? '');
+
+        if (empty($nik) || empty($nama)) {
+            $p = $this->pegawaiById($r->pegawai_id);
+            if ($p) {
+                $nik = $p['nik'] ?? $nik;
+                $nama = $p['nama'] ?? $nama;
+            }
+        }
+
+        $totalPendapatan = (float) ($r->total_pendapatan ?? 0);
+        $totalPotongan = (float) ($r->total_potongan ?? 0);
+        $gajiBersih = (float) ($r->gaji_bersih ?? 0);
+
+        if ($totalPendapatan <= 0) {
+            $totalPendapatan = (float) ($r->gapok ?? 0)
+                + (float) ($r->tunjangan_istri ?? 0)
+                + (float) ($r->tunjangan_anak ?? 0)
+                + (float) ($r->tunjangan_prestasi ?? 0)
+                + (float) ($r->tunjangan_jabatan ?? 0)
+                + (float) ($r->tunjangan_transportasi ?? 0)
+                + (float) ($r->tunjangan_pangan ?? 0)
+                + (float) ($r->tunjangan_bpjs_tenaga_kerja ?? 0)
+                + (float) ($r->tunjangan_perumahan ?? 0)
+                + (float) ($r->tunjangan_perusahaan ?? 0)
+                + (float) ($r->tunjangan_air_minum ?? 0)
+                + (float) ($r->tunjangan_bpjs_kesehatan ?? 0)
+                + (float) ($r->tunjangan_komunikasi ?? 0)
+                + (float) ($r->tunjangan_pajak ?? 0)
+                + (float) ($r->lembur ?? 0);
+        }
+
+        if ($totalPotongan <= 0) {
+            $totalPotongan = (float) ($r->potongan_sanksi_perusahaan ?? 0)
+                + (float) ($r->potongan_dapenma ?? 0)
+                + (float) ($r->potongan_bpjs_tenaga_kerja ?? 0)
+                + (float) ($r->potongan_bpjs_kesehatan ?? 0)
+                + (float) ($r->potongan_perumahan ?? 0)
+                + (float) ($r->potongan_pajak ?? 0)
+                + (float) ($r->potongan_korpri ?? 0)
+                + (float) ($r->potongan_tunjangan_perusahaan ?? 0)
+                + (float) ($r->potongan_trandist_pmi_lain ?? 0)
+                + (float) ($r->potongan_koperasi ?? 0)
+                + (float) ($r->potongan_darma_wanita ?? 0)
+                + (float) ($r->potongan_rekening_air_minum ?? 0)
+                + (float) ($r->potongan_kas ?? 0)
+                + (float) ($r->potongan_bank_bjb ?? 0)
+                + (float) ($r->potongan_bank_bjbs ?? 0)
+                + (float) ($r->potongan_asuransi ?? 0)
+                + (float) ($r->potongan_bank_btn ?? 0)
+                + (float) ($r->potongan_bank_bpr ?? 0)
+                + (float) ($r->potongan_zakat_profesi ?? 0);
+        }
+
+        if ($gajiBersih <= 0) {
+            $gajiBersih = $totalPendapatan - $totalPotongan;
+        }
+
+        return [
+            'id' => $r->id,
+            'pegawai_id' => $r->pegawai_id,
+            'nik' => $nik,
+            'nama' => $nama,
+            'jabatan' => (string) ($r->p_jabatan ?? $r->jabatan ?? 'Pegawai'),
+            'unit_kerja' => (string) ($r->p_unit_kerja ?? $r->unit_kerja ?? 'Kantor Pusat'),
+            'golongan' => (string) ($r->p_golongan ?? $r->golongan ?? 'III/a'),
+            'kategori' => (string) ($r->kategori ?? 'satuan'),
+            'kode_ptkp' => (string) ($r->kode_ptkp ?? 'K1'),
+            'bulan' => (int) ($r->bulan ?? now()->month),
+            'tahun' => (int) ($r->tahun ?? now()->year),
+            'status' => $status,
+            'disetujui_oleh' => (string) ($r->disetujui_oleh ?? ''),
+
+            // Komponen Pendapatan
+            'gapok' => (float) ($r->gapok ?? 0),
+            'tunjangan_istri' => (float) ($r->tunjangan_istri ?? 0),
+            'tunjangan_anak' => (float) ($r->tunjangan_anak ?? 0),
+            'tunjangan_prestasi' => (float) ($r->tunjangan_prestasi ?? 0),
+            'tunjangan_jabatan' => (float) ($r->tunjangan_jabatan ?? 0),
+            'tunjangan_transport' => (float) ($r->tunjangan_transportasi ?? $r->tunjangan_transport ?? 0),
+            'tunjangan_pangan' => (float) ($r->tunjangan_pangan ?? 0),
+            'tunjangan_bpjstk' => (float) ($r->tunjangan_bpjs_tenaga_kerja ?? $r->tunjangan_bpjstk ?? 0),
+            'tunjangan_perumahan' => (float) ($r->tunjangan_perumahan ?? 0),
+            'tunjangan_perusahaan' => (float) ($r->tunjangan_perusahaan ?? 0),
+            'tunjangan_airminum' => (float) ($r->tunjangan_air_minum ?? $r->tunjangan_airminum ?? 0),
+            'tunjangan_bpjskes' => (float) ($r->tunjangan_bpjs_kesehatan ?? $r->tunjangan_bpjskes ?? 0),
+            'tunjangan_komunikasi' => (float) ($r->tunjangan_komunikasi ?? 0),
+            'tunjangan_pajak' => (float) ($r->tunjangan_pajak ?? 0),
+            'lembur' => (float) ($r->lembur ?? 0),
+
+            // Komponen Potongan
+            'potongan_sanksi' => (float) ($r->potongan_sanksi_perusahaan ?? $r->potongan_sanksi ?? 0),
+            'potongan_dapenma' => (float) ($r->potongan_dapenma ?? 0),
+            'potongan_bpjstk' => (float) ($r->potongan_bpjs_tenaga_kerja ?? $r->potongan_bpjstk ?? 0),
+            'potongan_bpjskes' => (float) ($r->potongan_bpjs_kesehatan ?? $r->potongan_bpjskes ?? 0),
+            'potongan_perumahan' => (float) ($r->potongan_perumahan ?? 0),
+            'potongan_pajak' => (float) ($r->potongan_pajak ?? 0),
+            'potongan_korpri' => (float) ($r->potongan_korpri ?? 0),
+            'potongan_tperusahaan' => (float) ($r->potongan_tunjangan_perusahaan ?? $r->potongan_tperusahaan ?? 0),
+            'potongan_lain' => (float) ($r->potongan_trandist_pmi_lain ?? $r->potongan_lain ?? 0),
+            'potongan_koperasi' => (float) ($r->potongan_koperasi ?? 0),
+            'potongan_darmawanita' => (float) ($r->potongan_darma_wanita ?? $r->potongan_darmawanita ?? 0),
+            'potongan_ledeng' => (float) ($r->potongan_rekening_air_minum ?? $r->potongan_ledeng ?? 0),
+            'potongan_kas' => (float) ($r->potongan_kas ?? 0),
+            'potongan_bjb' => (float) ($r->potongan_bank_bjb ?? $r->potongan_bjb ?? 0),
+            'potongan_bjbs' => (float) ($r->potongan_bank_bjbs ?? $r->potongan_bjbs ?? 0),
+            'potongan_asuransi' => (float) ($r->potongan_asuransi ?? 0),
+            'potongan_btn' => (float) ($r->potongan_bank_btn ?? $r->potongan_btn ?? 0),
+            'potongan_bpr' => (float) ($r->potongan_bank_bpr ?? $r->potongan_bpr ?? 0),
+            'potongan_zakat' => (float) ($r->potongan_zakat_profesi ?? $r->potongan_zakat ?? 0),
+
+            'total_pendapatan' => $totalPendapatan,
+            'total_potongan' => $totalPotongan,
+            'gaji_bersih' => $gajiBersih,
+        ];
+    }
+
+    public function findItem(mixed $id): ?array
+    {
+        try {
+            $row = \Illuminate\Support\Facades\DB::table('payroll')
+                ->leftJoin('pegawai', 'payroll.pegawai_id', '=', 'pegawai.id')
+                ->select(
+                    'payroll.*',
+                    'pegawai.nik as p_nik',
+                    'pegawai.name as p_name',
+                    'pegawai.jabatan as p_jabatan',
+                    'pegawai.unit_kerja as p_unit_kerja',
+                    'pegawai.golongan as p_golongan'
+                )
+                ->where('payroll.id', $id)
+                ->first();
+
+            if ($row) {
+                return $this->mapPayrollRowToGajiArray($row);
+            }
+        } catch (\Throwable $e) {}
+
+        return collect($this->getLocalData())->first(fn ($r) => (string)($r['id'] ?? '') === (string)$id);
     }
 
     protected function pegawaiList(): array
@@ -261,177 +427,92 @@ class GajiProsesController extends Controller
         $validated['gaji_bersih'] = $totalPendapatan - $totalPotongan;
         $validated['status'] = 'draft';
 
-        $data = $this->all();
-        $newId = $data ? max(array_column($data, 'id')) + 1 : 1;
-        $validated['id'] = $newId;
+        // Cari UUID pegawai di DB Supabase
+        $dbPegawaiId = $pegawai['db_id'] ?? null;
+        if (! $dbPegawaiId && ! empty($validated['nik'])) {
+            $dbPegawaiId = \Illuminate\Support\Facades\DB::table('pegawai')->where('nik', $validated['nik'])->value('id');
+        }
 
-        $data[] = $validated;
-        $this->save($data);
+        $bulanNama = AbsensiController::BULAN[$validated['bulan']] ?? 'Bulan ' . $validated['bulan'];
+        $periode = $bulanNama . ' ' . $validated['tahun'];
+
+        $insertedToDb = false;
+        if ($dbPegawaiId) {
+            try {
+                $newId = \Illuminate\Support\Facades\DB::table('payroll')->insertGetId([
+                    'pegawai_id' => $dbPegawaiId,
+                    'periode' => $periode,
+                    'tahun' => (int) $validated['tahun'],
+                    'bulan' => (int) $validated['bulan'],
+                    'status' => 'draft',
+                    'kategori' => $validated['kategori'],
+                    'kode_ptkp' => $validated['kode_ptkp'],
+                    'total_pendapatan' => (int) $totalPendapatan,
+                    'total_potongan' => (int) $totalPotongan,
+                    'gaji_bersih' => (int) ($totalPendapatan - $totalPotongan),
+
+                    // Komponen Pendapatan
+                    'gapok' => (int) ($validated['gapok'] ?? 0),
+                    'tunjangan_istri' => (int) ($validated['tunjangan_istri'] ?? 0),
+                    'tunjangan_anak' => (int) ($validated['tunjangan_anak'] ?? 0),
+                    'tunjangan_prestasi' => (int) ($validated['tunjangan_prestasi'] ?? 0),
+                    'tunjangan_jabatan' => (int) ($validated['tunjangan_jabatan'] ?? 0),
+                    'tunjangan_transportasi' => (int) ($validated['tunjangan_transport'] ?? 0),
+                    'tunjangan_pangan' => (int) ($validated['tunjangan_pangan'] ?? 0),
+                    'tunjangan_bpjs_tenaga_kerja' => (int) ($validated['tunjangan_bpjstk'] ?? 0),
+                    'tunjangan_perumahan' => (int) ($validated['tunjangan_perumahan'] ?? 0),
+                    'tunjangan_perusahaan' => (int) ($validated['tunjangan_perusahaan'] ?? 0),
+                    'tunjangan_air_minum' => (int) ($validated['tunjangan_airminum'] ?? 0),
+                    'tunjangan_bpjs_kesehatan' => (int) ($validated['tunjangan_bpjskes'] ?? 0),
+                    'tunjangan_komunikasi' => (int) ($validated['tunjangan_komunikasi'] ?? 0),
+                    'tunjangan_pajak' => (int) ($validated['tunjangan_pajak'] ?? 0),
+                    'lembur' => (int) ($validated['lembur'] ?? 0),
+
+                    // Komponen Potongan
+                    'potongan_sanksi_perusahaan' => (int) ($validated['potongan_sanksi'] ?? 0),
+                    'potongan_dapenma' => (int) ($validated['potongan_dapenma'] ?? 0),
+                    'potongan_bpjs_tenaga_kerja' => (int) ($validated['potongan_bpjstk'] ?? 0),
+                    'potongan_bpjs_kesehatan' => (int) ($validated['potongan_bpjskes'] ?? 0),
+                    'potongan_perumahan' => (int) ($validated['potongan_perumahan'] ?? 0),
+                    'potongan_pajak' => (int) ($validated['potongan_pajak'] ?? 0),
+                    'potongan_korpri' => (int) ($validated['potongan_korpri'] ?? 0),
+                    'potongan_tunjangan_perusahaan' => (int) ($validated['potongan_tperusahaan'] ?? 0),
+                    'potongan_trandist_pmi_lain' => (int) ($validated['potongan_lain'] ?? 0),
+                    'potongan_koperasi' => (int) ($validated['potongan_koperasi'] ?? 0),
+                    'potongan_darma_wanita' => (int) ($validated['potongan_darmawanita'] ?? 0),
+                    'potongan_rekening_air_minum' => (int) ($validated['potongan_ledeng'] ?? 0),
+                    'potongan_kas' => (int) ($validated['potongan_kas'] ?? 0),
+                    'potongan_bank_bjb' => (int) ($validated['potongan_bjb'] ?? 0),
+                    'potongan_bank_bjbs' => (int) ($validated['potongan_bjbs'] ?? 0),
+                    'potongan_asuransi' => (int) ($validated['potongan_asuransi'] ?? 0),
+                    'potongan_bank_btn' => (int) ($validated['potongan_btn'] ?? 0),
+                    'potongan_bank_bpr' => (int) ($validated['potongan_bpr'] ?? 0),
+                    'potongan_zakat_profesi' => (int) ($validated['potongan_zakat'] ?? 0),
+                ]);
+
+                $insertedToDb = true;
+                $validated['id'] = $newId;
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('DB payroll insert failed: ' . $e->getMessage());
+            }
+        }
+
+        // Simpan juga ke file lokal sebagai fallback
+        $localData = $this->getLocalData();
+        if (! $insertedToDb) {
+            $newId = $localData ? max(array_column($localData, 'id')) + 1 : 1;
+            $validated['id'] = $newId;
+        }
+        $localData[] = $validated;
+        $this->save($localData);
 
         return redirect()->route('gaji-proses.index', ['bulan' => $validated['bulan'], 'tahun' => $validated['tahun']])
-            ->with('success', 'Proses gaji untuk '.$validated['nama'].' berhasil disimpan sebagai draft.');
+            ->with('success', 'Proses gaji untuk '.$validated['nama'].' berhasil disimpan dan masuk ke antrean approval.');
     }
 
     public function show(mixed $id)
     {
-        $gaji = collect($this->all())->first(fn ($r) => (string)($r['id'] ?? '') === (string)$id);
-
-        if (! $gaji) {
-            try {
-                $pRow = \Illuminate\Support\Facades\DB::table('payroll')
-                    ->join('pegawai', 'payroll.pegawai_id', '=', 'pegawai.id')
-                    ->select('payroll.*', 'pegawai.nik', 'pegawai.nama', 'pegawai.jabatan', 'pegawai.unit_kerja', 'pegawai.golongan')
-                    ->where('payroll.id', $id)
-                    ->orWhere('pegawai.nik', $id)
-                    ->first();
-
-                if ($pRow) {
-                    $gapok = (float) ($pRow->gapok ?? 0);
-                    $tunjJabatan = (float) ($pRow->tunjangan_jabatan ?? 0);
-                    $tunjIstri = (float) ($pRow->tunjangan_istri ?? 0);
-                    $tunjAnak = (float) ($pRow->tunjangan_anak ?? 0);
-                    $tunjPerumahan = (float) ($pRow->tunjangan_perumahan ?? 0);
-                    $tunjBpjstk = (float) ($pRow->tunjangan_bpjstk ?? 0);
-                    $potDapenma = (float) ($pRow->potongan_dapenma ?? 0);
-                    $potBjbs = (float) ($pRow->potongan_bank_bjb ?? 0);
-                    $potBpjstk = (float) ($pRow->potongan_bpjstk ?? 0);
-                    $potPajak = (float) ($pRow->potongan_pajak ?? 0);
-
-                    $totalPendapatan = $gapok + $tunjJabatan + $tunjIstri + $tunjAnak + $tunjPerumahan + $tunjBpjstk;
-                    $totalPotongan = $potDapenma + $potBjbs + $potBpjstk + $potPajak;
-
-                    $gaji = [
-                        'id' => $pRow->id,
-                        'pegawai_id' => $pRow->pegawai_id,
-                        'nik' => $pRow->nik,
-                        'nama' => $pRow->nama,
-                        'jabatan' => $pRow->jabatan,
-                        'unit_kerja' => $pRow->unit_kerja ?? 'PDAM Tirta Darma Ayu',
-                        'golongan' => $pRow->golongan ?? 'III/a',
-                        'kategori' => 'satuan',
-                        'kode_ptkp' => 'K1',
-                        'bulan' => now()->month,
-                        'tahun' => now()->year,
-                        'status' => 'terbit',
-                        'gapok' => $gapok,
-                        'tunjangan_istri' => $tunjIstri,
-                        'tunjangan_anak' => $tunjAnak,
-                        'tunjangan_prestasi' => 0,
-                        'tunjangan_jabatan' => $tunjJabatan,
-                        'tunjangan_transport' => 0,
-                        'tunjangan_pangan' => 0,
-                        'tunjangan_bpjstk' => $tunjBpjstk,
-                        'tunjangan_perumahan' => $tunjPerumahan,
-                        'tunjangan_perusahaan' => 0,
-                        'tunjangan_airminum' => 0,
-                        'tunjangan_bpjskes' => 0,
-                        'tunjangan_komunikasi' => 0,
-                        'tunjangan_pajak' => 0,
-                        'lembur' => 0,
-                        'potongan_sanksi' => 0,
-                        'potongan_dapenma' => $potDapenma,
-                        'potongan_bpjstk' => $potBpjstk,
-                        'potongan_bpjskes' => 0,
-                        'potongan_perumahan' => 0,
-                        'potongan_pajak' => $potPajak,
-                        'potongan_korpri' => 0,
-                        'potongan_tperusahaan' => 0,
-                        'potongan_lain' => 0,
-                        'potongan_koperasi' => 0,
-                        'potongan_darmawanita' => 0,
-                        'potongan_ledeng' => 0,
-                        'potongan_kas' => 0,
-                        'potongan_bjb' => 0,
-                        'potongan_bjbs' => $potBjbs,
-                        'potongan_asuransi' => 0,
-                        'potongan_btn' => 0,
-                        'potongan_bpr' => 0,
-                        'potongan_zakat' => 0,
-                        'total_pendapatan' => $totalPendapatan,
-                        'total_potongan' => $totalPotongan,
-                        'gaji_bersih' => (float) ($pRow->total_terima ?? ($totalPendapatan - $totalPotongan)),
-                    ];
-                }
-            } catch (\Throwable $e) {}
-        }
-
-        if (! $gaji) {
-            $pegawai = $this->pegawaiById($id)
-                ?? collect($this->pegawaiList())->first(fn ($p) => (string)($p['nik'] ?? '') === (string)$id)
-                ?? collect($this->pegawaiList())->first(fn ($p) => (string)($p['id'] ?? '') === (string)(session('simpeg_user.id') ?? ''))
-                ?? collect($this->pegawaiList())->first(fn ($p) => (string)($p['nik'] ?? '') === (string)(session('simpeg_user.nik') ?? ''))
-                ?? collect($this->pegawaiList())->first();
-
-            if ($pegawai) {
-                $gapok = (float) ($pegawai['gaji_pokok'] ?? 4500000);
-                $tunjJabatan = 500000;
-                $tunjIstri = 200000;
-                $tunjAnak = 100000;
-                $tunjPerumahan = 150000;
-                $tunjBpjstk = 120000;
-                $potDapenma = 200000;
-                $potBjbs = 100000;
-                $potBpjstk = 120000;
-                $potPajak = 50000;
-
-                $totalPendapatan = $gapok + $tunjJabatan + $tunjIstri + $tunjAnak + $tunjPerumahan + $tunjBpjstk;
-                $totalPotongan = $potDapenma + $potBjbs + $potBpjstk + $potPajak;
-                $gajiBersih = $totalPendapatan - $totalPotongan;
-
-                $gaji = [
-                    'id' => $id,
-                    'pegawai_id' => $pegawai['id'],
-                    'nik' => $pegawai['nik'],
-                    'nama' => $pegawai['nama'],
-                    'jabatan' => $pegawai['jabatan'] ?? 'Staf Pegawai',
-                    'unit_kerja' => $pegawai['unit_kerja'] ?? 'PDAM Tirta Darma Ayu',
-                    'golongan' => $pegawai['golongan'] ?? 'III/a',
-                    'kategori' => 'satuan',
-                    'kode_ptkp' => 'K1',
-                    'bulan' => now()->month,
-                    'tahun' => now()->year,
-                    'status' => 'terbit',
-                    'gapok' => $gapok,
-                    'tunjangan_istri' => $tunjIstri,
-                    'tunjangan_anak' => $tunjAnak,
-                    'tunjangan_prestasi' => 0,
-                    'tunjangan_jabatan' => $tunjJabatan,
-                    'tunjangan_transport' => 0,
-                    'tunjangan_pangan' => 0,
-                    'tunjangan_bpjstk' => $tunjBpjstk,
-                    'tunjangan_perumahan' => $tunjPerumahan,
-                    'tunjangan_perusahaan' => 0,
-                    'tunjangan_airminum' => 0,
-                    'tunjangan_bpjskes' => 0,
-                    'tunjangan_komunikasi' => 0,
-                    'tunjangan_pajak' => 0,
-                    'lembur' => 0,
-                    'potongan_sanksi' => 0,
-                    'potongan_dapenma' => $potDapenma,
-                    'potongan_bpjstk' => $potBpjstk,
-                    'potongan_bpjskes' => 0,
-                    'potongan_perumahan' => 0,
-                    'potongan_pajak' => $potPajak,
-                    'potongan_korpri' => 0,
-                    'potongan_tperusahaan' => 0,
-                    'potongan_lain' => 0,
-                    'potongan_koperasi' => 0,
-                    'potongan_darmawanita' => 0,
-                    'potongan_ledeng' => 0,
-                    'potongan_kas' => 0,
-                    'potongan_bjb' => 0,
-                    'potongan_bjbs' => $potBjbs,
-                    'potongan_asuransi' => 0,
-                    'potongan_btn' => 0,
-                    'potongan_bpr' => 0,
-                    'potongan_zakat' => 0,
-                    'total_pendapatan' => $totalPendapatan,
-                    'total_potongan' => $totalPotongan,
-                    'gaji_bersih' => $gajiBersih,
-                ];
-            }
-        }
-
+        $gaji = $this->findItem($id);
         abort_if(! $gaji, 404);
 
         $gaji['bisa_approve'] = $this->canUserApprove($gaji['status'] ?? 'draft');
@@ -450,98 +531,70 @@ class GajiProsesController extends Controller
      */
     public function terbitkan(int $id)
     {
-        $data = $this->all();
-        $row = collect($data)->firstWhere('id', $id);
+        $row = $this->findItem($id);
         abort_if(! $row, 404);
         abort_unless($this->canUserApprove($row['status']), 403, 'Kamu tidak berhak menyetujui tahap ini.');
 
-        $data = collect($data)->map(function ($r) use ($id) {
-            if ($r['id'] === $id) {
-                $approved = $this->applyApproval($r);
+        $stage = $this->nextStageFor($row['status']);
+        $nextStatus = ($stage === 'dirut') ? 'terbit' : $stage;
+        $approverNama = session('simpeg_user.nama_peg', 'Admin');
 
-                // Sinkronisasi langsung ke tabel payroll di database Supabase
-                try {
-                    $pegawai = \Illuminate\Support\Facades\DB::table('pegawai')
-                        ->where('nik', $approved['nik'] ?? '')
-                        ->orWhere('id', $approved['pegawai_id'] ?? 0)
-                        ->first();
+        // Update langsung di tabel payroll di database Supabase
+        try {
+            $dbStatus = ($nextStatus === 'terbit') ? 'DITERBITKAN' : $nextStatus;
+            \Illuminate\Support\Facades\DB::table('payroll')
+                ->where('id', $id)
+                ->update([
+                    'status' => $dbStatus,
+                    'disetujui_oleh' => $approverNama,
+                    'updated_at' => now(),
+                ]);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('DB payroll update status failed: ' . $e->getMessage());
+        }
 
-                    if ($pegawai && ($approved['status'] ?? '') === 'terbit') {
-                        $bulanNama = AbsensiController::BULAN[$approved['bulan']] ?? 'Bulan ' . ($approved['bulan'] ?? 1);
-                        \Illuminate\Support\Facades\DB::table('payroll')->updateOrInsert(
-                            [
-                                'pegawai_id' => $pegawai->id,
-                                'periode' => $bulanNama . ' ' . ($approved['tahun'] ?? now()->year),
-                            ],
-                            [
-                                'tahun' => (int) ($approved['tahun'] ?? now()->year),
-                                'bulan' => (int) ($approved['bulan'] ?? now()->month),
-                                'status' => 'DITERBITKAN',
-                                // Komponen Pendapatan
-                                'gapok' => (int) ($approved['gapok'] ?? 0),
-                                'tunjangan_istri' => (int) ($approved['tunjangan_istri'] ?? 0),
-                                'tunjangan_anak' => (int) ($approved['tunjangan_anak'] ?? 0),
-                                'tunjangan_prestasi' => (int) ($approved['tunjangan_prestasi'] ?? 0),
-                                'tunjangan_jabatan' => (int) ($approved['tunjangan_jabatan'] ?? 0),
-                                'tunjangan_transportasi' => (int) ($approved['tunjangan_transport'] ?? 0),
-                                'tunjangan_pangan' => (int) ($approved['tunjangan_pangan'] ?? 0),
-                                'tunjangan_bpjs_kesehatan' => (int) ($approved['tunjangan_bpjskes'] ?? 0),
-                                'tunjangan_perumahan' => (int) ($approved['tunjangan_perumahan'] ?? 0),
-                                'tunjangan_bpjs_tenaga_kerja' => (int) ($approved['tunjangan_bpjstk'] ?? 0),
-                                'tunjangan_perusahaan' => (int) ($approved['tunjangan_perusahaan'] ?? 0),
-                                'lembur' => (int) ($approved['lembur'] ?? 0),
-                                'tunjangan_pajak' => (int) ($approved['tunjangan_pajak'] ?? 0),
-                                'tunjangan_air_minum' => (int) ($approved['tunjangan_airminum'] ?? 0),
-                                'tunjangan_komunikasi' => (int) ($approved['tunjangan_komunikasi'] ?? 0),
-                                // Komponen Potongan
-                                'potongan_sanksi_perusahaan' => (int) ($approved['potongan_sanksi'] ?? 0),
-                                'potongan_trandist_pmi_lain' => (int) ($approved['potongan_lain'] ?? 0),
-                                'potongan_dapenma' => (int) ($approved['potongan_dapenma'] ?? 0),
-                                'potongan_bpjs_tenaga_kerja' => (int) ($approved['potongan_bpjstk'] ?? 0),
-                                'potongan_perumahan' => (int) ($approved['potongan_perumahan'] ?? 0),
-                                'potongan_tunjangan_perusahaan' => (int) ($approved['potongan_tperusahaan'] ?? 0),
-                                'potongan_korpri' => (int) ($approved['potongan_korpri'] ?? 0),
-                                'potongan_pajak' => (int) ($approved['potongan_pajak'] ?? 0),
-                                'potongan_bpjs_kesehatan' => (int) ($approved['potongan_bpjskes'] ?? 0),
-                                'potongan_koperasi' => (int) ($approved['potongan_koperasi'] ?? 0),
-                                'potongan_darma_wanita' => (int) ($approved['potongan_darmawanita'] ?? 0),
-                                'potongan_rekening_air_minum' => (int) ($approved['potongan_ledeng'] ?? 0),
-                                'potongan_kas' => (int) ($approved['potongan_kas'] ?? 0),
-                                'potongan_bank_bjb' => (int) ($approved['potongan_bjb'] ?? 0),
-                                'potongan_bank_bjbs' => (int) ($approved['potongan_bjbs'] ?? 0),
-                                'potongan_bank_btn' => (int) ($approved['potongan_btn'] ?? 0),
-                                'potongan_bank_bpr' => (int) ($approved['potongan_bpr'] ?? 0),
-                                'potongan_asuransi' => (int) ($approved['potongan_asuransi'] ?? 0),
-                                'potongan_zakat_profesi' => (int) ($approved['potongan_zakat'] ?? 0),
-                            ]
-                        );
+        // Update juga di file lokal
+        $localData = $this->getLocalData();
+        if (! empty($localData)) {
+            $updated = collect($localData)->map(function ($r) use ($id, $nextStatus, $approverNama) {
+                if ((int) ($r['id'] ?? 0) === $id) {
+                    $r['status'] = $nextStatus;
+                    $r['disetujui_oleh'] = $approverNama;
+                    if ($nextStatus === 'terbit') {
+                        $r['tgl_terbit'] = now()->toDateString();
                     }
-                } catch (\Throwable $e) {
-                    // Fallback — tabel payroll mungkin belum punya semua kolom
                 }
+                return $r;
+            })->all();
+            $this->save($updated);
+        }
 
-                return $approved;
-            }
-
-            return $r;
-        })->all();
-
-        $this->save($data);
-
-        return redirect()->back()->with('success', 'Gaji berhasil disetujui ke tahap berikutnya dan tersinkronisasi ke database.');
+        $label = self::approvalStatusLabel($nextStatus);
+        return redirect()->back()->with('success', "Gaji berhasil disetujui ({$label}) dan tersimpan di database.");
     }
 
     public function destroy(Request $request, int $id)
     {
-        $gaji = collect($this->all())->firstWhere('id', $id);
-        abort_if(! $gaji, 404);
-        abort_if($gaji['status'] === 'terbit', 400, 'Gaji yang sudah terbit tidak bisa dihapus.');
+        $row = $this->findItem($id);
+        abort_if(! $row, 404);
+        abort_if($row['status'] === 'terbit', 400, 'Gaji yang sudah terbit tidak bisa dihapus.');
 
-        $bulan = $request->input('bulan', $request->query('bulan', $gaji['bulan'] ?? null));
-        $tahun = $request->input('tahun', $request->query('tahun', $gaji['tahun'] ?? null));
+        $bulan = $request->input('bulan', $request->query('bulan', $row['bulan'] ?? null));
+        $tahun = $request->input('tahun', $request->query('tahun', $row['tahun'] ?? null));
 
-        $data = collect($this->all())->reject(fn ($row) => $row['id'] === $id)->values()->all();
-        $this->save($data);
+        // Hapus dari tabel payroll Supabase
+        try {
+            \Illuminate\Support\Facades\DB::table('payroll')->where('id', $id)->delete();
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('DB payroll delete failed: ' . $e->getMessage());
+        }
+
+        // Hapus dari file lokal
+        $localData = $this->getLocalData();
+        if (! empty($localData)) {
+            $filtered = collect($localData)->reject(fn ($r) => (int)($r['id'] ?? 0) === $id)->values()->all();
+            $this->save($filtered);
+        }
 
         $params = array_filter(['bulan' => $bulan, 'tahun' => $tahun]);
 
