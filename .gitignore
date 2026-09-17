@@ -1,8 +1,9 @@
 *.log
 .DS_Store
-.env
-.env.backup
-.env.production
+# Semua env plaintext -- daftar eksplisit sebelumnya tidak mencakup `.env-prod`
+# (berisi kredensial DB Supabase produksi), jadi diperlebar jadi pola.
+.env*
+!.env.example
 .phpactor.json
 .phpunit.result.cache
 /.fleet

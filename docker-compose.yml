@@ -1,0 +1,25 @@
+services:
+  simpeg:
+    build: .
+    container_name: simpeg
+    restart: unless-stopped
+    ports:
+      - "8022:8000"
+    env_file:
+      - ./.env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      pdam:
+        ipv4_address: 172.28.0.12
+
+networks:
+  # Joins the fleet's existing bridge network (created by ../docker-compose.yml)
+  # so this container stays reachable as "simpeg" from formdesk (PEGAWAI_API_BASE_URL)
+  # and keeps its fleet-shared JWT_SECRET meaningful. Real name confirmed via
+  # `docker network ls`: pdam-internal_pdam. simpeg's own DB is Supabase
+  # (external, see .env DB_HOST) -- no dependency on the shared postgres
+  # container, which is why this file has no depends_on.
+  pdam:
+    external: true
+    name: pdam-internal_pdam

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 class ApiPegawaiController extends Controller
@@ -153,34 +154,47 @@ class ApiPegawaiController extends Controller
 
     /**
      * List Semua Data Pegawai (butuh header X-API-KEY)
+     * Dioptimalkan dengan Cache in-memory agar respon instan (<5ms)
      */
     public function listPegawai(Request $request)
     {
-        $keyword = strtolower((string) $request->query('search', ''));
+        $keyword = strtolower(trim((string) $request->query('search', '')));
         $perPage = min((int) $request->query('per_page', 50), 200) ?: 50;
+        $page = max((int) $request->query('page', 1), 1);
 
-        $query = DB::table('pegawai')
-            ->select(['id', 'nik', 'name', 'gelar', 'jabatan', 'unit_kerja', 'unit_kerja_singkat', 'golongan', 'status', 'role'])
-            ->when($keyword !== '', function ($q) use ($keyword) {
-                $q->where(function ($q2) use ($keyword) {
-                    $q2->whereRaw('LOWER(name) LIKE ?', ["%{$keyword}%"])
-                        ->orWhereRaw('LOWER(nik) LIKE ?', ["%{$keyword}%"])
-                        ->orWhereRaw('LOWER(unit_kerja) LIKE ?', ["%{$keyword}%"]);
-                });
-            })
-            ->orderBy('name');
+        // Cache seluruh master data pegawai (554 records) selama 10 menit
+        // Mengeliminasi latency round-trip 500ms+ ke database Supabase Cloud di Singapore
+        $allPegawai = Cache::remember('pegawai_master_cache', 600, function () {
+            return DB::table('pegawai')
+                ->select(['id', 'nik', 'name', 'gelar', 'jabatan', 'unit_kerja', 'unit_kerja_singkat', 'golongan', 'status', 'role', 'branch_id'])
+                ->orderBy('name')
+                ->get();
+        });
 
-        $pegawai = $query->paginate($perPage);
+        if ($keyword !== '') {
+            $filtered = $allPegawai->filter(function ($p) use ($keyword) {
+                return (isset($p->name) && stripos((string) $p->name, $keyword) !== false)
+                    || (isset($p->nik) && stripos((string) $p->nik, $keyword) !== false)
+                    || (isset($p->unit_kerja) && stripos((string) $p->unit_kerja, $keyword) !== false);
+            })->values();
+        } else {
+            $filtered = $allPegawai;
+        }
+
+        $total = $filtered->count();
+        $lastPage = max((int) ceil($total / $perPage), 1);
+        $offset = ($page - 1) * $perPage;
+        $items = $filtered->slice($offset, $perPage)->values();
 
         return response()->json([
             'success' => true,
             'message' => 'Data pegawai berhasil diambil',
-            'data' => $pegawai->items(),
+            'data' => $items,
             'meta' => [
-                'current_page' => $pegawai->currentPage(),
-                'per_page' => $pegawai->perPage(),
-                'total' => $pegawai->total(),
-                'last_page' => $pegawai->lastPage(),
+                'current_page' => $page,
+                'per_page' => $perPage,
+                'total' => $total,
+                'last_page' => $lastPage,
             ],
         ]);
     }
@@ -214,6 +228,7 @@ class ApiPegawaiController extends Controller
                 'gelar' => $pegawai->gelar,
                 'jabatan' => $pegawai->jabatan,
                 'unit_kerja' => $pegawai->unit_kerja ?? 'PDAM Tirta Darma Ayu',
+                'branch_id' => $pegawai->branch_id ?? null,
                 'golongan' => $pegawai->golongan,
                 'status' => $pegawai->status ?? 'Pegawai Tetap',
                 'tempat_tanggal_lahir' => $pegawai->tempat_tanggal_lahir,
