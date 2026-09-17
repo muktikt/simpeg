@@ -324,12 +324,24 @@ class GajiProsesController extends Controller
             default => 'K3',
         };
 
+        $potonganKeu = null;
+        if (! empty($pegawai['nik'])) {
+            try {
+                $potonganKeu = \Illuminate\Support\Facades\DB::table('potongan_keu')
+                    ->where('tipe', 'gaji')
+                    ->where('nik', $pegawai['nik'])
+                    ->orderByDesc('id')
+                    ->first();
+            } catch (\Throwable $e) {}
+        }
+
         return [
             'kawin' => $kawin,
             'jml_istri' => $jmlIstri,
             'jml_anak' => $jmlAnak,
             'jml_anak_pajak' => $jmlAnakPajak,
             'kode_ptkp' => $kodePtkp,
+            'potongan_keu' => $potonganKeu,
         ];
     }
 

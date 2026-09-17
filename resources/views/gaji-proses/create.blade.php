@@ -122,8 +122,32 @@ async function onPegawaiChange() {
         if (gapokField && tunjIstriField && data.kawin) {
             const gapok = parseFloat(gapokField.value) || 0;
             tunjIstriField.value = Math.round(gapok * 0.1);
-            hitungTotal();
         }
+
+        // Auto-isi Potongan dari Keuangan (Koperasi, Darmawanita, Ledeng, Kas, Bank, Zakat, dll)
+        if (data.potongan_keu) {
+            const pk = data.potongan_keu;
+            const mapFields = {
+                'potongan_koperasi': pk.pot_koperasi,
+                'potongan_darmawanita': pk.pot_darmawanita,
+                'potongan_ledeng': pk.pot_air,
+                'potongan_kas': pk.pot_kas,
+                'potongan_bjb': pk.pot_bjb,
+                'potongan_bjbs': pk.pot_bjbs,
+                'potongan_asuransi': pk.pot_asuransi,
+                'potongan_btn': pk.pot_btn,
+                'potongan_bpr': pk.pot_bpr,
+                'potongan_zakat': pk.pot_zakat_profesi,
+            };
+            for (const [fieldId, val] of Object.entries(mapFields)) {
+                const el = document.getElementById(fieldId);
+                if (el && val !== undefined && val !== null) {
+                    el.value = val;
+                }
+            }
+        }
+
+        hitungTotal();
     } catch (e) {
         info.value = 'Gagal menghitung data keluarga';
     }

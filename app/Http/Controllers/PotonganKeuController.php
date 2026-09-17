@@ -50,49 +50,20 @@ class PotonganKeuController extends Controller
         'pot_bpr'           => 'BPR',
     ];
 
-    protected function sessionKey(string $tipe): string
-    {
-        return "dummy_potongan_{$tipe}";
-    }
-
-    protected function seedIfEmpty(string $tipe): void
-    {
-        if (! session()->has($this->sessionKey($tipe))) {
-            $pegawaiList = $this->pegawaiList();
-            $seed = [];
-            foreach (array_slice($pegawaiList, 0, 4) as $idx => $p) {
-                $statusPilihan = ($idx === 0) ? 'kepegawaian' : (($idx === 1) ? 'Y' : 'N');
-                $row = [
-                    'id'            => $idx + 1,
-                    'tipe'          => $tipe,
-                    'tgl_potongan'  => now()->toDateString(),
-                    'nik'           => $p['nik'],
-                    'pegawai_id'    => $p['id'],
-                    'petugas_entri' => 'Admin Keuangan',
-                    'tgl_update'    => now()->toDateString(),
-                    'status'        => $statusPilihan,
-                    'disetujui_kepegawaian_oleh' => ($statusPilihan !== 'N') ? 'SDM/Kepegawaian' : null,
-                    'tgl_setuju_kepegawaian'    => ($statusPilihan !== 'N') ? now()->format('d/m/Y H:i') : null,
-                    'disetujui_oleh'             => ($statusPilihan === 'Y') ? 'Manajer Keuangan' : null,
-                ];
-                foreach ($this->kolom as $k) {
-                    $row[$k] = rand(0, 500) * 1000;
-                }
-                $seed[] = $row;
-            }
-            session()->put($this->sessionKey($tipe), $seed);
-        }
-    }
-
     protected function all(string $tipe): array
     {
-        $this->seedIfEmpty($tipe);
-        return session($this->sessionKey($tipe), []);
-    }
+        try {
+            $rows = \Illuminate\Support\Facades\DB::table('potongan_keu')
+                ->where('tipe', $tipe)
+                ->orderBy('id', 'desc')
+                ->get();
 
-    protected function save(string $tipe, array $data): void
-    {
-        session()->put($this->sessionKey($tipe), $data);
+            return $rows->map(fn ($r) => (array) $r)->all();
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('DB potongan_keu read failed: ' . $e->getMessage());
+        }
+
+        return [];
     }
 
     protected ?array $cachedPegawaiList = null;
@@ -223,30 +194,31 @@ class PotonganKeuController extends Controller
             return back()->withErrors(['pegawai_id' => 'Pegawai ini sudah ada potongan untuk bulan ini.'])->withInput();
         }
 
-        $data = $this->all($tipe);
-        $newId = $data ? max(array_column($data, 'id')) + 1 : 1;
+        $dbPegawaiId = $peg['db_id'] ?? null;
+        if (! $dbPegawaiId && ! empty($peg['nik'])) {
+            $dbPegawaiId = \Illuminate\Support\Facades\DB::table('pegawai')->where('nik', $peg['nik'])->value('id');
+        }
 
         $row = [
-            'id'            => $newId,
             'tipe'          => $tipe,
             'tgl_potongan'  => now()->toDateString(),
             'nik'           => $peg['nik'],
-            'pegawai_id'    => $peg['id'],
+            'pegawai_id'    => $dbPegawaiId,
+            'bulan'         => $bulan,
+            'tahun'         => $tahun,
             'petugas_entri' => session('simpeg_user.nama_peg', 'Admin'),
             'tgl_update'    => now()->toDateString(),
             'status'        => 'N',
-            'disetujui_kepegawaian_oleh' => null,
-            'tgl_setuju_kepegawaian'    => null,
-            'disetujui_oleh'             => null,
+            'created_at'    => now(),
+            'updated_at'    => now(),
         ];
         foreach ($this->kolom as $k) {
             $row[$k] = (int) ($validated[$k] ?? 0);
         }
 
-        $data[] = $row;
-        $this->save($tipe, $data);
+        \Illuminate\Support\Facades\DB::table('potongan_keu')->insert($row);
 
-        return redirect()->route('potongan-keu.index', $tipe)->with('success', 'Potongan berhasil ditambahkan.');
+        return redirect()->route('potongan-keu.index', $tipe)->with('success', 'Potongan berhasil ditambahkan dan tersimpan di database.');
     }
 
     public function edit(string $tipe, int $id)
@@ -272,29 +244,26 @@ class PotonganKeuController extends Controller
         $peg = $this->pegawaiById((int) $validated['pegawai_id']);
         abort_if(! $peg, 404);
 
-        $data = collect($this->all($tipe))->map(function ($row) use ($id, $validated, $peg) {
-            if ($row['id'] === $id) {
-                foreach ($this->kolom as $k) {
-                    $row[$k] = (int) ($validated[$k] ?? 0);
-                }
-                $row['nik'] = $peg['nik'];
-                $row['pegawai_id'] = $peg['id'];
-                $row['petugas_entri'] = session('simpeg_user.nama_peg', 'Admin');
-                $row['tgl_update'] = now()->toDateString();
-            }
-            return $row;
-        })->all();
+        $updateData = [
+            'tgl_update' => now()->toDateString(),
+            'petugas_entri' => session('simpeg_user.nama_peg', 'Admin'),
+            'updated_at' => now(),
+        ];
+        foreach ($this->kolom as $k) {
+            $updateData[$k] = (int) ($validated[$k] ?? 0);
+        }
 
-        $this->save($tipe, $data);
-        return redirect()->route('potongan-keu.index', $tipe)->with('success', 'Potongan berhasil diperbarui.');
+        \Illuminate\Support\Facades\DB::table('potongan_keu')->where('id', $id)->where('tipe', $tipe)->update($updateData);
+
+        return redirect()->route('potongan-keu.index', $tipe)->with('success', 'Potongan berhasil diperbarui di database.');
     }
 
     public function destroy(string $tipe, int $id)
     {
         $this->validateTipe($tipe);
-        $data = collect($this->all($tipe))->reject(fn ($r) => $r['id'] === $id)->values()->all();
-        $this->save($tipe, $data);
-        return redirect()->route('potongan-keu.index', $tipe)->with('success', 'Potongan berhasil dihapus.');
+        \Illuminate\Support\Facades\DB::table('potongan_keu')->where('id', $id)->where('tipe', $tipe)->delete();
+
+        return redirect()->route('potongan-keu.index', $tipe)->with('success', 'Potongan berhasil dihapus dari database.');
     }
 
     // ───── FITUR IMPORT EXCEL / CSV MASSAL ─────
@@ -425,49 +394,56 @@ class PotonganKeuController extends Controller
                 $values[$k] = $cleanVal;
             }
 
-            if (isset($existingMap[$nik])) {
+            $dbPegId = $peg['db_id'] ?? null;
+            if (! $dbPegId && ! empty($nik)) {
+                $dbPegId = \Illuminate\Support\Facades\DB::table('pegawai')->where('nik', $nik)->value('id');
+            }
+
+            $existing = \Illuminate\Support\Facades\DB::table('potongan_keu')
+                ->where('tipe', $tipe)
+                ->where('nik', $nik)
+                ->where('bulan', (int) now()->month)
+                ->where('tahun', (int) now()->year)
+                ->first();
+
+            if ($existing) {
                 if ($mode === 'update') {
-                    // Update data yang ada
-                    $existingItem = $existingMap[$nik];
+                    $updateVals = [
+                        'tgl_update' => now()->toDateString(),
+                        'petugas_entri' => session('simpeg_user.nama_peg', 'Admin (Excel Import)'),
+                        'updated_at' => now(),
+                    ];
                     foreach ($values as $k => $v) {
-                        $existingItem[$k] = $v;
+                        $updateVals[$k] = $v;
                     }
-                    $existingItem['tgl_update'] = now()->toDateString();
-                    $existingItem['petugas_entri'] = session('simpeg_user.nama_peg', 'Admin (Excel Import)');
-                    $existingMap[$nik] = $existingItem;
+                    \Illuminate\Support\Facades\DB::table('potongan_keu')->where('id', $existing->id)->update($updateVals);
                     $updatedCount++;
                 }
             } else {
-                // Tambah data baru
-                $maxId++;
                 $newRow = [
-                    'id'            => $maxId,
                     'tipe'          => $tipe,
                     'tgl_potongan'  => now()->toDateString(),
                     'nik'           => $nik,
-                    'pegawai_id'    => $peg['id'],
+                    'pegawai_id'    => $dbPegId,
+                    'bulan'         => (int) now()->month,
+                    'tahun'         => (int) now()->year,
                     'petugas_entri' => session('simpeg_user.nama_peg', 'Admin (Excel Import)'),
                     'tgl_update'    => now()->toDateString(),
                     'status'        => 'N',
-                    'disetujui_kepegawaian_oleh' => null,
-                    'tgl_setuju_kepegawaian'    => null,
-                    'disetujui_oleh'             => null,
+                    'created_at'    => now(),
+                    'updated_at'    => now(),
                 ];
                 foreach ($values as $k => $v) {
                     $newRow[$k] = $v;
                 }
-                $existingMap[$nik] = $newRow;
+                \Illuminate\Support\Facades\DB::table('potongan_keu')->insert($newRow);
                 $importedCount++;
             }
         }
 
-        $finalData = array_values($existingMap);
-        $this->save($tipe, $finalData);
-
-        $totalTersimpan = $importedCount + $updatedCount;
         return redirect()->route('potongan-keu.index', $tipe)->with(
             'success',
-            "Berhasil mengimpor potongan {$this->tipeLabels[$tipe]} dari file Excel: {$importedCount} data baru ditambahkan, {$updatedCount} data diperbarui."
+            "Berhasil mengimpor potongan {$this->tipeLabels[$tipe]} dari file Excel ke database: {$importedCount} data baru ditambahkan, {$updatedCount} data diperbarui."
         );
     }
 
@@ -658,23 +634,25 @@ class PotonganKeuController extends Controller
         $targetId = $request->input('id');
         $approver = session('simpeg_user.nama_peg', 'SDM / Kepegawaian');
 
-        $data = collect($this->all($tipe))->map(function ($row) use ($targetId, $approver) {
-            if ($targetId ? ($row['id'] == $targetId) : ($row['status'] === 'N')) {
-                $row['status'] = 'kepegawaian';
-                $row['disetujui_kepegawaian_oleh'] = $approver;
-                $row['tgl_setuju_kepegawaian'] = now()->format('d/m/Y H:i');
-                $row['tgl_update'] = now()->toDateString();
-            }
-            return $row;
-        })->all();
-
-        $this->save($tipe, $data);
+        $query = \Illuminate\Support\Facades\DB::table('potongan_keu')->where('tipe', $tipe);
+        if ($targetId) {
+            $query->where('id', $targetId);
+        } else {
+            $query->where('status', 'N');
+        }
+        $query->update([
+            'status' => 'kepegawaian',
+            'disetujui_kepegawaian_oleh' => $approver,
+            'tgl_setuju_kepegawaian' => now(),
+            'tgl_update' => now()->toDateString(),
+            'updated_at' => now(),
+        ]);
 
         if ($request->wantsJson() || $request->ajax()) {
-            return response()->json(['success' => true, 'message' => 'Status berhasil disetujui oleh Kepegawaian.']);
+            return response()->json(['success' => true, 'message' => 'Status berhasil disetujui oleh Kepegawaian di database.']);
         }
 
-        return redirect()->route('potongan-keu.terbit', $tipe)->with('success', 'Potongan berhasil disetujui oleh Kepegawaian (SDM). Status kini Realtime: Siap Diterbitkan.');
+        return redirect()->route('potongan-keu.terbit', $tipe)->with('success', 'Potongan berhasil disetujui oleh Kepegawaian (SDM) dan tersimpan di database.');
     }
 
     /**
@@ -687,22 +665,24 @@ class PotonganKeuController extends Controller
         $approverNik = session('simpeg_user.nik', config('simpeg_approval.keuangan', '0'));
         $approverName = session('simpeg_user.nama_peg', 'Keuangan');
 
-        $data = collect($this->all($tipe))->map(function ($row) use ($targetId, $approverNik, $approverName) {
-            if ($targetId ? ($row['id'] == $targetId) : ($row['status'] !== 'Y')) {
-                $row['status'] = 'Y';
-                $row['disetujui_oleh'] = $approverName . ' (' . $approverNik . ')';
-                $row['tgl_update'] = now()->toDateString();
-            }
-            return $row;
-        })->all();
-
-        $this->save($tipe, $data);
+        $query = \Illuminate\Support\Facades\DB::table('potongan_keu')->where('tipe', $tipe);
+        if ($targetId) {
+            $query->where('id', $targetId);
+        } else {
+            $query->where('status', '!=', 'Y');
+        }
+        $query->update([
+            'status' => 'Y',
+            'disetujui_oleh' => $approverName . ' (' . $approverNik . ')',
+            'tgl_update' => now()->toDateString(),
+            'updated_at' => now(),
+        ]);
 
         if ($request->wantsJson() || $request->ajax()) {
-            return response()->json(['success' => true, 'message' => 'Potongan berhasil diterbitkan & disetujui secara final.']);
+            return response()->json(['success' => true, 'message' => 'Potongan berhasil diterbitkan & disetujui secara final di database.']);
         }
 
-        return redirect()->route('potongan-keu.terbit', $tipe)->with('success', 'Semua potongan ' . strtolower($this->tipeLabels[$tipe]) . ' berhasil diterbitkan dan disetujui.');
+        return redirect()->route('potongan-keu.terbit', $tipe)->with('success', 'Semua potongan ' . strtolower($this->tipeLabels[$tipe]) . ' berhasil diterbitkan dan disahkan di database.');
     }
 
     // ───── BELUM MASUK ─────
