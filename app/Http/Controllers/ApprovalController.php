@@ -26,7 +26,7 @@ class ApprovalController extends Controller
         $pending = [];
 
         // 1. Gaji Bulanan
-        $gajiProses = session('dummy_gaji_proses', []);
+        $gajiProses = app(GajiProsesController::class)->all();
         foreach ($gajiProses as $item) {
             $nextStage = $this->nextStageFor($item['status'] ?? '');
             if ($nextStage && $userNik === $this->approverNikFor($nextStage)) {
@@ -37,7 +37,7 @@ class ApprovalController extends Controller
         }
 
         // 2. THR
-        $thr = session('dummy_thr', []);
+        $thr = app(ThrController::class)->all();
         foreach ($thr as $item) {
             $nextStage = $this->nextStageFor($item['status'] ?? '');
             if ($nextStage && $userNik === $this->approverNikFor($nextStage)) {
@@ -48,7 +48,7 @@ class ApprovalController extends Controller
         }
 
         // 3. Gaji 13
-        $gaji13 = session('dummy_gaji13', []);
+        $gaji13 = app(GajiTigabelasController::class)->all();
         foreach ($gaji13 as $item) {
             $nextStage = $this->nextStageFor($item['status'] ?? '');
             if ($nextStage && $userNik === $this->approverNikFor($nextStage)) {

@@ -85,23 +85,38 @@ class GajiTigabelasController extends Controller
         'potongan_zakat' => 'Potongan Zakat',
     ];
 
+    protected function storageFile(): string
+    {
+        return storage_path('app/gaji13_proses.json');
+    }
+
     protected function seedIfEmpty(): void
     {
-        if (! session()->has('dummy_gaji13')) {
-            session()->put('dummy_gaji13', []);
+        $file = $this->storageFile();
+        if (! file_exists($file)) {
+            @file_put_contents($file, json_encode([], JSON_PRETTY_PRINT));
         }
     }
 
-    protected function all(): array
+    public function all(): array
     {
-        $this->seedIfEmpty();
+        $file = $this->storageFile();
+        if (file_exists($file)) {
+            $data = json_decode(file_get_contents($file), true);
+            if (is_array($data)) {
+                return $data;
+            }
+        }
 
         return session('dummy_gaji13', []);
     }
 
-    protected function save(array $data): void
+    public function save(array $data): void
     {
-        session()->put('dummy_gaji13', $data);
+        $file = $this->storageFile();
+        $clean = array_values($data);
+        @file_put_contents($file, json_encode($clean, JSON_PRETTY_PRINT));
+        session()->put('dummy_gaji13', $clean);
     }
 
     protected function pegawaiList(): array

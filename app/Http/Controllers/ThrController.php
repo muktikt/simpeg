@@ -78,23 +78,38 @@ class ThrController extends Controller
         'potongan_zakat' => 'Potongan Zakat',
     ];
 
+    protected function storageFile(): string
+    {
+        return storage_path('app/thr_proses.json');
+    }
+
     protected function seedIfEmpty(): void
     {
-        if (! session()->has('dummy_thr')) {
-            session()->put('dummy_thr', []);
+        $file = $this->storageFile();
+        if (! file_exists($file)) {
+            @file_put_contents($file, json_encode([], JSON_PRETTY_PRINT));
         }
     }
 
-    protected function all(): array
+    public function all(): array
     {
-        $this->seedIfEmpty();
+        $file = $this->storageFile();
+        if (file_exists($file)) {
+            $data = json_decode(file_get_contents($file), true);
+            if (is_array($data)) {
+                return $data;
+            }
+        }
 
         return session('dummy_thr', []);
     }
 
-    protected function save(array $data): void
+    public function save(array $data): void
     {
-        session()->put('dummy_thr', $data);
+        $file = $this->storageFile();
+        $clean = array_values($data);
+        @file_put_contents($file, json_encode($clean, JSON_PRETTY_PRINT));
+        session()->put('dummy_thr', $clean);
     }
 
     protected function pegawaiList(): array

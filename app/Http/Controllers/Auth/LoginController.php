@@ -146,7 +146,6 @@ class LoginController extends Controller
     public function logout(Request $request)
     {
         $request->session()->forget('simpeg_user');
-        $request->session()->invalidate();
         $request->session()->regenerateToken();
 
         return redirect()->route('login');
