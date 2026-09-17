@@ -9,7 +9,7 @@
 // Urutan approval: Proses -> Kepegawaian -> Dirum -> Dirut (final/terbit).
 
 return [
-    'kepegawaian' => '1711254', // Mukti Kurniawan (Admin/Staf SDM)
+    'kepegawaian' => '1711254', // Heddy Kelana, S.H. (Manajer Bidang Sumber Daya Manusia)
     'dirum' => '1711002',        // Dr. Sunaryo, S.T., MT. (Direktur Umum)
     'dirut' => '1711001',        // Nurpan, S.E., M.Si. (Direktur Utama)
     'keuangan' => '1711296',     // Yayah Khaeriyah, S.T. (Manajer Keuangan)
