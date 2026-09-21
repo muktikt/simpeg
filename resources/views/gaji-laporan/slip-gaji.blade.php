@@ -66,17 +66,19 @@
                         I. PENERIMAAN / PENDAPATAN
                     </div>
                     <div class="slip-items-body">
-                        @if(($item['gapok'] ?? 0) > 0)
-                            <div class="slip-row-item"><span class="item-label">Gaji Pokok</span><span class="item-val">Rp {{ number_format($item['gapok'], 0, ',', '.') }}</span></div>
-                        @endif
-                        @if(($item['tunjangan_jabatan'] ?? 0) > 0)
-                            <div class="slip-row-item"><span class="item-label">Tunjangan Jabatan</span><span class="item-val">Rp {{ number_format($item['tunjangan_jabatan'], 0, ',', '.') }}</span></div>
-                        @endif
-                        @if(($item['tunjangan_transport'] ?? 0) > 0)
-                            <div class="slip-row-item"><span class="item-label">Tunjangan Transport</span><span class="item-val">Rp {{ number_format($item['tunjangan_transport'], 0, ',', '.') }}</span></div>
-                        @endif
-                        @if(($item['lembur'] ?? 0) > 0)
-                            <div class="slip-row-item"><span class="item-label">Lembur</span><span class="item-val">Rp {{ number_format($item['lembur'], 0, ',', '.') }}</span></div>
+                        @if (!empty($komponenPendapatan))
+                            @foreach ($komponenPendapatan as $key => $label)
+                                @if (($item[$key] ?? 0) > 0)
+                                    <div class="slip-row-item"><span class="item-label">{{ $label }}</span><span class="item-val">Rp {{ number_format($item[$key], 0, ',', '.') }}</span></div>
+                                @endif
+                            @endforeach
+                        @else
+                            @if(($item['gapok'] ?? 0) > 0)
+                                <div class="slip-row-item"><span class="item-label">Gaji Pokok</span><span class="item-val">Rp {{ number_format($item['gapok'], 0, ',', '.') }}</span></div>
+                            @endif
+                            @if(($item['tunjangan_jabatan'] ?? 0) > 0)
+                                <div class="slip-row-item"><span class="item-label">Tunjangan Jabatan</span><span class="item-val">Rp {{ number_format($item['tunjangan_jabatan'], 0, ',', '.') }}</span></div>
+                            @endif
                         @endif
                     </div>
                     <div class="slip-col-total" style="background:#F0F9FF; border-color:#BAE6FD;">
@@ -91,26 +93,19 @@
                         II. POTONGAN GAJI
                     </div>
                     <div class="slip-items-body">
-                        @if(($item['potongan_pajak'] ?? 0) > 0)
-                            <div class="slip-row-item"><span class="item-label">Potongan Pajak (PPh21)</span><span class="item-val" style="color:#DC2626;">Rp {{ number_format($item['potongan_pajak'], 0, ',', '.') }}</span></div>
-                        @endif
-                        @if(($item['potongan_bpjskes'] ?? 0) > 0)
-                            <div class="slip-row-item"><span class="item-label">BPJS Kesehatan (1%)</span><span class="item-val" style="color:#DC2626;">Rp {{ number_format($item['potongan_bpjskes'], 0, ',', '.') }}</span></div>
-                        @endif
-                        @if(($item['potongan_bpjstk'] ?? 0) > 0)
-                            <div class="slip-row-item"><span class="item-label">BPJS Ketenagakerjaan</span><span class="item-val" style="color:#DC2626;">Rp {{ number_format($item['potongan_bpjstk'], 0, ',', '.') }}</span></div>
-                        @endif
-                        @if(($item['potongan_dapenma'] ?? 0) > 0)
-                            <div class="slip-row-item"><span class="item-label">Dapenma</span><span class="item-val" style="color:#DC2626;">Rp {{ number_format($item['potongan_dapenma'], 0, ',', '.') }}</span></div>
-                        @endif
-                        @if(($item['potongan_kas'] ?? 0) > 0)
-                            <div class="slip-row-item"><span class="item-label">Potongan Kas / Pinjaman</span><span class="item-val" style="color:#DC2626;">Rp {{ number_format($item['potongan_kas'], 0, ',', '.') }}</span></div>
-                        @endif
-                        @if(($item['potongan_korpri'] ?? 0) > 0)
-                            <div class="slip-row-item"><span class="item-label">Potongan Korpri</span><span class="item-val" style="color:#DC2626;">Rp {{ number_format($item['potongan_korpri'], 0, ',', '.') }}</span></div>
-                        @endif
-                        @if(($item['potongan_perumahan'] ?? 0) > 0)
-                            <div class="slip-row-item"><span class="item-label">Potongan Perumahan</span><span class="item-val" style="color:#DC2626;">Rp {{ number_format($item['potongan_perumahan'], 0, ',', '.') }}</span></div>
+                        @if (!empty($komponenPotongan))
+                            @foreach ($komponenPotongan as $key => $label)
+                                @if (($item[$key] ?? 0) > 0)
+                                    <div class="slip-row-item"><span class="item-label">{{ $label }}</span><span class="item-val" style="color:#DC2626;">Rp {{ number_format($item[$key], 0, ',', '.') }}</span></div>
+                                @endif
+                            @endforeach
+                        @else
+                            @if(($item['potongan_pajak'] ?? 0) > 0)
+                                <div class="slip-row-item"><span class="item-label">Potongan Pajak (PPh21)</span><span class="item-val" style="color:#DC2626;">Rp {{ number_format($item['potongan_pajak'], 0, ',', '.') }}</span></div>
+                            @endif
+                            @if(($item['potongan_bpjskes'] ?? 0) > 0)
+                                <div class="slip-row-item"><span class="item-label">BPJS Kesehatan (1%)</span><span class="item-val" style="color:#DC2626;">Rp {{ number_format($item['potongan_bpjskes'], 0, ',', '.') }}</span></div>
+                            @endif
                         @endif
                     </div>
                     <div class="slip-col-total" style="background:#FEF2F2; border-color:#FECACA;">

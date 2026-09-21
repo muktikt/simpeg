@@ -32,14 +32,14 @@
                     <td class="cell-nik">{{ $p['nik'] }}</td>
                     <td class="cell-name">{{ $p['nama'] }}</td>
                     <td>
-                        @if ($p['jenis'] === 'Gaji Bulanan')
-                            {{ \App\Http\Controllers\AbsensiController::BULAN[$p['bulan']] }} {{ $p['tahun'] }}
+                        @if ($p['jenis'] === 'Gaji Bulanan' || str_starts_with($p['jenis'], 'Potongan'))
+                            {{ \App\Http\Controllers\AbsensiController::BULAN[$p['bulan'] ?? 9] ?? '' }} {{ $p['tahun'] ?? '' }}
                         @else
                             {{ $p['tahun'] }}
                         @endif
                     </td>
                     <td>
-                        Rp {{ number_format($p['gaji_bersih'] ?? $p['thr_diterima'] ?? $p['gaji13_diterima'] ?? 0, 0, ',', '.') }}
+                        Rp {{ number_format($p['nominal'] ?? $p['gaji_bersih'] ?? $p['thr_diterima'] ?? $p['gaji13_diterima'] ?? 0, 0, ',', '.') }}
                     </td>
                     <td><span class="badge badge-PH">Menunggu Persetujuanmu</span></td>
                     <td><a href="{{ $p['route'] }}" class="btn btn-primary btn-sm">Tinjau</a></td>

@@ -298,7 +298,7 @@ Route::middleware(['simpeg.auth'])->group(function () {
     // ══════════════════════════════════════════════════════════════
 
     // Potongan Keuangan (Gaji / THR / Gaji 13) - CRUD + terbitkan + belum-masuk + Import Excel + Realtime Status
-    Route::prefix('potongan-keu')->name('potongan-keu.')->middleware(['simpeg.auth:2'])->group(function () {
+    Route::prefix('potongan-keu')->name('potongan-keu.')->middleware(['simpeg.auth:1,2'])->group(function () {
         Route::get('/{tipe}', [PotonganKeuController::class, 'index'])->name('index')->where('tipe', 'gaji|thr|gaji13');
         Route::get('/{tipe}/terbit', [PotonganKeuController::class, 'terbitIndex'])->name('terbit')->where('tipe', 'gaji|thr|gaji13');
         Route::get('/{tipe}/create', [PotonganKeuController::class, 'create'])->name('create')->where('tipe', 'gaji|thr|gaji13');

@@ -648,6 +648,15 @@ class PotonganKeuController extends Controller
             'updated_at' => now(),
         ]);
 
+        // Sinkronisasi ke tabel payroll
+        $affectedRows = \Illuminate\Support\Facades\DB::table('potongan_keu')
+            ->where('tipe', $tipe)
+            ->when($targetId, fn ($q) => $q->where('id', $targetId))
+            ->get();
+        foreach ($affectedRows as $row) {
+            $this->syncToPayroll($row);
+        }
+
         if ($request->wantsJson() || $request->ajax()) {
             return response()->json(['success' => true, 'message' => 'Status berhasil disetujui oleh Kepegawaian di database.']);
         }
@@ -678,11 +687,147 @@ class PotonganKeuController extends Controller
             'updated_at' => now(),
         ]);
 
+        // Sinkronisasi ke tabel payroll
+        $affectedRows = \Illuminate\Support\Facades\DB::table('potongan_keu')
+            ->where('tipe', $tipe)
+            ->when($targetId, fn ($q) => $q->where('id', $targetId))
+            ->get();
+        foreach ($affectedRows as $row) {
+            $this->syncToPayroll($row);
+        }
+
         if ($request->wantsJson() || $request->ajax()) {
             return response()->json(['success' => true, 'message' => 'Potongan berhasil diterbitkan & disetujui secara final di database.']);
         }
 
         return redirect()->route('potongan-keu.terbit', $tipe)->with('success', 'Semua potongan ' . strtolower($this->tipeLabels[$tipe]) . ' berhasil diterbitkan dan disahkan di database.');
+    }
+
+    /**
+     * Sinkronisasi potongan keuangan ke tabel payroll Supabase dan file storage lokal.
+     */
+    public function syncToPayroll(object|array $p): void
+    {
+        $p = (array) $p;
+        if (($p['tipe'] ?? 'gaji') !== 'gaji') {
+            return;
+        }
+
+        try {
+            $nik = $p['nik'] ?? null;
+            $pegawaiId = $p['pegawai_id'] ?? null;
+            $bulan = (int) ($p['bulan'] ?? now()->month);
+            $tahun = (int) ($p['tahun'] ?? now()->year);
+
+            $query = \Illuminate\Support\Facades\DB::table('payroll')
+                ->where('bulan', $bulan)
+                ->where('tahun', $tahun);
+
+            if ($pegawaiId) {
+                $query->where(function ($q) use ($pegawaiId, $nik) {
+                    $q->where('pegawai_id', $pegawaiId);
+                    if ($nik) {
+                        $q->orWhereIn('pegawai_id', function ($sub) use ($nik) {
+                            $sub->select('id')->from('pegawai')->where('nik', $nik);
+                        });
+                    }
+                });
+            } elseif ($nik) {
+                $query->whereIn('pegawai_id', function ($sub) use ($nik) {
+                    $sub->select('id')->from('pegawai')->where('nik', $nik);
+                });
+            } else {
+                return;
+            }
+
+            $payroll = $query->first();
+            if (! $payroll) {
+                return;
+            }
+
+            $potKoperasi = (int) ($p['pot_koperasi'] ?? 0);
+            $potDarmawanita = (int) ($p['pot_darmawanita'] ?? 0);
+            $potAir = (int) ($p['pot_air'] ?? 0);
+            $potKas = (int) ($p['pot_kas'] ?? 0);
+            $potBjb = (int) ($p['pot_bjb'] ?? 0);
+            $potBjbs = (int) ($p['pot_bjbs'] ?? 0);
+            $potAsuransi = (int) ($p['pot_asuransi'] ?? 0);
+            $potBtn = (int) ($p['pot_btn'] ?? 0);
+            $potBpr = (int) ($p['pot_bpr'] ?? 0);
+            $potZakat = (int) ($p['pot_zakat_profesi'] ?? 0);
+
+            $totalPotongan = (int) ($payroll->potongan_sanksi_perusahaan ?? 0)
+                + (int) ($payroll->potongan_dapenma ?? 0)
+                + (int) ($payroll->potongan_bpjs_tenaga_kerja ?? 0)
+                + (int) ($payroll->potongan_bpjs_kesehatan ?? 0)
+                + (int) ($payroll->potongan_perumahan ?? 0)
+                + (int) ($payroll->potongan_pajak ?? 0)
+                + (int) ($payroll->potongan_korpri ?? 0)
+                + (int) ($payroll->potongan_tunjangan_perusahaan ?? 0)
+                + (int) ($payroll->potongan_trandist_pmi_lain ?? 0)
+                + $potKoperasi
+                + $potDarmawanita
+                + $potAir
+                + $potKas
+                + $potBjb
+                + $potBjbs
+                + $potAsuransi
+                + $potBtn
+                + $potBpr
+                + $potZakat;
+
+            $totalPendapatan = (int) ($payroll->total_pendapatan ?? 0);
+            $gajiBersih = $totalPendapatan - $totalPotongan;
+
+            \Illuminate\Support\Facades\DB::table('payroll')
+                ->where('id', $payroll->id)
+                ->update([
+                    'potongan_koperasi' => $potKoperasi,
+                    'potongan_darma_wanita' => $potDarmawanita,
+                    'potongan_rekening_air_minum' => $potAir,
+                    'potongan_kas' => $potKas,
+                    'potongan_bank_bjb' => $potBjb,
+                    'potongan_bank_bjbs' => $potBjbs,
+                    'potongan_asuransi' => $potAsuransi,
+                    'potongan_bank_btn' => $potBtn,
+                    'potongan_bank_bpr' => $potBpr,
+                    'potongan_zakat_profesi' => $potZakat,
+                    'total_potongan' => $totalPotongan,
+                    'gaji_bersih' => $gajiBersih,
+                    'updated_at' => now(),
+                ]);
+
+            // Sinkronkan ke local storage jika ada
+            $localFile = storage_path('app/gaji_proses.json');
+            if (file_exists($localFile)) {
+                $localData = json_decode(file_get_contents($localFile), true);
+                if (is_array($localData)) {
+                    $changed = false;
+                    foreach ($localData as &$row) {
+                        if (($row['id'] ?? null) == $payroll->id || ($nik && ($row['nik'] ?? '') === $nik && ($row['bulan'] ?? '') == $bulan && ($row['tahun'] ?? '') == $tahun)) {
+                            $row['potongan_koperasi'] = $potKoperasi;
+                            $row['potongan_darmawanita'] = $potDarmawanita;
+                            $row['potongan_ledeng'] = $potAir;
+                            $row['potongan_kas'] = $potKas;
+                            $row['potongan_bjb'] = $potBjb;
+                            $row['potongan_bjbs'] = $potBjbs;
+                            $row['potongan_asuransi'] = $potAsuransi;
+                            $row['potongan_btn'] = $potBtn;
+                            $row['potongan_bpr'] = $potBpr;
+                            $row['potongan_zakat'] = $potZakat;
+                            $row['total_potongan'] = $totalPotongan;
+                            $row['gaji_bersih'] = $gajiBersih;
+                            $changed = true;
+                        }
+                    }
+                    if ($changed) {
+                        file_put_contents($localFile, json_encode($localData, JSON_PRETTY_PRINT));
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('syncToPayroll error: ' . $e->getMessage());
+        }
     }
 
     // ───── BELUM MASUK ─────

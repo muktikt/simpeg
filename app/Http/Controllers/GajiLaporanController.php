@@ -29,82 +29,21 @@ class GajiLaporanController extends Controller
      */
     protected function gajiTerbit(int $bulan, int $tahun)
     {
-        $sessionGaji = collect(session('dummy_gaji_proses', []))
+        $all = collect(app(GajiProsesController::class)->all())
+            ->where('bulan', $bulan)
+            ->where('tahun', $tahun)
+            ->filter(fn ($row) => $row['status'] === 'terbit' || strtolower($row['status'] ?? '') === 'diterbitkan');
+
+        if ($all->isNotEmpty()) {
+            return $all;
+        }
+
+        return collect(session('dummy_gaji_proses', []))
             ->where('bulan', $bulan)
             ->where('tahun', $tahun)
             ->filter(fn ($row) => $row['status'] === 'terbit');
-
-        try {
-            $bulanNama = AbsensiController::BULAN[$bulan] ?? 'Bulan ' . $bulan;
-            $periodeStr = $bulanNama . ' ' . $tahun;
-
-            $dbPayroll = \Illuminate\Support\Facades\DB::table('payroll')
-                ->join('pegawai', 'payroll.pegawai_id', '=', 'pegawai.id')
-                ->where('payroll.periode', 'like', "%$tahun%")
-                ->select(
-                    'payroll.*',
-                    'pegawai.nik',
-                    'pegawai.name as nama',
-                    'pegawai.jabatan',
-                    'pegawai.unit_kerja',
-                    'pegawai.golongan'
-                )
-                ->get()
-                ->map(function ($row) use ($bulan, $tahun) {
-                    $gapok = (float) ($row->gapok ?? 0);
-                    $tunjJabatan = (float) ($row->tunjangan_jabatan ?? 0);
-                    $tunjIstri = (float) ($row->tunjangan_istri ?? 0);
-                    $tunjAnak = (float) ($row->tunjangan_anak ?? 0);
-                    $tunjPerumahan = (float) ($row->tunjangan_perumahan ?? 0);
-                    $tunjBpjstk = (float) ($row->tunjangan_bpjstk ?? 0);
-                    $potDapenma = (float) ($row->potongan_dapenma ?? 0);
-                    $potBjbs = (float) ($row->potongan_bank_bjb ?? 0);
-                    $potBpjstk = (float) ($row->potongan_bpjstk ?? 0);
-                    $potPajak = (float) ($row->potongan_pajak ?? 0);
-
-                    $totalPendapatan = $gapok + $tunjJabatan + $tunjIstri + $tunjAnak + $tunjPerumahan + $tunjBpjstk;
-                    $totalPotongan = $potDapenma + $potBjbs + $potBpjstk + $potPajak;
-                    $gajiBersih = (float) ($row->total_terima ?? ($totalPendapatan - $totalPotongan));
-
-                    return [
-                        'id' => $row->id,
-                        'pegawai_id' => $row->pegawai_id,
-                        'nik' => $row->nik,
-                        'nama' => $row->nama,
-                        'jabatan' => $row->jabatan,
-                        'unit_kerja' => $row->unit_kerja ?? 'PDAM Tirta Darma Ayu',
-                        'golongan' => $row->golongan ?? 'III/a',
-                        'kategori' => 'pegawai',
-                        'kode_ptkp' => 'K1',
-                        'bulan' => $bulan,
-                        'tahun' => $tahun,
-                        'status' => 'terbit',
-                        'gaji_pokok' => $gapok,
-                        'tunj_jabatan' => $tunjJabatan,
-                        'tunj_istri' => $tunjIstri,
-                        'tunj_anak' => $tunjAnak,
-                        'tunjangan_perumahan' => $tunjPerumahan,
-                        'tunjangan_bpjstk' => $tunjBpjstk,
-                        'pot_dapenma' => $potDapenma,
-                        'pot_bjbs' => $potBjbs,
-                        'potongan_bpjstk' => $potBpjstk,
-                        'potongan_pajak' => $potPajak,
-                        'total_pendapatan' => $totalPendapatan,
-                        'total_potongan' => $totalPotongan,
-                        'gaji_diterima' => $gajiBersih,
-                        'gaji_bersih' => $gajiBersih,
-                    ];
-                });
-
-            if ($dbPayroll->isNotEmpty()) {
-                return $sessionGaji->merge($dbPayroll)->unique('nik');
-            }
-        } catch (\Throwable $e) {
-            // Fallback
-        }
-
-        return $sessionGaji;
     }
+
 
     protected function pegawaiById(mixed $id): ?array
     {
@@ -181,10 +120,10 @@ class GajiLaporanController extends Controller
         if ($userLogin['userlevel'] === '5' || $request->has('my')) {
             $data = $data->where('nik', $userLogin['nik']);
 
-            // Ambill 3-6 bulan riwayat terbit milik pegawai ini
-            $allGaji = collect(session('dummy_gaji_proses', []))
+            // Ambil 3-6 bulan riwayat terbit milik pegawai ini
+            $allGaji = collect(app(GajiProsesController::class)->all())
                 ->where('nik', $userLogin['nik'])
-                ->filter(fn ($row) => $row['status'] === 'terbit')
+                ->filter(fn ($row) => $row['status'] === 'terbit' || strtolower($row['status'] ?? '') === 'diterbitkan')
                 ->sortByDesc(fn ($row) => $row['tahun'] * 100 + $row['bulan'])
                 ->values();
 
@@ -192,8 +131,10 @@ class GajiLaporanController extends Controller
         }
 
         $data = $data->sortBy('nama')->values();
+        $komponenPendapatan = GajiProsesController::KOMPONEN_PENDAPATAN;
+        $komponenPotongan = GajiProsesController::KOMPONEN_POTONGAN;
 
-        return view('gaji-laporan.slip-gaji', compact('data', 'bulan', 'tahun', 'riwayatGaji'));
+        return view('gaji-laporan.slip-gaji', compact('data', 'bulan', 'tahun', 'riwayatGaji', 'komponenPendapatan', 'komponenPotongan'));
     }
 
     public function bukuBesar(Request $request)
