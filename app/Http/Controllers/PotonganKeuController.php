@@ -200,18 +200,17 @@ class PotonganKeuController extends Controller
         }
 
         $row = [
-            'tipe'          => $tipe,
-            'tgl_potongan'  => now()->toDateString(),
-            'nik'           => $peg['nik'],
-            'pegawai_id'    => $dbPegawaiId,
-            'bulan'         => $bulan,
-            'tahun'         => $tahun,
-            'petugas_entri' => session('simpeg_user.nama_peg', 'Admin'),
-            'tgl_update'    => now()->toDateString(),
-            'status'        => 'N',
-            'created_at'    => now(),
-            'updated_at'    => now(),
-        ];
+    'tipe'          => $tipe,
+    'tgl_potongan'  => now()->toDateString(),
+    'nik'           => $peg['nik'],
+    'pegawai_id'    => $dbPegawaiId,
+    'bulan'         => $bulan,
+    'tahun'         => $tahun,
+    'petugas_entri' => session('simpeg_user.nama_peg', 'Admin'),
+    'status'        => 'N',
+    'created_at'    => now(),
+    'updated_at'    => now(),
+];
         foreach ($this->kolom as $k) {
             $row[$k] = (int) ($validated[$k] ?? 0);
         }
@@ -245,10 +244,9 @@ class PotonganKeuController extends Controller
         abort_if(! $peg, 404);
 
         $updateData = [
-            'tgl_update' => now()->toDateString(),
-            'petugas_entri' => session('simpeg_user.nama_peg', 'Admin'),
-            'updated_at' => now(),
-        ];
+        'petugas_entri' => session('simpeg_user.nama_peg', 'Admin'),
+        'updated_at' => now(),
+    ];
         foreach ($this->kolom as $k) {
             $updateData[$k] = (int) ($validated[$k] ?? 0);
         }
@@ -409,10 +407,9 @@ class PotonganKeuController extends Controller
             if ($existing) {
                 if ($mode === 'update') {
                     $updateVals = [
-                        'tgl_update' => now()->toDateString(),
-                        'petugas_entri' => session('simpeg_user.nama_peg', 'Admin (Excel Import)'),
-                        'updated_at' => now(),
-                    ];
+        'petugas_entri' => session('simpeg_user.nama_peg', 'Admin (Excel Import)'),
+        'updated_at' => now(),
+    ];
                     foreach ($values as $k => $v) {
                         $updateVals[$k] = $v;
                     }
@@ -421,18 +418,17 @@ class PotonganKeuController extends Controller
                 }
             } else {
                 $newRow = [
-                    'tipe'          => $tipe,
-                    'tgl_potongan'  => now()->toDateString(),
-                    'nik'           => $nik,
-                    'pegawai_id'    => $dbPegId,
-                    'bulan'         => (int) now()->month,
-                    'tahun'         => (int) now()->year,
-                    'petugas_entri' => session('simpeg_user.nama_peg', 'Admin (Excel Import)'),
-                    'tgl_update'    => now()->toDateString(),
-                    'status'        => 'N',
-                    'created_at'    => now(),
-                    'updated_at'    => now(),
-                ];
+    'tipe'          => $tipe,
+    'tgl_potongan'  => now()->toDateString(),
+    'nik'           => $nik,
+    'pegawai_id'    => $dbPegId,
+    'bulan'         => (int) now()->month,
+    'tahun'         => (int) now()->year,
+    'petugas_entri' => session('simpeg_user.nama_peg', 'Admin (Excel Import)'),
+    'status'        => 'N',
+    'created_at'    => now(),
+    'updated_at'    => now(),
+];
                 foreach ($values as $k => $v) {
                     $newRow[$k] = $v;
                 }
@@ -641,12 +637,11 @@ class PotonganKeuController extends Controller
             $query->where('status', 'N');
         }
         $query->update([
-            'status' => 'kepegawaian',
-            'disetujui_kepegawaian_oleh' => $approver,
-            'tgl_setuju_kepegawaian' => now(),
-            'tgl_update' => now()->toDateString(),
-            'updated_at' => now(),
-        ]);
+    'status' => 'kepegawaian',
+    'disetujui_kepegawaian_oleh' => $approver,
+    'tgl_setuju_kepegawaian' => now(),
+    'updated_at' => now(),
+]);
 
         // Sinkronisasi ke tabel payroll
         $affectedRows = \Illuminate\Support\Facades\DB::table('potongan_keu')
@@ -681,11 +676,10 @@ class PotonganKeuController extends Controller
             $query->where('status', '!=', 'Y');
         }
         $query->update([
-            'status' => 'Y',
-            'disetujui_oleh' => $approverName . ' (' . $approverNik . ')',
-            'tgl_update' => now()->toDateString(),
-            'updated_at' => now(),
-        ]);
+    'status' => 'Y',
+    'disetujui_oleh' => $approverName . ' (' . $approverNik . ')',
+    'updated_at' => now(),
+]);
 
         // Sinkronisasi ke tabel payroll
         $affectedRows = \Illuminate\Support\Facades\DB::table('potongan_keu')
