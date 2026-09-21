@@ -99,9 +99,32 @@ class LoginController extends Controller
                 ->onlyInput('nik');
         }
 
-        // 3. Tentukan userlevel & role pengaduan murni dari kolom database (pegawai.role & pegawai.divisi_kadiv):
-        $dbRole = strtolower(trim($pegawai->role ?? 'pegawai'));
+        // 3. Tentukan userlevel & role pengaduan murni dari kolom database (pegawai.role & pegawai.divisi_kadiv)
+        // dengan fallback otomatis untuk NIK inti (SDM, Keuangan, Direksi) jika role di DB lokal belum sinkron:
+        $masterRoles = [
+            '1711001' => ['role' => 'direktur', 'userlevel' => '7', 'role_pengaduan' => 'dirut'],
+            '1711002' => ['role' => 'direktur', 'userlevel' => '7', 'role_pengaduan' => 'dirut'],
+            '1711003' => ['role' => 'direktur', 'userlevel' => '7', 'role_pengaduan' => 'dirut'],
+            '1711254' => ['role' => 'sdm', 'userlevel' => '1', 'role_pengaduan' => 'sdm'],
+            '1711157' => ['role' => 'sdm', 'userlevel' => '1', 'role_pengaduan' => 'sdm'],
+            '1711444' => ['role' => 'sdm', 'userlevel' => '1', 'role_pengaduan' => 'sdm'],
+            '1711590' => ['role' => 'sdm', 'userlevel' => '1', 'role_pengaduan' => 'sdm'],
+            '1711567' => ['role' => 'sdm', 'userlevel' => '1', 'role_pengaduan' => 'sdm'],
+            '1711296' => ['role' => 'keuangan', 'userlevel' => '2', 'role_pengaduan' => 'keuangan'],
+            '1711145' => ['role' => 'keuangan', 'userlevel' => '2', 'role_pengaduan' => 'keuangan'],
+        ];
+
+        $dbRole = strtolower(trim($pegawai->role ?? ''));
         $divisiKadiv = $pegawai->divisi_kadiv ?? null;
+
+        // Jika NIK terdaftar di masterRoles tapi kolom role di DB lokal belum terisi / masih pegawai biasa,
+        // gunakan masterRoles dan sinkronkan otomatis ke DB pegawai:
+        if (isset($masterRoles[$nik]) && ($dbRole === '' || $dbRole === 'pegawai')) {
+            $dbRole = $masterRoles[$nik]['role'];
+            try {
+                DB::table('pegawai')->where('nik', $nik)->update(['role' => $dbRole]);
+            } catch (\Throwable $e) {}
+        }
 
         if ($dbRole === 'direktur') {
             $userLevel = '7'; // DIRUT
