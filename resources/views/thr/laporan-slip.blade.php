@@ -45,9 +45,9 @@
             <!-- Header KOP Resmi -->
             <div class="slip-header-kop">
                 <div class="slip-kop-brand">
-                    <div class="slip-kop-company">PERUMDAM TIRTA MUKTI</div>
-                    <div class="slip-kop-sub">KABUPATEN CIANJUR &middot; JAWA BARAT</div>
-                    <div class="slip-kop-address">Jl. Pangeran Hidayatullah No. 123 Cianjur | Telp. (0263) 261158</div>
+                    <div class="slip-kop-company">PERUMDAM Tirta Darma Ayu</div>
+                    <div class="slip-kop-sub">KABUPATEN INDRAMAYU &middot; JAWA BARAT</div>
+                    <div class="slip-kop-address">Jl. Letjen Suprapto No25/E, Indramayu 45214 Telp (0234) 271322</div>
                 </div>
                 <div class="slip-kop-title-box">
                     <div class="slip-title-text">SLIP TUNJANGAN HARI RAYA (THR)</div>
@@ -136,9 +136,9 @@
                     <div class="slip-sig-nip">NIK. {{ $item['nik'] }}</div>
                 </div>
                 <div class="slip-sig-box">
-                    <div class="slip-sig-role">Cianjur, {{ \Carbon\Carbon::now()->translatedFormat('d F Y') }}<br>Bagian Keuangan & Penggajian,</div>
+                    <div class="slip-sig-role">Indramayu, {{ \Carbon\Carbon::now()->translatedFormat('d F Y') }}<br>Bagian Keuangan & Penggajian,</div>
                     <div class="slip-sig-spacer"></div>
-                    <div class="slip-sig-name">PERUMDAM TIRTA MUKTI</div>
+                    <div class="slip-sig-name">PERUMDAM Tirta Darma Ayu</div>
                     <div class="slip-sig-nip">Kasubag / Staf Keuangan</div>
                 </div>
             </div>
