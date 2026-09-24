@@ -45,28 +45,35 @@ class PerubahanNikController extends Controller
         $nikLama = $pegawai['nik'];
         $nikBaru = $validated['nik_baru'];
 
-        // 1. Update NIK utama di Data Pegawai.
-        $pegawaiList = collect($pegawaiList)->map(function ($p) use ($validated, $nikBaru) {
-            if ($p['id'] === $validated['pegawai_id']) {
-                $p['nik'] = $nikBaru;
+        // 1. Update NIK utama di Database Pegawai dan tabel snapshot terkait
+        if (! empty($pegawai['db_id'])) {
+            try {
+                \Illuminate\Support\Facades\DB::table('pegawai')
+                    ->where('id', $pegawai['db_id'])
+                    ->update(['nik' => $nikBaru]);
+
+                \Illuminate\Support\Facades\DB::table('payroll')
+                    ->where('pegawai_id', $pegawai['db_id'])
+                    ->orWhere('nik', $nikLama)
+                    ->update(['nik' => $nikBaru]);
+
+                \Illuminate\Support\Facades\DB::table('thr')
+                    ->where('pegawai_id', $pegawai['db_id'])
+                    ->orWhere('nik', $nikLama)
+                    ->update(['nik' => $nikBaru]);
+
+                \Illuminate\Support\Facades\DB::table('gaji_13')
+                    ->where('pegawai_id', $pegawai['db_id'])
+                    ->orWhere('nik', $nikLama)
+                    ->update(['nik' => $nikBaru]);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('DB update NIK failed: ' . $e->getMessage());
             }
-
-            return $p;
-        })->all();
-        session()->put('dummy_pegawai', $pegawaiList);
-
-        // 2. Cascade update NIK snapshot di Gaji Proses, THR, dan Gaji 13.
-        foreach (['dummy_gaji_proses', 'dummy_thr', 'dummy_gaji13'] as $sessionKey) {
-            $rows = session($sessionKey, []);
-            $rows = collect($rows)->map(function ($row) use ($validated, $nikBaru) {
-                if (($row['pegawai_id'] ?? null) === $validated['pegawai_id']) {
-                    $row['nik'] = $nikBaru;
-                }
-
-                return $row;
-            })->all();
-            session()->put($sessionKey, $rows);
         }
+
+        \Illuminate\Support\Facades\Cache::forget('simpeg_all_pegawai_list');
+        \Illuminate\Support\Facades\Cache::forget('pegawai_master_cache');
+        \Illuminate\Support\Facades\Cache::forget('simpeg_dashboard_stats');
 
         return redirect()->route('perubahan-nik.index')
             ->with('success', "NIK berhasil diubah dari {$nikLama} menjadi {$nikBaru}, termasuk di riwayat Gaji, THR, dan Gaji 13.");

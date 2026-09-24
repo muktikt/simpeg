@@ -7,7 +7,7 @@ use Illuminate\Http\Request;
 class DrdTukinController extends Controller
 {
     /**
-     * DATA DUMMY BERBASIS SESSION.
+     * Modul DRD Tukin.
      *
      * Struktur disamakan dengan sistem lama (set_drd_tukin.php / tambah_drd_tukin.php):
      *   tbl_drd (id_efisiensi, tgl_efisiensi, drd, penerimaan, drd_persen, nik)
@@ -16,29 +16,27 @@ class DrdTukinController extends Controller
      * "drd_persen" (Efisiensi %) DIHITUNG OTOMATIS dari (penerimaan / drd) * 100,
      * persis seperti logic di tambah_drd_tukin.php - bukan input manual.
      */
-    protected function seedIfEmpty(): void
+    protected function storageFile(): string
     {
-        if (! session()->has('dummy_drd')) {
-            session()->put('dummy_drd', [
-                ['id' => 1, 'tanggal' => '2026-03-01', 'nominal_drd' => 48000000, 'nominal_penerimaan' => 44500000],
-                ['id' => 2, 'tanggal' => '2026-04-01', 'nominal_drd' => 50000000, 'nominal_penerimaan' => 46000000],
-                ['id' => 3, 'tanggal' => '2026-05-01', 'nominal_drd' => 50000000, 'nominal_penerimaan' => 47500000],
-                ['id' => 4, 'tanggal' => '2026-06-01', 'nominal_drd' => 50000000, 'nominal_penerimaan' => 49000000],
-                ['id' => 5, 'tanggal' => '2026-07-01', 'nominal_drd' => 52000000, 'nominal_penerimaan' => 50500000],
-            ]);
-        }
+        return storage_path('app/drd_tukin.json');
     }
 
     protected function all(): array
     {
-        $this->seedIfEmpty();
-
-        return session('dummy_drd', []);
+        $file = $this->storageFile();
+        if (file_exists($file)) {
+            $data = json_decode(file_get_contents($file), true);
+            if (is_array($data)) {
+                return $data;
+            }
+        }
+        return [];
     }
 
     protected function save(array $data): void
     {
-        session()->put('dummy_drd', $data);
+        $file = $this->storageFile();
+        @file_put_contents($file, json_encode(array_values($data), JSON_PRETTY_PRINT));
     }
 
     protected function withPersen(array $row): array

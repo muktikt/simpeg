@@ -81,8 +81,8 @@ class ProfileController extends Controller
             }
         }
 
-        // Pastikan keluarga selalu terisi jika ada di DB
-        if (empty($pegawai['keluarga']) && !empty($pegawai['db_id'])) {
+        // Pastikan keluarga selalu terisi langsung dari database DB
+        if (!empty($pegawai['db_id'])) {
             try {
                 $pegawai['keluarga'] = \Illuminate\Support\Facades\DB::table('keluarga')
                     ->where('pegawai_id', $pegawai['db_id'])
@@ -93,6 +93,24 @@ class ProfileController extends Controller
                         $arr['tanggal_lahir'] = $arr['tanggal_lahir'] ?? $arr['tgl_lahir'] ?? '-';
                         $arr['keterangan'] = $arr['keterangan'] ?? $arr['pekerjaan'] ?? '-';
                         $arr['pekerjaan'] = $arr['pekerjaan'] ?? $arr['keterangan'] ?? '-';
+                        return $arr;
+                    })
+                    ->toArray();
+            } catch (\Throwable $e) {}
+
+            try {
+                $pegawai['prestasi'] = \Illuminate\Support\Facades\DB::table('prestasi')
+                    ->where('pegawai_id', $pegawai['db_id'])
+                    ->orderByDesc('id')
+                    ->get()
+                    ->map(function ($r) {
+                        $arr = (array) $r;
+                        if (!empty($arr['keterangan']) && str_starts_with(trim($arr['keterangan']), '{')) {
+                            $dec = json_decode($arr['keterangan'], true);
+                            if (is_array($dec) && !empty($dec['desc'])) {
+                                $arr['keterangan'] = $dec['desc'];
+                            }
+                        }
                         return $arr;
                     })
                     ->toArray();
@@ -111,12 +129,11 @@ class ProfileController extends Controller
         $pegawai['surat_kerja'] = $pegawai['surat_kerja'] ?? null;
         $pegawai['surat_diklat'] = $pegawai['surat_diklat'] ?? null;
  
-        // Default data CV (biodata, diklat, sertifikasi, kompetensi) supaya
-        // aman dipakai di view meski pegawai belum pernah mengisi sama sekali.
-        $pegawai['biodata'] = $pegawai['biodata'] ?? [];
-        $pegawai['diklat'] = $pegawai['diklat'] ?? [];
-        $pegawai['sertifikasi'] = $pegawai['sertifikasi'] ?? [];
-        $pegawai['kompetensi'] = $pegawai['kompetensi'] ?? [];
+        $cv = $this->getPegawaiCv($pegawai['db_id'] ?? $pegawai['nik']);
+        $pegawai['biodata'] = $cv['biodata'] ?? [];
+        $pegawai['diklat'] = $cv['diklat'] ?? [];
+        $pegawai['sertifikasi'] = $cv['sertifikasi'] ?? [];
+        $pegawai['kompetensi'] = $cv['kompetensi'] ?? [];
  
         $cvDetailTypes = [];
         foreach (self::CV_DETAIL_TYPES as $type) {
@@ -126,29 +143,38 @@ class ProfileController extends Controller
         return view('profile.show', compact('userLogin', 'pegawai', 'detailTypes', 'cvDetailTypes'));
     }
  
-    /**
-     * Cari record pegawai (dummy/DB) milik user yang sedang login, dan
-     * pastikan session dummy_pegawai punya entry dengan id yang sama supaya
-     * data CV bisa disimpan/diupdate secara konsisten.
-     */
     protected function currentPegawai(): array
     {
         $userLogin = session('simpeg_user');
         $allPegawai = app(PegawaiController::class)->all();
-        $pegawai = collect($allPegawai)->firstWhere('nik', $userLogin['nik']);
+        $pegawai = collect($allPegawai)->firstWhere('nik', $userLogin['nik'] ?? '');
  
         if (! $pegawai) {
             abort(404, 'Data pegawai tidak ditemukan.');
         }
  
-        $data = session('dummy_pegawai', []);
- 
-        if (! collect($data)->firstWhere('id', $pegawai['id'])) {
-            $data[] = $pegawai;
-            session()->put('dummy_pegawai', $data);
-        }
- 
         return $pegawai;
+    }
+
+    protected function cvStoragePath(mixed $key): string
+    {
+        return storage_path("app/cv_pegawai_{$key}.json");
+    }
+
+    protected function getPegawaiCv(mixed $key): array
+    {
+        $path = $this->cvStoragePath($key);
+        if (file_exists($path)) {
+            $data = json_decode(file_get_contents($path), true);
+            if (is_array($data)) return $data;
+        }
+        return ['biodata' => [], 'kompetensi' => [], 'diklat' => [], 'sertifikasi' => []];
+    }
+
+    protected function savePegawaiCv(mixed $key, array $cv): void
+    {
+        $path = $this->cvStoragePath($key);
+        @file_put_contents($path, json_encode($cv, JSON_PRETTY_PRINT));
     }
  
     /**
@@ -257,21 +283,38 @@ class ProfileController extends Controller
             $fileName = $request->file('file')->getClientOriginalName();
         }
  
-        $allPegawai = collect($allPegawai)->map(function ($p) use ($validated, $fileName) {
-            if ($p['id'] == $validated['pegawai_id']) {
-                $p[$validated['jenis_dokumen']] = [
-                    'nomor' => $validated['nomor'],
-                    'judul' => $validated['judul'],
-                    'tgl_terbit' => $validated['tgl_terbit'],
-                    'file_name' => $fileName,
-                    'file_url' => '#',
-                ];
+        $targetPegawai = collect($allPegawai)->firstWhere('id', $validated['pegawai_id']);
+        if ($targetPegawai && ! empty($targetPegawai['db_id'])) {
+            $fileUrl = '#';
+            if ($request->hasFile('file')) {
+                $file = $request->file('file');
+                $destination = public_path('uploads/dokumen');
+                if (! File::isDirectory($destination)) {
+                    File::makeDirectory($destination, 0755, true, true);
+                }
+                $storedName = time() . '_' . $file->getClientOriginalName();
+                $file->move($destination, $storedName);
+                $fileUrl = url('uploads/dokumen/' . $storedName);
             }
-            return $p;
-        })->all();
- 
-        session()->put('dummy_pegawai', $allPegawai);
- 
+
+            $kategoriDb = $validated['jenis_dokumen'] === 'surat_kerja' ? 'SK' : 'Diklat';
+            try {
+                DB::table('dokumen_pegawai')->updateOrInsert(
+                    ['pegawai_id' => $targetPegawai['db_id'], 'kategori' => $kategoriDb],
+                    [
+                        'nomor' => $validated['nomor'],
+                        'judul' => $validated['judul'],
+                        'file_url' => $fileUrl,
+                        'file_nama' => $fileName,
+                        'diunggah_oleh' => session('simpeg_user.nama_peg') ?? 'Admin SDM',
+                        'created_at' => now(),
+                    ]
+                );
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('DB uploadDokumen failed: ' . $e->getMessage());
+            }
+        }
+
         return back()->with('success', 'Dokumen berhasil diunggah/diperbarui oleh Admin SDM.');
     }
  
@@ -291,24 +334,30 @@ class ProfileController extends Controller
         ]);
  
         $pegawai = $this->currentPegawai();
- 
-        $data = collect(session('dummy_pegawai', []))->map(function ($p) use ($pegawai, $validated) {
-            if ($p['id'] === $pegawai['id']) {
-                $p['biodata'] = $validated;
- 
-                // Alamat & telepon dipakai juga di header profil, jadi disinkronkan.
-                if (! empty($validated['alamat'])) {
-                    $p['alamat'] = $validated['alamat'];
+        $cvKey = $pegawai['db_id'] ?? $pegawai['nik'];
+        $cv = $this->getPegawaiCv($cvKey);
+        $cv['biodata'] = $validated;
+        $this->savePegawaiCv($cvKey, $cv);
+
+        if (! empty($pegawai['db_id'])) {
+            try {
+                $dbUpdates = [];
+                if (! empty($validated['alamat'])) $dbUpdates['alamat'] = $validated['alamat'];
+                if (! empty($validated['telp'])) $dbUpdates['no_telp'] = $validated['telp'];
+                if (! empty($validated['email'])) $dbUpdates['email'] = $validated['email'];
+                if (! empty($validated['status_kawin'])) $dbUpdates['status_pernikahan'] = $validated['status_kawin'];
+                if (! empty($validated['tempat_lahir']) || ! empty($validated['tgl_lahir'])) {
+                    $dbUpdates['tempat_tanggal_lahir'] = trim(($validated['tempat_lahir'] ?? '') . ', ' . ($validated['tgl_lahir'] ?? ''), ', ');
                 }
-                if (! empty($validated['telp'])) {
-                    $p['telp'] = $validated['telp'];
+                if (! empty($dbUpdates)) {
+                    \Illuminate\Support\Facades\DB::table('pegawai')->where('id', $pegawai['db_id'])->update($dbUpdates);
+                    \Illuminate\Support\Facades\Cache::forget('simpeg_all_pegawai_list');
+                    \Illuminate\Support\Facades\Cache::forget('pegawai_master_cache');
                 }
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('DB update biodata failed: ' . $e->getMessage());
             }
- 
-            return $p;
-        })->all();
- 
-        session()->put('dummy_pegawai', $data);
+        }
  
         return redirect()->route('profile.show')->with('success', 'Data Pribadi berhasil disimpan.');
     }
@@ -329,16 +378,10 @@ class ProfileController extends Controller
             ->all();
  
         $pegawai = $this->currentPegawai();
- 
-        $data = collect(session('dummy_pegawai', []))->map(function ($p) use ($pegawai, $items) {
-            if ($p['id'] === $pegawai['id']) {
-                $p['kompetensi'] = $items;
-            }
- 
-            return $p;
-        })->all();
- 
-        session()->put('dummy_pegawai', $data);
+        $cvKey = $pegawai['db_id'] ?? $pegawai['nik'];
+        $cv = $this->getPegawaiCv($cvKey);
+        $cv['kompetensi'] = $items;
+        $this->savePegawaiCv($cvKey, $cv);
  
         return redirect()->route('profile.show')->with('success', 'Kompetensi/Keahlian berhasil disimpan.');
     }
@@ -368,20 +411,14 @@ class ProfileController extends Controller
         $validated = $request->validate($this->cvDetailRules($type));
  
         $pegawai = $this->currentPegawai();
- 
-        $data = collect(session('dummy_pegawai', []))->map(function ($p) use ($pegawai, $type, $validated) {
-            if ($p['id'] === $pegawai['id']) {
-                $items = $p[$type] ?? [];
-                $newId = $items ? max(array_column($items, 'id')) + 1 : 1;
-                $validated['id'] = $newId;
-                $items[] = $validated;
-                $p[$type] = $items;
-            }
- 
-            return $p;
-        })->all();
- 
-        session()->put('dummy_pegawai', $data);
+        $cvKey = $pegawai['db_id'] ?? $pegawai['nik'];
+        $cv = $this->getPegawaiCv($cvKey);
+        $items = $cv[$type] ?? [];
+        $newId = $items ? max(array_column($items, 'id')) + 1 : 1;
+        $validated['id'] = $newId;
+        $items[] = $validated;
+        $cv[$type] = $items;
+        $this->savePegawaiCv($cvKey, $cv);
  
         return redirect()->route('profile.show')->with('success', self::cvDetailFieldConfig($type)['title'].' berhasil ditambahkan.');
     }
@@ -392,22 +429,15 @@ class ProfileController extends Controller
         $validated = $request->validate($this->cvDetailRules($type));
  
         $pegawai = $this->currentPegawai();
- 
-        $data = collect(session('dummy_pegawai', []))->map(function ($p) use ($pegawai, $type, $itemId, $validated) {
-            if ($p['id'] === $pegawai['id']) {
-                $p[$type] = collect($p[$type] ?? [])->map(function ($item) use ($itemId, $validated) {
-                    if ($item['id'] === $itemId) {
-                        return array_merge($item, $validated);
-                    }
- 
-                    return $item;
-                })->all();
+        $cvKey = $pegawai['db_id'] ?? $pegawai['nik'];
+        $cv = $this->getPegawaiCv($cvKey);
+        $cv[$type] = collect($cv[$type] ?? [])->map(function ($item) use ($itemId, $validated) {
+            if ($item['id'] === $itemId) {
+                return array_merge($item, $validated);
             }
- 
-            return $p;
+            return $item;
         })->all();
- 
-        session()->put('dummy_pegawai', $data);
+        $this->savePegawaiCv($cvKey, $cv);
  
         return redirect()->route('profile.show')->with('success', self::cvDetailFieldConfig($type)['title'].' berhasil diperbarui.');
     }
@@ -417,16 +447,10 @@ class ProfileController extends Controller
         $this->validateCvDetailType($type);
  
         $pegawai = $this->currentPegawai();
- 
-        $data = collect(session('dummy_pegawai', []))->map(function ($p) use ($pegawai, $type, $itemId) {
-            if ($p['id'] === $pegawai['id']) {
-                $p[$type] = collect($p[$type] ?? [])->reject(fn ($item) => $item['id'] === $itemId)->values()->all();
-            }
- 
-            return $p;
-        })->all();
- 
-        session()->put('dummy_pegawai', $data);
+        $cvKey = $pegawai['db_id'] ?? $pegawai['nik'];
+        $cv = $this->getPegawaiCv($cvKey);
+        $cv[$type] = collect($cv[$type] ?? [])->reject(fn ($item) => $item['id'] === $itemId)->values()->all();
+        $this->savePegawaiCv($cvKey, $cv);
  
         return redirect()->route('profile.show')->with('success', 'Data berhasil dihapus.');
     }
@@ -438,16 +462,15 @@ class ProfileController extends Controller
     public function cvCetak()
     {
         $pegawai = $this->currentPegawai();
+        $cvKey = $pegawai['db_id'] ?? $pegawai['nik'];
+        $cv = $this->getPegawaiCv($cvKey);
  
-        // Ambil versi terbaru dari session (biar data yang baru disimpan langsung kepakai).
-        $pegawai = collect(session('dummy_pegawai', []))->firstWhere('id', $pegawai['id']) ?? $pegawai;
- 
-        $pegawai['biodata'] = $pegawai['biodata'] ?? [];
+        $pegawai['biodata'] = $cv['biodata'] ?? [];
         $pegawai['pendidikan'] = $pegawai['pendidikan'] ?? [];
         $pegawai['jabatan_riwayat'] = $pegawai['jabatan_riwayat'] ?? [];
-        $pegawai['diklat'] = $pegawai['diklat'] ?? [];
-        $pegawai['sertifikasi'] = $pegawai['sertifikasi'] ?? [];
-        $pegawai['kompetensi'] = $pegawai['kompetensi'] ?? [];
+        $pegawai['diklat'] = $cv['diklat'] ?? [];
+        $pegawai['sertifikasi'] = $cv['sertifikasi'] ?? [];
+        $pegawai['kompetensi'] = $cv['kompetensi'] ?? [];
         $pegawai['prestasi'] = $pegawai['prestasi'] ?? [];
  
         return view('profile.cv-cetak', compact('pegawai'));
@@ -469,17 +492,6 @@ class ProfileController extends Controller
         // Update password di session login yang sedang aktif.
         $userLogin['password'] = $validated['new_password'];
         session()->put('simpeg_user', $userLogin);
- 
-        // Cascade update juga ke daftar akun di modul Pengaturan Akun Pengguna,
-        // supaya tetap konsisten kalau Admin buka daftar itu.
-        $users = collect(session('dummy_userakses', []))->map(function ($u) use ($userLogin, $validated) {
-            if ($u['username'] === $userLogin['nik']) {
-                $u['password'] = $validated['new_password'];
-            }
- 
-            return $u;
-        })->all();
-        session()->put('dummy_userakses', $users);
  
         return redirect()->route('profile.show')->with('success', 'Password berhasil diubah.');
     }

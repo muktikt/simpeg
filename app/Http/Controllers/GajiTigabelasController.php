@@ -9,7 +9,7 @@ class GajiTigabelasController extends Controller
 {
     use HasApprovalChain;
     /**
-     * DATA DUMMY BERBASIS SESSION.
+     * Modul Penggajian Gaji 13 / Tunjangan Pendidikan.
      *
      * "Gaji 13" dan "Tunjangan Pendidikan" adalah MODUL YANG SAMA di sistem
      * lama - dicek langsung ke menu_incl.php, menu "Laporan Tunj. Pendidikan"
@@ -99,7 +99,7 @@ class GajiTigabelasController extends Controller
                 return $data;
             }
         }
-        return session('dummy_gaji13', []);
+        return [];
     }
 
     public function all(): array
@@ -131,7 +131,6 @@ class GajiTigabelasController extends Controller
         $file = $this->storageFile();
         $clean = array_values($data);
         @file_put_contents($file, json_encode($clean, JSON_PRETTY_PRINT));
-        session()->put('dummy_gaji13', $clean);
     }
 
     protected function mapGaji13RowToArray(object $r): array

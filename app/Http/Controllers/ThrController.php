@@ -9,7 +9,8 @@ class ThrController extends Controller
 {
     use HasApprovalChain;
     /**
-     * DATA DUMMY BERBASIS SESSION.
+     * Modul Penggajian THR (Tunjangan Hari Raya).
+     * Terhubung langsung dengan tabel thr di database Supabase PostgreSQL.
      *
      * Disamakan dengan sistem lama (proses_thr_satuan.php dkk, ~886 baris
      * per file x 8 kategori pegawai, digabung jadi 1 form dinamis).
@@ -92,7 +93,7 @@ class ThrController extends Controller
                 return $data;
             }
         }
-        return session('dummy_thr', []);
+        return [];
     }
 
     public function all(): array
@@ -124,7 +125,6 @@ class ThrController extends Controller
         $file = $this->storageFile();
         $clean = array_values($data);
         @file_put_contents($file, json_encode($clean, JSON_PRETTY_PRINT));
-        session()->put('dummy_thr', $clean);
     }
 
     protected function mapThrRowToThrArray(object $r): array

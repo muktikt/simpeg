@@ -8,7 +8,8 @@ use Illuminate\Validation\Rule;
 class SanksiController extends Controller
 {
     /**
-     * DATA DUMMY BERBASIS SESSION.
+     * Modul Sanksi Pegawai.
+     * Terhubung langsung dengan tabel sanksi di database Supabase PostgreSQL.
      *
      * Struktur disamakan dengan sistem lama (set_sanksi_pegawai.php / tambah_sanksi_pegawai.php):
      *   tbl_sanksi (id, id_pegawai, nik, tgl_sanksi, jenis_sanksi, ket_sanksi, pot_persen)
@@ -23,13 +24,6 @@ class SanksiController extends Controller
      */
     public const JENIS_SANKSI = ['Lisan', 'Tulisan', 'Dikeluarkan'];
 
-    protected function seedIfEmpty(): void
-    {
-        if (! session()->has('dummy_sanksi')) {
-            session()->put('dummy_sanksi', []);
-        }
-    }
-
     protected function all(): array
     {
         try {
@@ -39,12 +33,7 @@ class SanksiController extends Controller
             }
         } catch (\Throwable $e) {}
 
-        return session('dummy_sanksi', []);
-    }
-
-    protected function save(array $data): void
-    {
-        session()->put('dummy_sanksi', $data);
+        return [];
     }
 
     protected function pegawaiList(): array
@@ -122,19 +111,29 @@ class SanksiController extends Controller
         $data[] = $validated;
         $this->save($data);
 
-        try {
-            $pegawai = \Illuminate\Support\Facades\DB::table('pegawai')->where('id', $validated['pegawai_id'])->first();
-            \Illuminate\Support\Facades\DB::table('sanksi')->insert([
-                'pegawai_id' => $validated['pegawai_id'],
-                'jenis_sanksi' => $validated['jenis_sanksi'],
-                'no_surat' => 'SK-' . date('Ymd') . '-' . $newId,
-                'tanggal' => $validated['tanggal'],
-                'keterangan' => $validated['keterangan'] ?? '-',
-                'status' => 'AKTIF',
-                'created_at' => now(),
-            ]);
-        } catch (\Throwable $e) {
-            // Fallback
+        $pegawai = $this->pegawaiById($validated['pegawai_id']);
+        $dbPegId = $pegawai['db_id'] ?? null;
+        if (!$dbPegId && !empty($validated['pegawai_id'])) {
+            $dbRow = \Illuminate\Support\Facades\DB::table('pegawai')
+                ->where('id', $validated['pegawai_id'])
+                ->orWhere('nik', (string) $validated['pegawai_id'])
+                ->first();
+            $dbPegId = $dbRow?->id;
+        }
+
+        if ($dbPegId) {
+            try {
+                \Illuminate\Support\Facades\DB::table('sanksi')->insert([
+                    'pegawai_id' => $dbPegId,
+                    'jenis_sanksi' => $validated['jenis_sanksi'],
+                    'tanggal' => $validated['tanggal'],
+                    'keterangan' => $validated['keterangan'] ?? '-',
+                    'tingkat' => $validated['jenis_sanksi'] ?? 'Internal',
+                    'created_at' => now(),
+                ]);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('DB insert sanksi failed: ' . $e->getMessage());
+            }
         }
 
         return redirect()->route('sanksi.index')->with('success', 'Data sanksi pegawai berhasil ditambahkan dan tersimpan ke database.');
@@ -144,6 +143,11 @@ class SanksiController extends Controller
     {
         $sanksi = collect($this->all())->firstWhere('id', $id);
         abort_if(! $sanksi, 404);
+
+        $p = $this->pegawaiById($sanksi['pegawai_id'] ?? null);
+        if ($p) {
+            $sanksi['pegawai_id'] = $p['id'];
+        }
 
         return view('sanksi.edit', [
             'sanksi' => $sanksi,
@@ -155,6 +159,26 @@ class SanksiController extends Controller
     public function update(Request $request, int $id)
     {
         $validated = $this->validateData($request, $id);
+
+        $pegawai = $this->pegawaiById($validated['pegawai_id']);
+        $dbPegId = $pegawai['db_id'] ?? null;
+        if (!$dbPegId && !empty($validated['pegawai_id'])) {
+            $dbRow = \Illuminate\Support\Facades\DB::table('pegawai')
+                ->where('id', $validated['pegawai_id'])
+                ->orWhere('nik', (string) $validated['pegawai_id'])
+                ->first();
+            $dbPegId = $dbRow?->id;
+        }
+
+        try {
+            \Illuminate\Support\Facades\DB::table('sanksi')->where('id', $id)->update([
+                'pegawai_id' => $dbPegId ?: \Illuminate\Support\Facades\DB::raw('pegawai_id'),
+                'jenis_sanksi' => $validated['jenis_sanksi'],
+                'tanggal' => $validated['tanggal'],
+                'keterangan' => $validated['keterangan'] ?? '-',
+                'tingkat' => $validated['jenis_sanksi'] ?? 'Internal',
+            ]);
+        } catch (\Throwable $e) {}
 
         $data = collect($this->all())->map(function ($row) use ($id, $validated) {
             if ($row['id'] === $id) {
@@ -173,6 +197,10 @@ class SanksiController extends Controller
 
     public function destroy(int $id)
     {
+        try {
+            \Illuminate\Support\Facades\DB::table('sanksi')->where('id', $id)->delete();
+        } catch (\Throwable $e) {}
+
         $data = collect($this->all())->reject(fn ($row) => $row['id'] === $id)->values()->all();
         $this->save($data);
 

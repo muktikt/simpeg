@@ -21,27 +21,16 @@ class GajiLaporanController extends Controller
      *   - Lap. BPJSTK           -> tbl_gaji_detail (field tunjangan/potongan_bpjstk)
      *   - Lap. Tunj. Perumahan  -> tbl_gaji_detail (field tunjangan_perumahan)
      *
-     * Jadi semua method di bawah ini murni MENYARING & MERINGKAS data dari
-     * GajiProsesController (dummy_gaji_proses) dan PrestasiController
-     * (dummy_prestasi_gaji) yang sudah ada - tidak ada CRUD baru.
-     * Hanya data yang sudah TERBIT yang ditampilkan (draft tidak dihitung),
-     * mengikuti pola query asli yang selalu mengacu ke data final.
+     * Jadi semua method di bawah ini menyaring & meringkas data dari
+     * GajiProsesController (tabel payroll) dan PrestasiController (tabel prestasi / lembur).
+     * Hanya data yang sudah TERBIT yang ditampilkan (draft tidak dihitung).
      */
     protected function gajiTerbit(int $bulan, int $tahun)
     {
-        $all = collect(app(GajiProsesController::class)->all())
+        return collect(app(GajiProsesController::class)->all())
             ->where('bulan', $bulan)
             ->where('tahun', $tahun)
             ->filter(fn ($row) => $row['status'] === 'terbit' || strtolower($row['status'] ?? '') === 'diterbitkan');
-
-        if ($all->isNotEmpty()) {
-            return $all;
-        }
-
-        return collect(session('dummy_gaji_proses', []))
-            ->where('bulan', $bulan)
-            ->where('tahun', $tahun)
-            ->filter(fn ($row) => $row['status'] === 'terbit');
     }
 
 
@@ -97,21 +86,33 @@ class GajiLaporanController extends Controller
                 });
         } catch (\Throwable $e) {}
 
-        // 2. Data fallback dari session dummy_prestasi_gaji
-        $sessionData = collect(session('dummy_prestasi_gaji', []))
-            ->filter(fn ($row) => \Illuminate\Support\Carbon::parse($row['tanggal'])->month === $bulan
-                && \Illuminate\Support\Carbon::parse($row['tanggal'])->year === $tahun
-                && ($row['jam_lembur'] ?? 0) > 0)
-            ->map(function ($row) {
-                $p = $this->pegawaiById($row['pegawai_id'] ?? null);
-                $row['nik'] = $p['nik'] ?? ($row['nik'] ?? '-');
-                $row['nama'] = $p['nama'] ?? ($row['nama'] ?? '-');
-                $row['nominal_lembur'] = ($row['jam_lembur'] ?? 0) * PrestasiController::RATE_LEMBUR_PER_JAM;
+        // 2. Ambil juga data lembur dari tabel lembur (misal dari input Set Prestasi)
+        $namaBulan = \App\Http\Controllers\AbsensiController::BULAN[$bulan] ?? '';
+        $periodeStr = "$namaBulan $tahun";
+        $dbLemburRows = collect();
+        try {
+            $dbLemburRows = \Illuminate\Support\Facades\DB::table('lembur')
+                ->leftJoin('pegawai', 'lembur.pegawai_id', '=', 'pegawai.id')
+                ->where('lembur.bulan', 'ilike', "%$periodeStr%")
+                ->select(
+                    'lembur.id',
+                    'lembur.pegawai_id',
+                    'pegawai.nik',
+                    'pegawai.name as nama',
+                    'lembur.uang_lembur as nominal_lembur',
+                    'lembur.jam_lembur',
+                    'lembur.bulan as periode'
+                )
+                ->get()
+                ->map(function ($r) {
+                    $arr = (array) $r;
+                    $arr['nominal_lembur'] = (float) ($arr['nominal_lembur'] ?? 0);
+                    $arr['jam_lembur'] = (float) ($arr['jam_lembur'] ?? 0);
+                    return $arr;
+                });
+        } catch (\Throwable $e) {}
 
-                return $row;
-            });
-
-        $data = $payrollLembur->concat($sessionData)->unique('nik');
+        $data = $payrollLembur->concat($dbLemburRows)->unique('nik');
 
         $riwayatLembur = [];
 
@@ -119,10 +120,10 @@ class GajiLaporanController extends Controller
             $myNik = $userLogin['nik'] ?? '';
             $data = $data->where('nik', $myNik);
 
-            // Ambil semua riwayat lembur milik pegawai ini dari tabel payroll
-            $dbRiwayat = collect();
+            // Ambil semua riwayat lembur milik pegawai ini dari tabel payroll & lembur
+            $dbRiwayatPayroll = collect();
             try {
-                $dbRiwayat = \Illuminate\Support\Facades\DB::table('payroll')
+                $dbRiwayatPayroll = \Illuminate\Support\Facades\DB::table('payroll')
                     ->leftJoin('pegawai', 'payroll.pegawai_id', '=', 'pegawai.id')
                     ->where('pegawai.nik', $myNik)
                     ->where('payroll.lembur', '>', 0)
@@ -145,18 +146,24 @@ class GajiLaporanController extends Controller
                     });
             } catch (\Throwable $e) {}
 
-            $sessionRiwayat = collect(session('dummy_prestasi_gaji', []))
-                ->filter(fn ($row) => ($row['jam_lembur'] ?? 0) > 0)
-                ->map(function ($row) {
-                    $p = $this->pegawaiById($row['pegawai_id'] ?? null);
-                    $row['nik'] = $p['nik'] ?? ($row['nik'] ?? '-');
-                    $row['nominal_lembur'] = ($row['jam_lembur'] ?? 0) * PrestasiController::RATE_LEMBUR_PER_JAM;
-                    $row['bulan_nama'] = \Illuminate\Support\Carbon::parse($row['tanggal'])->translatedFormat('F Y');
-                    return $row;
-                })
-                ->where('nik', $myNik);
+            $dbRiwayatLembur = collect();
+            try {
+                $dbRiwayatLembur = \Illuminate\Support\Facades\DB::table('lembur')
+                    ->leftJoin('pegawai', 'lembur.pegawai_id', '=', 'pegawai.id')
+                    ->where('pegawai.nik', $myNik)
+                    ->select(
+                        'lembur.id',
+                        'pegawai.nik',
+                        'pegawai.name as nama',
+                        'lembur.uang_lembur as nominal_lembur',
+                        'lembur.bulan as bulan_nama',
+                        'lembur.jam_lembur'
+                    )
+                    ->get()
+                    ->map(fn ($r) => (array) $r);
+            } catch (\Throwable $e) {}
 
-            $riwayatLembur = $dbRiwayat->concat($sessionRiwayat)->unique('bulan_nama')->values();
+            $riwayatLembur = $dbRiwayatPayroll->concat($dbRiwayatLembur)->unique('bulan_nama')->values();
         }
 
         $data = $data->sortBy('nama')->values();

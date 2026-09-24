@@ -7,11 +7,8 @@ use Illuminate\Http\Request;
 class AbsensiController extends Controller
 {
     /**
-     * DATA DUMMY BERBASIS SESSION - sama seperti PegawaiController.
-     * Ganti pakai Eloquent Model (tbl_absensi) kalau sudah siap ke database asli.
-     *
-     * Data pegawai ditarik dari session 'dummy_pegawai' (modul Data Pegawai)
-     * supaya nyambung - satu sumber data yang sama, bukan data pegawai sendiri lagi.
+     * Data presensi terintegrasi langsung dengan database Supabase (tabel attendance).
+     * Data pegawai ditarik dari PegawaiController yang membaca tabel pegawai.
      */
     public const BULAN = [
         1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
@@ -19,23 +16,37 @@ class AbsensiController extends Controller
         9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember',
     ];
 
-    protected function seedIfEmpty(): void
-    {
-        if (! session()->has('dummy_absensi')) {
-            session()->put('dummy_absensi', []);
-        }
-    }
-
     protected function all(): array
     {
-        $this->seedIfEmpty();
+        try {
+            $rows = \Illuminate\Support\Facades\DB::table('attendance')
+                ->leftJoin('pegawai', 'attendance.pegawai_id', '=', 'pegawai.id')
+                ->select('attendance.*', 'pegawai.nik as p_nik', 'pegawai.name as p_name', 'pegawai.unit_kerja as p_unit_kerja')
+                ->orderByDesc('attendance.id')
+                ->get();
+            if ($rows->isNotEmpty()) {
+                return $rows->map(function ($r) {
+                    $arr = (array) $r;
+                    $p = $this->pegawaiById($arr['pegawai_id'] ?? null);
+                    $arr['pegawai_id'] = $p['id'] ?? $arr['pegawai_id'];
+                    $arr['nik'] = $arr['p_nik'] ?? $p['nik'] ?? '-';
+                    $arr['nama'] = $arr['p_name'] ?? $p['nama'] ?? '-';
+                    $arr['unit_kerja'] = $arr['p_unit_kerja'] ?? $p['unit_kerja'] ?? '-';
+                    $arr['hari_kerja'] = (int) cache()->get('simpeg_hari_kerja', 25);
+                    $arr['hadir'] = (int) ($arr['hadir'] ?? 0);
+                    $arr['telat'] = (int) ($arr['telat'] ?? 0);
+                    $arr['izin'] = (int) ($arr['izin'] ?? 0);
+                    $arr['sakit'] = 0;
+                    $arr['alpha'] = (int) ($arr['telat'] ?? 0);
+                    $arr['keterangan'] = '-';
+                    return $arr;
+                })->toArray();
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('DB read attendance failed: ' . $e->getMessage());
+        }
 
-        return session('dummy_absensi', []);
-    }
-
-    protected function save(array $data): void
-    {
-        session()->put('dummy_absensi', $data);
+        return [];
     }
 
     protected function pegawaiList(): array
@@ -74,14 +85,10 @@ class AbsensiController extends Controller
 
     /**
      * SET Hari Kerja - disamakan dengan sistem lama (set_hari_kerja.php).
-     * Ternyata cuma SATU nilai global (tbl_hari_kerja, tanpa filter id di
-     * query UPDATE-nya - bukan daftar per bulan/tahun, cuma 1 angka
-     * "Hari Kerja dalam 1 Bulan" yang dipakai di seluruh sistem). Karena
-     * itu di sini tidak dibuat CRUD, cukup 1 halaman edit nilai tunggal.
      */
     public function hariKerjaEdit()
     {
-        $hariKerja = session('dummy_hari_kerja', 25);
+        $hariKerja = cache()->get('simpeg_hari_kerja', 25);
 
         return view('absensi.hari-kerja', compact('hariKerja'));
     }
@@ -92,7 +99,7 @@ class AbsensiController extends Controller
             'hari_kerja' => 'required|integer|min:1|max:31',
         ]);
 
-        session()->put('dummy_hari_kerja', $validated['hari_kerja']);
+        cache()->forever('simpeg_hari_kerja', $validated['hari_kerja']);
 
         return redirect()->route('absensi.hari-kerja')->with('success', 'Hari kerja berhasil diperbarui.');
     }
@@ -133,15 +140,36 @@ class AbsensiController extends Controller
     {
         $validated = $this->validateData($request);
 
-        $data = $this->all();
-        $newId = $data ? max(array_column($data, 'id')) + 1 : 1;
-        $validated['id'] = $newId;
+        $pegawai = $this->pegawaiById($validated['pegawai_id']);
+        $dbPegId = $pegawai['db_id'] ?? null;
+        if (!$dbPegId && !empty($validated['pegawai_id'])) {
+            $dbRow = \Illuminate\Support\Facades\DB::table('pegawai')
+                ->where('id', $validated['pegawai_id'])
+                ->orWhere('nik', (string) $validated['pegawai_id'])
+                ->first();
+            $dbPegId = $dbRow?->id;
+        }
 
-        $data[] = $validated;
-        $this->save($data);
+        if ($dbPegId) {
+            try {
+                $bulanLabel = self::BULAN[$validated['bulan']] ?? "Bulan {$validated['bulan']}";
+                \Illuminate\Support\Facades\DB::table('attendance')->insert([
+                    'pegawai_id' => $dbPegId,
+                    'tahun' => $validated['tahun'],
+                    'bulan' => $validated['bulan'],
+                    'bulan_label' => "{$bulanLabel} {$validated['tahun']}",
+                    'hadir' => $validated['hadir'],
+                    'telat' => $validated['alpha'] ?? 0,
+                    'izin' => ($validated['izin'] ?? 0) + ($validated['sakit'] ?? 0),
+                    'created_at' => now(),
+                ]);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('DB insert attendance failed: ' . $e->getMessage());
+            }
+        }
 
         return redirect()->route('absensi.index', ['bulan' => $validated['bulan'], 'tahun' => $validated['tahun']])
-            ->with('success', 'Data absensi berhasil ditambahkan.');
+            ->with('success', 'Data absensi berhasil ditambahkan ke database.');
     }
 
     public function edit(int $id)
@@ -160,17 +188,28 @@ class AbsensiController extends Controller
     {
         $validated = $this->validateData($request);
 
-        $data = collect($this->all())->map(function ($row) use ($id, $validated) {
-            if ($row['id'] === $id) {
-                $validated['id'] = $id;
+        $pegawai = $this->pegawaiById($validated['pegawai_id']);
+        $dbPegId = $pegawai['db_id'] ?? null;
+        if (!$dbPegId && !empty($validated['pegawai_id'])) {
+            $dbRow = \Illuminate\Support\Facades\DB::table('pegawai')
+                ->where('id', $validated['pegawai_id'])
+                ->orWhere('nik', (string) $validated['pegawai_id'])
+                ->first();
+            $dbPegId = $dbRow?->id;
+        }
 
-                return $validated;
-            }
-
-            return $row;
-        })->all();
-
-        $this->save($data);
+        try {
+            $bulanLabel = self::BULAN[$validated['bulan']] ?? "Bulan {$validated['bulan']}";
+            \Illuminate\Support\Facades\DB::table('attendance')->where('id', $id)->update([
+                'pegawai_id' => $dbPegId ?: \Illuminate\Support\Facades\DB::raw('pegawai_id'),
+                'tahun' => $validated['tahun'],
+                'bulan' => $validated['bulan'],
+                'bulan_label' => "{$bulanLabel} {$validated['tahun']}",
+                'hadir' => $validated['hadir'],
+                'telat' => $validated['alpha'] ?? 0,
+                'izin' => ($validated['izin'] ?? 0) + ($validated['sakit'] ?? 0),
+            ]);
+        } catch (\Throwable $e) {}
 
         return redirect()->route('absensi.index', ['bulan' => $validated['bulan'], 'tahun' => $validated['tahun']])
             ->with('success', 'Data absensi berhasil diperbarui.');
@@ -182,8 +221,9 @@ class AbsensiController extends Controller
         $bulan = $request->input('bulan', $request->query('bulan', $item['bulan'] ?? null));
         $tahun = $request->input('tahun', $request->query('tahun', $item['tahun'] ?? null));
 
-        $data = collect($this->all())->reject(fn ($row) => $row['id'] === $id)->values()->all();
-        $this->save($data);
+        try {
+            \Illuminate\Support\Facades\DB::table('attendance')->where('id', $id)->delete();
+        } catch (\Throwable $e) {}
 
         $params = [];
         if ($bulan) {

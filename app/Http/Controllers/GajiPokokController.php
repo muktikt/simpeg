@@ -7,7 +7,7 @@ use Illuminate\Http\Request;
 class GajiPokokController extends Controller
 {
     /**
-     * DATA DUMMY BERBASIS SESSION.
+     * Modul Pengelolaan Gaji Pokok.
      *
      * Struktur ini disamakan dengan sistem lama (set_gaji_pokok.php):
      *   tbl_gapok (id_gapok, id_golongan, tahun_golongan, nominal_gapok)
@@ -18,34 +18,27 @@ class GajiPokokController extends Controller
      * Sistem lama TIDAK punya fitur hapus (cuma tambah + edit), jadi di
      * sini juga sengaja tidak ada tombol hapus, mengikuti aslinya.
      */
-    protected function seedIfEmpty(): void
+    protected function storageFile(): string
     {
-        if (! session()->has('dummy_gapok')) {
-            session()->put('dummy_gapok', [
-                ['id' => 1, 'golongan' => 'II/C', 'masa_kerja' => '0-5 tahun', 'nominal' => 2900000],
-                ['id' => 2, 'golongan' => 'II/D', 'masa_kerja' => '0-5 tahun', 'nominal' => 3200000],
-                ['id' => 3, 'golongan' => 'II/D', 'masa_kerja' => '6-10 tahun', 'nominal' => 3600000],
-                ['id' => 4, 'golongan' => 'III/A', 'masa_kerja' => '0-5 tahun', 'nominal' => 3800000],
-                ['id' => 5, 'golongan' => 'III/A', 'masa_kerja' => '6-10 tahun', 'nominal' => 4300000],
-                ['id' => 6, 'golongan' => 'III/B', 'masa_kerja' => '0-5 tahun', 'nominal' => 4100000],
-                ['id' => 7, 'golongan' => 'III/B', 'masa_kerja' => '6-10 tahun', 'nominal' => 4600000],
-                ['id' => 8, 'golongan' => 'IV/A', 'masa_kerja' => '0-5 tahun', 'nominal' => 5200000],
-                ['id' => 9, 'golongan' => 'IV/A', 'masa_kerja' => '6-10 tahun', 'nominal' => 5800000],
-                ['id' => 10, 'golongan' => 'IV/B', 'masa_kerja' => '0-5 tahun', 'nominal' => 6500000],
-            ]);
-        }
+        return storage_path('app/gaji_pokok.json');
     }
 
     protected function all(): array
     {
-        $this->seedIfEmpty();
-
-        return session('dummy_gapok', []);
+        $file = $this->storageFile();
+        if (file_exists($file)) {
+            $data = json_decode(file_get_contents($file), true);
+            if (is_array($data)) {
+                return $data;
+            }
+        }
+        return [];
     }
 
     protected function save(array $data): void
     {
-        session()->put('dummy_gapok', $data);
+        $file = $this->storageFile();
+        @file_put_contents($file, json_encode(array_values($data), JSON_PRETTY_PRINT));
     }
 
     public function index()

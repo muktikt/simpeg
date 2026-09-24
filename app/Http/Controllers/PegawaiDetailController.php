@@ -12,7 +12,7 @@ class PegawaiDetailController extends Controller
      * lama ini 15 file terpisah (tambah/edit/hapus x 5 jenis), sekarang
      * digabung jadi 1 controller dengan parameter $type.
      *
-     * Data masih dummy (session), lihat catatan yang sama di PegawaiController.
+     * Terhubung langsung dengan tabel database Supabase (keluarga, riwayat_golongan, riwayat_jabatan, pendidikan, prestasi).
      */
     public const TYPES = ['keluarga', 'golongan', 'jabatan_riwayat', 'pendidikan', 'prestasi'];
 
@@ -153,22 +153,6 @@ class PegawaiDetailController extends Controller
             }
         }
 
-        $data = session('dummy_pegawai', []);
-
-        $data = collect($data)->map(function ($p) use ($pegawaiId, $type, $validated, $insertedDbId) {
-            if ($p['id'] === $pegawaiId) {
-                $items = $p[$type] ?? [];
-                $newId = $insertedDbId ?: ($items ? max(array_column($items, 'id')) + 1 : 1);
-                $validated['id'] = $newId;
-                $items[] = $validated;
-                $p[$type] = $items;
-            }
-
-            return $p;
-        })->all();
-
-        session()->put('dummy_pegawai', $data);
-
         // Bersihkan cache agar data terbaru langsung termuat di profil web dan mobile
         \Illuminate\Support\Facades\Cache::forget('simpeg_all_pegawai_list');
         \Illuminate\Support\Facades\Cache::forget('pegawai_master_cache');
@@ -220,24 +204,6 @@ class PegawaiDetailController extends Controller
             \Illuminate\Support\Facades\Log::warning("DB update detail $type failed: " . $e->getMessage());
         }
 
-        $data = session('dummy_pegawai', []);
-
-        $data = collect($data)->map(function ($p) use ($pegawaiId, $type, $itemId, $validated) {
-            if ($p['id'] === $pegawaiId) {
-                $p[$type] = collect($p[$type] ?? [])->map(function ($item) use ($itemId, $validated) {
-                    if ($item['id'] === $itemId) {
-                        return array_merge($item, $validated);
-                    }
-
-                    return $item;
-                })->all();
-            }
-
-            return $p;
-        })->all();
-
-        session()->put('dummy_pegawai', $data);
-
         \Illuminate\Support\Facades\Cache::forget('simpeg_all_pegawai_list');
         \Illuminate\Support\Facades\Cache::forget('pegawai_master_cache');
         \Illuminate\Support\Facades\Cache::forget('simpeg_dashboard_stats');
@@ -265,18 +231,6 @@ class PegawaiDetailController extends Controller
                 \Illuminate\Support\Facades\Log::warning("DB destroy detail $type failed: " . $e->getMessage());
             }
         }
-
-        $data = session('dummy_pegawai', []);
-
-        $data = collect($data)->map(function ($p) use ($pegawaiId, $type, $itemId) {
-            if ($p['id'] === $pegawaiId) {
-                $p[$type] = collect($p[$type] ?? [])->reject(fn ($item) => $item['id'] === $itemId)->values()->all();
-            }
-
-            return $p;
-        })->all();
-
-        session()->put('dummy_pegawai', $data);
 
         \Illuminate\Support\Facades\Cache::forget('simpeg_all_pegawai_list');
         \Illuminate\Support\Facades\Cache::forget('pegawai_master_cache');

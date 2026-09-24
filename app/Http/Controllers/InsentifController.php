@@ -29,9 +29,6 @@ class InsentifController extends Controller
         if ($sumber === 'gaji_bulanan') {
             // Ambil dari GajiProsesController yang membaca database Supabase tabel 'payroll'
             $allGaji = app(GajiProsesController::class)->all();
-            if (empty($allGaji)) {
-                $allGaji = session('dummy_gaji_proses', []);
-            }
 
             $data = collect($allGaji)
                 ->filter(function ($row) use ($bulan, $tahun) {
@@ -45,9 +42,6 @@ class InsentifController extends Controller
         } else {
             // Ambil dari GajiTigabelasController yang membaca tabel gaji_13 / payroll
             $allGaji13 = app(GajiTigabelasController::class)->all();
-            if (empty($allGaji13)) {
-                $allGaji13 = session('dummy_gaji13', []);
-            }
 
             $data = collect($allGaji13)
                 ->filter(function ($row) use ($tahun) {

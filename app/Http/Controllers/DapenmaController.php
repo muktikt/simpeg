@@ -7,7 +7,7 @@ use Illuminate\Http\Request;
 class DapenmaController extends Controller
 {
     /**
-     * DATA DUMMY BERBASIS SESSION.
+     * Modul Pengelolaan Data Dapenma.
      *
      * Disamakan dengan sistem lama (set_phdp_dapenma.php / tambah_peserta_dapenma.php):
      *   tbl_dapenma (id, nik, nomor_peserta, nominal_phdp, nominal_beban,
@@ -16,23 +16,27 @@ class DapenmaController extends Controller
      * Formula ditemukan di kode asli: Nominal Beban = 5% x Nominal PHDP,
      * dihitung otomatis (bukan input manual).
      */
-    protected function seedIfEmpty(): void
+    protected function storageFile(): string
     {
-        if (! session()->has('dummy_dapenma')) {
-            session()->put('dummy_dapenma', []);
-        }
+        return storage_path('app/dapenma.json');
     }
 
     protected function all(): array
     {
-        $this->seedIfEmpty();
-
-        return session('dummy_dapenma', []);
+        $file = $this->storageFile();
+        if (file_exists($file)) {
+            $data = json_decode(file_get_contents($file), true);
+            if (is_array($data)) {
+                return $data;
+            }
+        }
+        return [];
     }
 
     protected function save(array $data): void
     {
-        session()->put('dummy_dapenma', $data);
+        $file = $this->storageFile();
+        @file_put_contents($file, json_encode(array_values($data), JSON_PRETTY_PRINT));
     }
 
     protected function pegawaiList(): array

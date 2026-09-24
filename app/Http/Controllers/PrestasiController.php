@@ -7,7 +7,8 @@ use Illuminate\Http\Request;
 class PrestasiController extends Controller
 {
     /**
-     * DATA DUMMY BERBASIS SESSION.
+     * Modul Set Prestasi Kerja Bulanan & Sinkronisasi Lembur.
+     * Terhubung langsung dengan tabel prestasi dan lembur di database Supabase PostgreSQL.
      *
      * "Prestasi" di sini BEDA dengan "Prestasi" di Data Pegawai (riwayat
      * penghargaan pribadi). Ini adalah rekap prestasi kerja bulanan yang
@@ -27,28 +28,38 @@ class PrestasiController extends Controller
      */
     public const RATE_LEMBUR_PER_JAM = 9375;
 
-    protected function seedIfEmpty(): void
-    {
-        if (! session()->has('dummy_prestasi_gaji')) {
-            session()->put('dummy_prestasi_gaji', []);
-        }
-    }
-
     protected function all(): array
     {
         try {
-            $rows = \Illuminate\Support\Facades\DB::table('prestasi')->get();
-            if ($rows->isNotEmpty()) {
-                return $rows->map(fn ($r) => (array) $r)->toArray();
-            }
-        } catch (\Throwable $e) {}
+            $rows = \Illuminate\Support\Facades\DB::table('prestasi')->orderByDesc('id')->get();
+            return $rows->map(function ($r) {
+                $arr = (array) $r;
+                $decoded = null;
+                if (!empty($arr['keterangan']) && str_starts_with(trim($arr['keterangan']), '{')) {
+                    $decoded = json_decode($arr['keterangan'], true);
+                }
+                if (is_array($decoded)) {
+                    $arr = array_merge($arr, $decoded);
+                }
+                $arr['karya'] = $arr['karya'] ?? $arr['judul'] ?? '-';
+                $arr['absensi'] = $arr['absensi'] ?? $arr['tingkat'] ?? 'Baik';
+                $arr['alpha'] = $arr['alpha'] ?? 0;
+                $arr['izin_ket'] = $arr['izin_ket'] ?? 0;
+                $arr['izin_non_ket'] = $arr['izin_non_ket'] ?? 0;
+                $arr['sakit_ket'] = $arr['sakit_ket'] ?? 0;
+                $arr['sakit_non_ket'] = $arr['sakit_non_ket'] ?? 0;
+                $arr['dinas_luar'] = $arr['dinas_luar'] ?? 0;
+                $arr['cuti'] = $arr['cuti'] ?? 0;
+                $arr['alasan_cuti'] = $arr['alasan_cuti'] ?? '';
+                $arr['jam_lembur'] = (float) ($arr['jam_lembur'] ?? 0);
+                $arr['nominal_lembur'] = (float) ($arr['nominal_lembur'] ?? ($arr['jam_lembur'] * self::RATE_LEMBUR_PER_JAM));
+                return $arr;
+            })->toArray();
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('DB fetch all prestasi failed: ' . $e->getMessage());
+        }
 
-        return session('dummy_prestasi_gaji', []);
-    }
-
-    protected function save(array $data): void
-    {
-        session()->put('dummy_prestasi_gaji', $data);
+        return [];
     }
 
     protected function pegawaiList(): array
@@ -75,12 +86,20 @@ class PrestasiController extends Controller
         $p = $this->pegawaiById($row['pegawai_id'] ?? null);
         $row['nik'] = $p['nik'] ?? ($row['nik'] ?? '-');
         $row['nama'] = $p['nama'] ?? ($row['nama_pegawai'] ?? '(pegawai tidak ditemukan)');
-        $row['karya'] = $row['karya'] ?? '-';
-        $row['absensi'] = $row['absensi'] ?? '-';
+        $row['karya'] = $row['karya'] ?? ($row['judul'] ?? '-');
+        $row['absensi'] = $row['absensi'] ?? ($row['tingkat'] ?? '-');
         $row['jam_lembur'] = (float) ($row['jam_lembur'] ?? 0);
         $row['nominal_lembur_harian'] = self::RATE_LEMBUR_PER_JAM;
         $row['nominal_lembur'] = $row['nominal_lembur'] ?? ($row['jam_lembur'] * self::RATE_LEMBUR_PER_JAM);
         $row['tanggal'] = $row['tanggal'] ?? ($row['created_at'] ?? now()->toDateString());
+        $row['alpha'] = $row['alpha'] ?? 0;
+        $row['izin_ket'] = $row['izin_ket'] ?? 0;
+        $row['izin_non_ket'] = $row['izin_non_ket'] ?? 0;
+        $row['sakit_ket'] = $row['sakit_ket'] ?? 0;
+        $row['sakit_non_ket'] = $row['sakit_non_ket'] ?? 0;
+        $row['dinas_luar'] = $row['dinas_luar'] ?? 0;
+        $row['cuti'] = $row['cuti'] ?? 0;
+        $row['alasan_cuti'] = $row['alasan_cuti'] ?? '';
 
         return $row;
     }
@@ -118,38 +137,90 @@ class PrestasiController extends Controller
     {
         $validated = $this->validateData($request);
 
-        $data = $this->all();
-        $newId = $data ? max(array_column($data, 'id')) + 1 : 1;
-        $validated['id'] = $newId;
-
-        $data[] = $validated;
-        $this->save($data);
-
-        try {
-            \Illuminate\Support\Facades\DB::table('prestasi')->insert([
-                'pegawai_id' => $validated['pegawai_id'],
-                'bulan' => \Illuminate\Support\Carbon::parse($validated['tanggal'])->month,
-                'tahun' => \Illuminate\Support\Carbon::parse($validated['tanggal'])->year,
-                'kehadiran' => $validated['absensi'] ?? 'Baik',
-                'telat' => (int) ($validated['alpha'] ?? 0),
-                'cuti' => (int) ($validated['cuti'] ?? 0),
-                'dinas' => (int) ($validated['dinas_luar'] ?? 0),
-                'lembur' => (int) ($validated['jam_lembur'] ?? 0),
-                'bonus' => 0,
-                'total_prestasi' => 100,
-                'created_at' => now(),
-            ]);
-        } catch (\Throwable $e) {
-            // Fallback
+        // Cari UUID db_id pegawai berdasarkan ID input
+        $pegawai = $this->pegawaiById($validated['pegawai_id']);
+        $dbPegId = $pegawai['db_id'] ?? null;
+        if (!$dbPegId && !empty($validated['pegawai_id'])) {
+            $dbRow = \Illuminate\Support\Facades\DB::table('pegawai')
+                ->where('id', $validated['pegawai_id'])
+                ->orWhere('nik', (string) $validated['pegawai_id'])
+                ->first();
+            $dbPegId = $dbRow?->id;
         }
 
-        return redirect()->route('prestasi.index')->with('success', 'Data prestasi berhasil ditambahkan dan tersinkronisasi ke database.');
+        if (!$dbPegId) {
+            return back()->withInput()->withErrors(['pegawai_id' => 'Pegawai tidak valid atau belum terdaftar di database.']);
+        }
+
+        $jamLembur = (float) ($validated['jam_lembur'] ?? 0);
+        $nominalLembur = (int) round($jamLembur * self::RATE_LEMBUR_PER_JAM);
+
+        $meta = [
+            'desc' => "Karya: {$validated['karya']}, Absensi: {$validated['absensi']}" . ($jamLembur > 0 ? ", Lembur: {$jamLembur} jam (Rp " . number_format($nominalLembur, 0, ',', '.') . ")" : ''),
+            'karya' => $validated['karya'],
+            'absensi' => $validated['absensi'],
+            'jam_lembur' => $jamLembur,
+            'nominal_lembur' => $nominalLembur,
+            'alpha' => (int) ($validated['alpha'] ?? 0),
+            'izin_ket' => (int) ($validated['izin_ket'] ?? 0),
+            'izin_non_ket' => (int) ($validated['izin_non_ket'] ?? 0),
+            'sakit_ket' => (int) ($validated['sakit_ket'] ?? 0),
+            'sakit_non_ket' => (int) ($validated['sakit_non_ket'] ?? 0),
+            'dinas_luar' => (int) ($validated['dinas_luar'] ?? 0),
+            'cuti' => (int) ($validated['cuti'] ?? 0),
+            'alasan_cuti' => $validated['alasan_cuti'] ?? '',
+        ];
+
+        // 1. Simpan ke tabel prestasi di PostgreSQL
+        \Illuminate\Support\Facades\DB::table('prestasi')->insert([
+            'pegawai_id' => $dbPegId,
+            'judul' => $validated['karya'],
+            'tanggal' => $validated['tanggal'],
+            'keterangan' => json_encode($meta),
+            'tingkat' => $validated['absensi'] ?? 'Perusahaan',
+            'created_at' => now(),
+        ]);
+
+        // 2. Sinkron ke tabel lembur jika jam_lembur > 0
+        if ($jamLembur > 0) {
+            try {
+                $tglCarbon = \Illuminate\Support\Carbon::parse($validated['tanggal']);
+                $bulanNama = AbsensiController::BULAN[$tglCarbon->month] ?? $tglCarbon->translatedFormat('F');
+                $periodeLembur = "{$bulanNama} {$tglCarbon->year}";
+
+                \Illuminate\Support\Facades\DB::table('lembur')->updateOrInsert(
+                    [
+                        'pegawai_id' => $dbPegId,
+                        'bulan' => $periodeLembur,
+                    ],
+                    [
+                        'jam_lembur' => (int) round($jamLembur),
+                        'uang_lembur' => $nominalLembur,
+                        'created_at' => now(),
+                    ]
+                );
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Sync prestasi lembur to lembur table failed: ' . $e->getMessage());
+            }
+        }
+
+        // 3. Clear cache pegawai
+        \Illuminate\Support\Facades\Cache::forget('simpeg_all_pegawai_list');
+        \Illuminate\Support\Facades\Cache::forget('pegawai_master_cache');
+        \Illuminate\Support\Facades\Cache::forget('simpeg_dashboard_stats');
+
+        return redirect()->route('prestasi.index')->with('success', 'Data prestasi pegawai berhasil ditambahkan dan tersimpan ke database.');
     }
 
     public function edit(int $id)
     {
         $prestasi = collect($this->all())->firstWhere('id', $id);
         abort_if(! $prestasi, 404);
+
+        $p = $this->pegawaiById($prestasi['pegawai_id'] ?? null);
+        if ($p) {
+            $prestasi['pegawai_id'] = $p['id'];
+        }
 
         return view('prestasi.edit', [
             'prestasi' => $prestasi,
@@ -161,25 +232,79 @@ class PrestasiController extends Controller
     {
         $validated = $this->validateData($request);
 
-        $data = collect($this->all())->map(function ($row) use ($id, $validated) {
-            if ($row['id'] === $id) {
-                $validated['id'] = $id;
+        $pegawai = $this->pegawaiById($validated['pegawai_id']);
+        $dbPegId = $pegawai['db_id'] ?? null;
+        if (!$dbPegId && !empty($validated['pegawai_id'])) {
+            $dbRow = \Illuminate\Support\Facades\DB::table('pegawai')
+                ->where('id', $validated['pegawai_id'])
+                ->orWhere('nik', (string) $validated['pegawai_id'])
+                ->first();
+            $dbPegId = $dbRow?->id;
+        }
 
-                return $validated;
-            }
+        $jamLembur = (float) ($validated['jam_lembur'] ?? 0);
+        $nominalLembur = (int) round($jamLembur * self::RATE_LEMBUR_PER_JAM);
 
-            return $row;
-        })->all();
+        $meta = [
+            'desc' => "Karya: {$validated['karya']}, Absensi: {$validated['absensi']}" . ($jamLembur > 0 ? ", Lembur: {$jamLembur} jam (Rp " . number_format($nominalLembur, 0, ',', '.') . ")" : ''),
+            'karya' => $validated['karya'],
+            'absensi' => $validated['absensi'],
+            'jam_lembur' => $jamLembur,
+            'nominal_lembur' => $nominalLembur,
+            'alpha' => (int) ($validated['alpha'] ?? 0),
+            'izin_ket' => (int) ($validated['izin_ket'] ?? 0),
+            'izin_non_ket' => (int) ($validated['izin_non_ket'] ?? 0),
+            'sakit_ket' => (int) ($validated['sakit_ket'] ?? 0),
+            'sakit_non_ket' => (int) ($validated['sakit_non_ket'] ?? 0),
+            'dinas_luar' => (int) ($validated['dinas_luar'] ?? 0),
+            'cuti' => (int) ($validated['cuti'] ?? 0),
+            'alasan_cuti' => $validated['alasan_cuti'] ?? '',
+        ];
 
-        $this->save($data);
+        \Illuminate\Support\Facades\DB::table('prestasi')->where('id', $id)->update([
+            'pegawai_id' => $dbPegId ?: \Illuminate\Support\Facades\DB::raw('pegawai_id'),
+            'judul' => $validated['karya'],
+            'tanggal' => $validated['tanggal'],
+            'keterangan' => json_encode($meta),
+            'tingkat' => $validated['absensi'] ?? 'Perusahaan',
+        ]);
 
-        return redirect()->route('prestasi.index')->with('success', 'Data prestasi berhasil diperbarui.');
+        if ($dbPegId && $jamLembur > 0) {
+            try {
+                $tglCarbon = \Illuminate\Support\Carbon::parse($validated['tanggal']);
+                $bulanNama = AbsensiController::BULAN[$tglCarbon->month] ?? $tglCarbon->translatedFormat('F');
+                $periodeLembur = "{$bulanNama} {$tglCarbon->year}";
+
+                \Illuminate\Support\Facades\DB::table('lembur')->updateOrInsert(
+                    [
+                        'pegawai_id' => $dbPegId,
+                        'bulan' => $periodeLembur,
+                    ],
+                    [
+                        'jam_lembur' => (int) round($jamLembur),
+                        'uang_lembur' => $nominalLembur,
+                        'created_at' => now(),
+                    ]
+                );
+            } catch (\Throwable $e) {}
+        }
+
+        \Illuminate\Support\Facades\Cache::forget('simpeg_all_pegawai_list');
+        \Illuminate\Support\Facades\Cache::forget('pegawai_master_cache');
+        \Illuminate\Support\Facades\Cache::forget('simpeg_dashboard_stats');
+
+        return redirect()->route('prestasi.index')->with('success', 'Data prestasi pegawai berhasil diperbarui.');
     }
 
     public function destroy(int $id)
     {
-        $data = collect($this->all())->reject(fn ($row) => $row['id'] === $id)->values()->all();
-        $this->save($data);
+        try {
+            \Illuminate\Support\Facades\DB::table('prestasi')->where('id', $id)->delete();
+        } catch (\Throwable $e) {}
+
+        \Illuminate\Support\Facades\Cache::forget('simpeg_all_pegawai_list');
+        \Illuminate\Support\Facades\Cache::forget('pegawai_master_cache');
+        \Illuminate\Support\Facades\Cache::forget('simpeg_dashboard_stats');
 
         return redirect()->route('prestasi.index')->with('success', 'Data prestasi berhasil dihapus.');
     }

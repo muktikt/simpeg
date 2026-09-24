@@ -16,16 +16,24 @@ class CekNikController extends Controller
 
     protected function getPotonganGaji(): array
     {
-        return session('dummy_potongan_gaji', []);
+        try {
+            return \Illuminate\Support\Facades\DB::table('potongan_keu')
+                ->where('tipe', 'gaji')
+                ->get()
+                ->map(fn ($r) => (array) $r)
+                ->toArray();
+        } catch (\Throwable $e) {}
+
+        return [];
     }
 
     public function bulanLalu()
     {
         $target = now()->subMonth();
         $nikList = collect($this->getPotonganGaji())->filter(function ($r) use ($target) {
-            $d = \Carbon\Carbon::parse($r['tgl_potongan']);
+            $d = \Carbon\Carbon::parse($r['tgl_potongan'] ?? $r['created_at'] ?? now());
             return $d->month === $target->month && $d->year === $target->year;
-        })->pluck('nik')->unique()->values();
+        })->pluck('nik')->filter()->unique()->values();
 
         return view('cek-nik.bulan-lalu', compact('nikList'));
     }
@@ -33,9 +41,9 @@ class CekNikController extends Controller
     public function bulanIni()
     {
         $nikList = collect($this->getPotonganGaji())->filter(function ($r) {
-            $d = \Carbon\Carbon::parse($r['tgl_potongan']);
+            $d = \Carbon\Carbon::parse($r['tgl_potongan'] ?? $r['created_at'] ?? now());
             return $d->month === now()->month && $d->year === now()->year;
-        })->pluck('nik')->unique()->values();
+        })->pluck('nik')->filter()->unique()->values();
 
         return view('cek-nik.bulan-ini', compact('nikList'));
     }
@@ -57,16 +65,29 @@ class CekNikController extends Controller
         $bulan = (int) $validated['bulan'];
         $tahun = (int) $validated['tahun'];
 
-        $data = collect($this->getPotonganGaji());
-        $before = $data->count();
-        $data = $data->reject(function ($r) use ($nik, $bulan, $tahun) {
-            $d = \Carbon\Carbon::parse($r['tgl_potongan']);
-            return $r['nik'] === $nik && $d->month === $bulan && $d->year === $tahun;
-        })->values()->all();
+        $deleted = 0;
+        try {
+            // Hapus dari database potongan_keu
+            $rows = \Illuminate\Support\Facades\DB::table('potongan_keu')
+                ->where('tipe', 'gaji')
+                ->where('nik', $nik)
+                ->get();
 
-        session()->put('dummy_potongan_gaji', $data);
+            $idsToDelete = [];
+            foreach ($rows as $row) {
+                $d = \Carbon\Carbon::parse($row->tgl_potongan ?? $row->created_at ?? now());
+                if ($d->month === $bulan && $d->year === $tahun) {
+                    $idsToDelete[] = $row->id;
+                }
+            }
 
-        $deleted = $before - count($data);
+            if (!empty($idsToDelete)) {
+                $deleted = \Illuminate\Support\Facades\DB::table('potongan_keu')
+                    ->whereIn('id', $idsToDelete)
+                    ->delete();
+            }
+        } catch (\Throwable $e) {}
+
         if ($deleted > 0) {
             return back()->with('success', "Berhasil menghapus {$deleted} data potongan NIK {$nik}.");
         }

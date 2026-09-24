@@ -9,7 +9,8 @@ use SimpleXMLElement;
 class PotonganKeuController extends Controller
 {
     /**
-     * DATA DUMMY BERBASIS SESSION — meniru pattern DapenmaController.
+     * Modul Potongan Keuangan (Gaji, THR, Gaji 13).
+     * Terhubung langsung dengan tabel potongan_keu di database Supabase PostgreSQL.
      *
      * Disamakan dengan sistem lama (set_potongan_keu.php / tambah_potongan_keu.php):
      *   tbl_potongan_keu (id_potongan_keu, tgl_potongan, nik,

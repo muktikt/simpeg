@@ -7,27 +7,32 @@ use Illuminate\Http\Request;
 class RekeningBjbController extends Controller
 {
     /**
-     * DATA DUMMY BERBASIS SESSION.
+     * Modul Pengelolaan No. Rekening BJB / BJBS Pegawai.
      *
      * Disamakan dengan sistem lama (set_rekening_bjbs.php):
      *   tbl_rek_bjbs (nik, no_rek)
      */
-    protected function seedIfEmpty(): void
+    protected function storageFile(): string
     {
-        if (! session()->has('dummy_rek_bjb')) {
-            session()->put('dummy_rek_bjb', []);
-        }
+        return storage_path('app/rek_bjb.json');
     }
 
     protected function all(): array
     {
-        $this->seedIfEmpty();
-        return session('dummy_rek_bjb', []);
+        $file = $this->storageFile();
+        if (file_exists($file)) {
+            $data = json_decode(file_get_contents($file), true);
+            if (is_array($data)) {
+                return $data;
+            }
+        }
+        return [];
     }
 
     protected function save(array $data): void
     {
-        session()->put('dummy_rek_bjb', $data);
+        $file = $this->storageFile();
+        @file_put_contents($file, json_encode(array_values($data), JSON_PRETTY_PRINT));
     }
 
     protected ?array $cachedPegawaiList = null;

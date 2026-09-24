@@ -34,22 +34,29 @@ class LaporanPotonganController extends Controller
 
     protected function getData(string $tipe, ?int $bulan = null, ?int $tahun = null): \Illuminate\Support\Collection
     {
-        $key = "dummy_potongan_{$tipe}";
-        $data = collect(session($key, []));
-        $pegawaiMap = collect(app(PegawaiController::class)->all())->keyBy('nik');
-
         $bulan = $bulan ?? now()->month;
         $tahun = $tahun ?? now()->year;
 
-        return $data->filter(function ($r) use ($bulan, $tahun) {
-            $d = \Carbon\Carbon::parse($r['tgl_potongan']);
+        try {
+            $rows = \Illuminate\Support\Facades\DB::table('potongan_keu')
+                ->where('tipe', $tipe)
+                ->get()
+                ->map(fn ($r) => (array) $r);
+        } catch (\Throwable $e) {
+            $rows = collect();
+        }
+
+        $pegawaiMap = collect(app(PegawaiController::class)->all())->keyBy('nik');
+
+        return collect($rows)->filter(function ($r) use ($bulan, $tahun) {
+            $d = \Carbon\Carbon::parse($r['tgl_potongan'] ?? $r['created_at'] ?? now());
             return $d->month === $bulan && $d->year === $tahun;
         })->map(function ($r) use ($pegawaiMap) {
             $p = $pegawaiMap->get($r['nik']);
-            $r['nama'] = $p['nama'] ?? '(tidak ditemukan)';
+            $r['nama'] = $p['nama'] ?? ($r['nama_pegawai'] ?? '(tidak ditemukan)');
             $total = 0;
             foreach ($this->kolom as $k) {
-                $total += $r[$k] ?? 0;
+                $total += (float) ($r[$k] ?? 0);
             }
             $r['total'] = $total;
             return $r;

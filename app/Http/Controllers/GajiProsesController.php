@@ -9,7 +9,7 @@ class GajiProsesController extends Controller
 {
     use HasApprovalChain;
     /**
-     * DATA DUMMY BERBASIS SESSION.
+     * Modul Penggajian / Payroll.
      *
      * Disamakan dengan sistem lama (proses_cek_gaji_satuan.php dkk, ~1390 baris
      * per file x 8 kategori pegawai). Sesuai keputusan konsolidasi, 8 kategori
@@ -98,7 +98,7 @@ class GajiProsesController extends Controller
                 return $data;
             }
         }
-        return session('dummy_gaji_proses', []);
+        return [];
     }
 
     public function all(): array
@@ -130,7 +130,6 @@ class GajiProsesController extends Controller
         $file = $this->storageFile();
         $clean = array_values($data);
         @file_put_contents($file, json_encode($clean, JSON_PRETTY_PRINT));
-        session()->put('dummy_gaji_proses', $clean);
     }
 
     protected function mapPayrollRowToGajiArray(object $r): array
@@ -403,7 +402,7 @@ class GajiProsesController extends Controller
             'selectedKategori' => $kategori,
             'komponenPendapatan' => self::KOMPONEN_PENDAPATAN,
             'komponenPotongan' => self::KOMPONEN_POTONGAN,
-            'gapokList' => session('dummy_gapok', []),
+            'gapokList' => app(GajiPokokController::class)->all(),
         ]);
     }
 

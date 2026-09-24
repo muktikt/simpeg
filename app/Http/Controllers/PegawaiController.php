@@ -8,52 +8,9 @@ use Illuminate\Support\Str;
 class PegawaiController extends Controller
 {
     /**
-     * DATA DUMMY BERBASIS SESSION.
-     *
-     * Ini BUKAN koneksi database - data disimpan di session browser supaya
-     * fitur tambah/edit/hapus beneran bisa dicoba tanpa perlu setup DB dulu.
-     * Data bakal hilang kalau session di-clear / ganti browser.
-     *
-     * Ganti seluruh method di controller ini pakai Eloquent Model (mis. Pegawai::all())
-     * kalau sudah siap dihubungkan ke tabel tbl_pegawai yang asli.
+     * Modul Master Data Pegawai.
+     * Terhubung langsung dengan tabel pegawai di database Supabase PostgreSQL.
      */
-    protected function getDefaultPegawaiList(): array
-    {
-        return [];
-    }
-
-    protected function seedIfEmpty(): void
-    {
-        $defaults = $this->getDefaultPegawaiList();
-        $defaultNiks = array_column($defaults, 'nik');
-
-        if (! session()->has('dummy_pegawai')) {
-            session()->put('dummy_pegawai', $defaults);
-        } else {
-            $existing = session('dummy_pegawai', []);
-            $obsoleteNiks = ['4000000004', '1800004', '1800005', '1800003', '1711254', '1800001'];
-            
-            // Remove obsolete NIKs from session
-            $filtered = array_values(array_filter($existing, function ($item) use ($obsoleteNiks) {
-                return ! in_array($item['nik'] ?? '', $obsoleteNiks, true);
-            }));
-
-            $existingNiks = array_column($filtered, 'nik');
-            $updated = count($filtered) !== count($existing);
-
-            foreach ($defaults as $def) {
-                if (! in_array($def['nik'], $existingNiks, true)) {
-                    $filtered[] = $def;
-                    $updated = true;
-                }
-            }
-
-            if ($updated) {
-                session()->put('dummy_pegawai', $filtered);
-            }
-        }
-    }
-
     protected static ?array $memoryCache = null;
 
     public function all(): array
@@ -91,21 +48,14 @@ class PegawaiController extends Controller
                     return $res;
                 }
             } catch (\Throwable $e) {
-                // Fallback to session defaults
+                \Illuminate\Support\Facades\Log::warning('DB pegawai read failed: ' . $e->getMessage());
             }
 
             return [];
         });
 
-        if (! empty($list)) {
-            static::$memoryCache = $list;
-            return $list;
-        }
-
-        $this->seedIfEmpty();
-        $res = session('dummy_pegawai', []);
-        static::$memoryCache = $res;
-        return $res;
+        static::$memoryCache = $list ?? [];
+        return static::$memoryCache;
     }
 
     protected function save(array $data): void
@@ -113,7 +63,6 @@ class PegawaiController extends Controller
         static::$memoryCache = $data;
         \Illuminate\Support\Facades\Cache::forget('simpeg_all_pegawai_list');
         \Illuminate\Support\Facades\Cache::forget('simpeg_dashboard_stats');
-        session()->put('dummy_pegawai', $data);
     }
 
     public function find(int $id): ?array
@@ -169,8 +118,18 @@ class PegawaiController extends Controller
 
                     $pegawai['prestasi'] = \Illuminate\Support\Facades\DB::table('prestasi')
                         ->where('pegawai_id', $pegawai['db_id'])
+                        ->orderByDesc('id')
                         ->get()
-                        ->map(fn ($r) => (array) $r)
+                        ->map(function ($r) {
+                            $arr = (array) $r;
+                            if (!empty($arr['keterangan']) && str_starts_with(trim($arr['keterangan']), '{')) {
+                                $dec = json_decode($arr['keterangan'], true);
+                                if (is_array($dec) && !empty($dec['desc'])) {
+                                    $arr['keterangan'] = $dec['desc'];
+                                }
+                            }
+                            return $arr;
+                        })
                         ->toArray();
                 } catch (\Throwable $e) {
                     \Illuminate\Support\Facades\Log::warning('DB load pegawai detail relations failed: ' . $e->getMessage());
