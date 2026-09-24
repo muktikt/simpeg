@@ -43,6 +43,7 @@ Route::prefix('v1')->group(function () {
 
     // Dokumen Resmi Kepegawaian (SK & Diklat dari SDM)
     Route::get('/dokumen', [ApiPegawaiController::class, 'dokumenResmi']);
+    Route::get('/dokumen/{id}/download', [ApiPegawaiController::class, 'downloadDokumen']);
 
     // Pengumuman Perusahaan
     Route::get('/pengumuman', [ApiPegawaiController::class, 'pengumuman']);

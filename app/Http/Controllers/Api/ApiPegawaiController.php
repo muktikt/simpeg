@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
 
 class ApiPegawaiController extends Controller
 {
@@ -619,14 +620,23 @@ class ApiPegawaiController extends Controller
                 })
                 ->orderByDesc('created_at')
                 ->get()
-                ->map(function ($d) {
+                ->map(function ($d) use ($request) {
+                    $fileUrl = $d->file_url ?? '';
+                    if (! empty($fileUrl) && $fileUrl !== '#') {
+                        $parsed = parse_url($fileUrl);
+                        $path = $parsed['path'] ?? '';
+                        if (! empty($path) && str_starts_with($path, '/uploads/')) {
+                            $fileUrl = $request->getSchemeAndHttpHost() . $path;
+                        }
+                    }
+
                     return [
                         'id' => $d->id,
                         'pegawai_id' => $d->pegawai_id,
                         'judul' => $d->judul ?? 'Dokumen Resmi Kepegawaian',
                         'kategori' => $d->kategori ?? 'SK',
                         'nomor' => $d->nomor ?? '-',
-                        'file_url' => $d->file_url ?? '',
+                        'file_url' => $fileUrl,
                         'file_nama' => $d->file_nama ?? 'dokumen.pdf',
                         'diunggah_oleh' => $d->diunggah_oleh ?? 'Admin SDM',
                         'created_at' => $d->created_at,
@@ -644,6 +654,27 @@ class ApiPegawaiController extends Controller
                 'data' => [],
             ], 500);
         }
+    }
+
+    /**
+     * Download berkas dokumen resmi fisik langsung via API
+     */
+    public function downloadDokumen($id)
+    {
+        $doc = DB::table('dokumen_pegawai')->where('id', $id)->first();
+        if (! $doc || empty($doc->file_url) || $doc->file_url === '#') {
+            return response()->json(['success' => false, 'message' => 'Berkas fisik dokumen belum diunggah oleh SDM.'], 404);
+        }
+
+        $parsedPath = parse_url($doc->file_url, PHP_URL_PATH);
+        $relativePath = ltrim($parsedPath ?? '', '/');
+        $fullPath = public_path($relativePath);
+
+        if (File::exists($fullPath)) {
+            return response()->download($fullPath, $doc->file_nama ?? 'Dokumen.pdf');
+        }
+
+        return response()->json(['success' => false, 'message' => 'Berkas fisik tidak ditemukan di server.'], 404);
     }
 
     /**
