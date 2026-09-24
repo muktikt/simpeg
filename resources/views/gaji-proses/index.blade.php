@@ -9,24 +9,30 @@
 </div>
 
 <div class="toolbar">
-    <form method="GET" action="{{ route('gaji-proses.index') }}" style="display:flex; gap:10px;">
-        @if (!empty($kategori))
-            <input type="hidden" name="kategori" value="{{ $kategori }}">
-        @endif
-        @if (!empty($status))
-            <input type="hidden" name="status" value="{{ $status }}">
-        @endif
-        <select name="bulan" onchange="this.form.submit()" style="padding:9px 12px; border-radius:9px; border:1px solid var(--border); font-size:13px;">
-            @foreach ($bulanList as $val => $label)
-                <option value="{{ $val }}" @selected($bulan === $val)>{{ $label }}</option>
-            @endforeach
-        </select>
-        <select name="tahun" onchange="this.form.submit()" style="padding:9px 12px; border-radius:9px; border:1px solid var(--border); font-size:13px;">
-            @for ($y = now()->year; $y >= now()->year - 3; $y--)
-                <option value="{{ $y }}" @selected($tahun === $y)>{{ $y }}</option>
-            @endfor
-        </select>
-    </form>
+    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+        <form method="GET" action="{{ route('gaji-proses.index') }}" style="display:flex; gap:10px;">
+            @if (!empty($kategori))
+                <input type="hidden" name="kategori" value="{{ $kategori }}">
+            @endif
+            @if (!empty($status))
+                <input type="hidden" name="status" value="{{ $status }}">
+            @endif
+            <select name="bulan" onchange="this.form.submit()" style="padding:9px 12px; border-radius:9px; border:1px solid var(--border); font-size:13px;">
+                @foreach ($bulanList as $val => $label)
+                    <option value="{{ $val }}" @selected($bulan === $val)>{{ $label }}</option>
+                @endforeach
+            </select>
+            <select name="tahun" onchange="this.form.submit()" style="padding:9px 12px; border-radius:9px; border:1px solid var(--border); font-size:13px;">
+                @for ($y = now()->year; $y >= now()->year - 3; $y--)
+                    <option value="{{ $y }}" @selected($tahun === $y)>{{ $y }}</option>
+                @endfor
+            </select>
+        </form>
+        <div class="search-box">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+            <input type="text" class="table-search-input" placeholder="Cari NIK, nama pegawai, status...">
+        </div>
+    </div>
 
     @if ($status !== 'terbit')
         <a href="{{ route('gaji-proses.create', !empty($kategori) ? ['kategori' => $kategori] : []) }}" class="btn btn-primary">

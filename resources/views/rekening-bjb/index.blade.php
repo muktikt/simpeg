@@ -16,6 +16,10 @@
 @endif
 
 <div class="toolbar">
+    <div class="search-box">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        <input type="text" class="table-search-input" placeholder="Cari NIK, nama pegawai, no. rekening...">
+    </div>
     <a href="{{ route('rekening-bjb.create') }}" class="btn btn-primary">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M12 5v14M5 12h14"/></svg>
         Tambah Rekening BJB

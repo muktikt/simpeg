@@ -11,18 +11,24 @@
 </div>
 
 <div class="toolbar">
-    <form method="GET" action="{{ route('absensi.index') }}" style="display:flex; gap:10px;">
-        <select name="bulan" class="form-group" onchange="this.form.submit()" style="padding:9px 12px; border-radius:9px; border:1px solid var(--border); font-size:13px;">
-            @foreach ($bulanList as $val => $label)
-                <option value="{{ $val }}" @selected($bulan === $val)>{{ $label }}</option>
-            @endforeach
-        </select>
-        <select name="tahun" onchange="this.form.submit()" style="padding:9px 12px; border-radius:9px; border:1px solid var(--border); font-size:13px;">
-            @for ($y = now()->year; $y >= now()->year - 3; $y--)
-                <option value="{{ $y }}" @selected($tahun === $y)>{{ $y }}</option>
-            @endfor
-        </select>
-    </form>
+    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+        <form method="GET" action="{{ route('absensi.index') }}" style="display:flex; gap:10px;">
+            <select name="bulan" class="form-group" onchange="this.form.submit()" style="padding:9px 12px; border-radius:9px; border:1px solid var(--border); font-size:13px;">
+                @foreach ($bulanList as $val => $label)
+                    <option value="{{ $val }}" @selected($bulan === $val)>{{ $label }}</option>
+                @endforeach
+            </select>
+            <select name="tahun" onchange="this.form.submit()" style="padding:9px 12px; border-radius:9px; border:1px solid var(--border); font-size:13px;">
+                @for ($y = now()->year; $y >= now()->year - 3; $y--)
+                    <option value="{{ $y }}" @selected($tahun === $y)>{{ $y }}</option>
+                @endfor
+            </select>
+        </form>
+        <div class="search-box">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+            <input type="text" class="table-search-input" placeholder="Cari NIK, nama, unit kerja...">
+        </div>
+    </div>
 
     @if ($myRole === '1')
         <a href="{{ route('absensi.create', ['bulan' => $bulan, 'tahun' => $tahun]) }}" class="btn btn-primary">

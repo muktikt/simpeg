@@ -163,7 +163,7 @@
     <form method="GET" action="{{ route('potongan-keu.index', $tipe) }}" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; flex:1; max-width:480px;">
         <div style="position:relative; flex:1; min-width:240px;">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="position:absolute; left:12px; top:50%; transform:translateY(-50%); color:#64748B;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <input type="text" name="q" value="{{ $keyword }}" placeholder="Cari NIK, nama pegawai, jabatan..." class="form-control" style="padding-left:36px; height:40px; border-radius:8px; width:100%; border:1px solid #CBD5E1; font-size:13px;">
+            <input type="text" name="q" value="{{ $keyword }}" placeholder="Cari NIK, nama pegawai, jabatan..." class="form-control table-search-input" style="padding-left:36px; height:40px; border-radius:8px; width:100%; border:1px solid #CBD5E1; font-size:13px;">
         </div>
         <button type="submit" class="btn btn-outline" style="height:40px; padding:0 16px; font-weight:600; font-size:13px;">Cari</button>
         @if ($keyword !== '')

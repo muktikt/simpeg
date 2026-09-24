@@ -22,10 +22,16 @@
         </select>
     </form>
 
-    <button type="button" class="btn btn-outline" onclick="window.print()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 9V3h12v6"/><path d="M6 18h12v4H6z"/><rect x="4" y="9" width="16" height="9" rx="1"/></svg>
-        Cetak
-    </button>
+    <div style="display:flex; gap:10px; align-items:center;">
+        <div class="search-box">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+            <input type="text" class="table-search-input" placeholder="Cari NIK, nama, unit kerja...">
+        </div>
+        <button type="button" class="btn btn-outline" onclick="window.print()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 9V3h12v6"/><path d="M6 18h12v4H6z"/><rect x="4" y="9" width="16" height="9" rx="1"/></svg>
+            Cetak
+        </button>
+    </div>
 </div>
 
 <div class="stat-grid" style="grid-template-columns: repeat(5, 1fr);">

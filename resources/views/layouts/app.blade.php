@@ -524,60 +524,143 @@ document.getElementById('global-custom-modal').addEventListener('click', functio
 });
 
 // ==========================================
-// AUTO-SEARCH DEBOUNCE DENGAN CURSOR PRESERVATION
+// UNIVERSAL LIVE TABLE SEARCH & SEARCHABLE PICKER
 // ==========================================
 document.addEventListener('DOMContentLoaded', function() {
-    const searchInputs = document.querySelectorAll('input[name="q"], input[name="search"], input[name="keyword"], .search-box input, .ds-search-input, form.search-bar input');
+    initLiveTableSearch();
+    initSearchablePegawaiSelects();
+});
 
-    // Restore focus and cursor position after auto reload
-    const activeSearchName = sessionStorage.getItem('simpeg_active_search_name');
-    const savedCursorPos = sessionStorage.getItem('simpeg_search_cursor');
-    if (activeSearchName) {
-        sessionStorage.removeItem('simpeg_active_search_name');
-        sessionStorage.removeItem('simpeg_search_cursor');
-        
-        searchInputs.forEach(input => {
-            if ((input.name && input.name === activeSearchName) || (input.id && input.id === activeSearchName) || (input.classList.contains('ds-search-input') && activeSearchName === 'ds-search-input')) {
+function initLiveTableSearch() {
+    const searchInputs = document.querySelectorAll('input.table-search-input, .search-box input:not(.css-input), .ds-search-input, form.search-bar input');
+
+    searchInputs.forEach(input => {
+        // Tambahkan tombol clear jika belum ada di dalam .search-box
+        const parent = input.closest('.search-box');
+        let clearBtn = parent ? parent.querySelector('.search-clear-btn') : null;
+        if (parent && !clearBtn) {
+            clearBtn = document.createElement('button');
+            clearBtn.type = 'button';
+            clearBtn.className = 'search-clear-btn';
+            clearBtn.innerHTML = '&times;';
+            clearBtn.title = 'Hapus pencarian';
+            clearBtn.style.cssText = 'display:none; background:none; border:none; color:#94A3B8; font-size:18px; cursor:pointer; padding:0 4px; line-height:1; flex-shrink:0;';
+            parent.appendChild(clearBtn);
+
+            clearBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                input.value = '';
+                filterTable(input, '');
+                clearBtn.style.display = 'none';
                 input.focus();
-                const pos = savedCursorPos !== null ? parseInt(savedCursorPos, 10) : input.value.length;
-                try {
-                    input.setSelectionRange(pos, pos);
-                } catch (e) {}
+                
+                const form = input.closest('form');
+                if (form && new URLSearchParams(window.location.search).has(input.name || 'q')) {
+                    form.submit();
+                }
+            });
+        }
+
+        const updateClearBtn = () => {
+            if (clearBtn) {
+                clearBtn.style.display = input.value.trim().length > 0 ? 'inline-block' : 'none';
+            }
+        };
+
+        // Live filter saat pengguna mengetik (real-time 0ms delay)
+        input.addEventListener('input', function() {
+            updateClearBtn();
+            filterTable(input, input.value.trim().toLowerCase());
+        });
+
+        // Tombol Escape untuk membersihkan pencarian
+        input.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                input.value = '';
+                updateClearBtn();
+                filterTable(input, '');
+            }
+        });
+
+        // Inisialisasi awal jika ada value
+        updateClearBtn();
+        if (input.value.trim().length > 0) {
+            filterTable(input, input.value.trim().toLowerCase());
+        }
+
+        // Jika input di dalam form pencarian (misal pegawai/index), Enter tetap submit ke backend jika diinginkan
+        const form = input.closest('form');
+        if (form && (input.name === 'q' || input.name === 'search' || input.name === 'keyword')) {
+            input.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    form.submit();
+                }
+            });
+        }
+    });
+
+    function filterTable(input, query) {
+        const container = input.closest('.content') || document;
+        const tables = container.querySelectorAll('table.data-table');
+        if (!tables.length) return;
+
+        tables.forEach(table => {
+            const tbody = table.querySelector('tbody');
+            if (!tbody) return;
+
+            const rows = tbody.querySelectorAll('tr:not(.table-search-empty-row)');
+            let visibleCount = 0;
+            let totalDataRows = 0;
+
+            rows.forEach(row => {
+                if (row.querySelector('.table-empty') && query === '') {
+                    row.style.display = '';
+                    return;
+                }
+                if (row.querySelector('.table-empty') && query !== '') {
+                    row.style.display = 'none';
+                    return;
+                }
+
+                totalDataRows++;
+                if (query === '') {
+                    row.style.display = '';
+                    visibleCount++;
+                } else {
+                    const rowText = row.innerText.toLowerCase();
+                    const isMatch = rowText.includes(query);
+                    row.style.display = isMatch ? '' : 'none';
+                    if (isMatch) visibleCount++;
+                }
+            });
+
+            // Tampilkan pesan kosong jika tidak ada yang cocok
+            let emptyRow = tbody.querySelector('.table-search-empty-row');
+            if (query !== '' && visibleCount === 0 && totalDataRows > 0) {
+                if (!emptyRow) {
+                    emptyRow = document.createElement('tr');
+                    emptyRow.className = 'table-search-empty-row';
+                    const colSpan = (table.querySelectorAll('thead th').length) || 10;
+                    emptyRow.innerHTML = `
+                        <td colspan="${colSpan}" style="text-align:center; padding:36px 16px; color:#64748B;">
+                            <div style="width:40px; height:40px; border-radius:50%; background:#F1F5F9; color:#94A3B8; display:inline-flex; align-items:center; justify-content:center; margin:0 auto 10px auto;">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                            </div>
+                            <div style="font-weight:600; font-size:14px; color:#1E293B;">Tidak ada data yang cocok dengan pencarian "<span class="search-term-text"></span>"</div>
+                            <div style="font-size:12px; color:#94A3B8; margin-top:4px;">Coba gunakan kata kunci lain seperti NIK, Nama, atau Unit Kerja</div>
+                        </td>
+                    `;
+                    tbody.appendChild(emptyRow);
+                }
+                const termSpan = emptyRow.querySelector('.search-term-text');
+                if (termSpan) termSpan.textContent = query;
+                emptyRow.style.display = '';
+            } else if (emptyRow) {
+                emptyRow.remove();
             }
         });
     }
-
-    searchInputs.forEach(input => {
-        let debounceTimer = null;
-        const form = input.closest('form');
-        if (!form) return;
-
-        input.addEventListener('input', function() {
-            clearTimeout(debounceTimer);
-            // Jeda 450ms setelah berhenti mengetik
-            debounceTimer = setTimeout(() => {
-                sessionStorage.setItem('simpeg_active_search_name', input.name || input.id || 'q');
-                sessionStorage.setItem('simpeg_search_cursor', input.selectionStart || input.value.length);
-                form.submit();
-            }, 450);
-        });
-
-        // Jika user tekan Enter, langsung submit seketika
-        input.addEventListener('keydown', function(e) {
-            if (e.key === 'Enter') {
-                clearTimeout(debounceTimer);
-                sessionStorage.setItem('simpeg_active_search_name', input.name || input.id || 'q');
-                sessionStorage.setItem('simpeg_search_cursor', input.selectionStart || input.value.length);
-                form.submit();
-            }
-        });
-    });
-
-    // ==========================================
-    // INITIALIZE SEARCHABLE PEGAWAI SELECT PICKER
-    // ==========================================
-    initSearchablePegawaiSelects();
-});
+}
 
 function initSearchablePegawaiSelects() {
     const selectElements = document.querySelectorAll('select#pegawai_id, select[name="pegawai_id"], select#modal-pegawai-id, select.searchable-pegawai, select[data-searchable="pegawai"]');

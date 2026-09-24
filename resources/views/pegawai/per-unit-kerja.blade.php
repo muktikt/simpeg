@@ -28,10 +28,14 @@
 
 @if ($selected)
     <div class="table-card">
-        <div class="table-card-header" style="padding:16px; border-bottom:1px solid var(--border-color);">
+        <div class="table-card-header" style="padding:16px; border-bottom:1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
             <h3 style="margin:0; font-size:16px; color:var(--text-color);">
                 Unit Kerja: <strong>{{ $selected }}</strong> ({{ $filtered->count() }} Pegawai)
             </h3>
+            <div class="search-box">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+                <input type="text" class="table-search-input" placeholder="Cari NIK, nama, jabatan...">
+            </div>
         </div>
         <table class="data-table">
             <thead>

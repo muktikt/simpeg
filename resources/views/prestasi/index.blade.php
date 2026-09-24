@@ -11,7 +11,10 @@
 </div>
 
 <div class="toolbar">
-    <div></div>
+    <div class="search-box">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        <input type="text" class="table-search-input" placeholder="Cari NIK, nama pegawai, karya...">
+    </div>
     @if ($bisaKelola)
         <a href="{{ route('prestasi.create') }}" class="btn btn-primary">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
