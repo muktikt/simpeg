@@ -559,6 +559,59 @@ class GajiProsesController extends Controller
                     'disetujui_oleh' => $approverNama,
                     'updated_at' => now(),
                 ]);
+
+            if ($nextStatus === 'terbit') {
+                $dbPayroll = \Illuminate\Support\Facades\DB::table('payroll')->where('id', $id)->first();
+                if ($dbPayroll && !empty($dbPayroll->pegawai_id)) {
+                    // 1. Sinkron ke tabel lembur jika ada lembur
+                    if (($dbPayroll->lembur ?? 0) > 0) {
+                        try {
+                            \Illuminate\Support\Facades\DB::table('lembur')->updateOrInsert(
+                                ['pegawai_id' => $dbPayroll->pegawai_id, 'bulan' => $dbPayroll->periode],
+                                [
+                                    'jam_lembur' => max(1, (int) round(($dbPayroll->lembur ?? 0) / 50000)),
+                                    'uang_lembur' => $dbPayroll->lembur,
+                                    'created_at' => now(),
+                                ]
+                            );
+                        } catch (\Throwable $e) {
+                            \Illuminate\Support\Facades\Log::warning('Sync to lembur table failed: ' . $e->getMessage());
+                        }
+                    }
+
+                    // 2. Sinkron ke tabel insentif
+                    try {
+                        \Illuminate\Support\Facades\DB::table('insentif')->updateOrInsert(
+                            ['pegawai_id' => $dbPayroll->pegawai_id, 'periode' => $dbPayroll->periode],
+                            [
+                                'judul' => 'Slip Insentif ' . $dbPayroll->periode,
+                                'insentif_jabatan' => $dbPayroll->tunjangan_jabatan ?? 0,
+                                'insentif_prestasi' => $dbPayroll->tunjangan_prestasi ?? 0,
+                                'insentif_transportasi' => $dbPayroll->tunjangan_transportasi ?? 0,
+                                'insentif_pangan' => $dbPayroll->tunjangan_pangan ?? 0,
+                                'insentif_bpjs_kesehatan' => $dbPayroll->tunjangan_bpjs_kesehatan ?? 0,
+                                'insentif_perumahan' => $dbPayroll->tunjangan_perumahan ?? 0,
+                                'insentif_bpjs_tenaga_kerja' => $dbPayroll->tunjangan_bpjs_tenaga_kerja ?? 0,
+                                'insentif_perusahaan' => $dbPayroll->tunjangan_perusahaan ?? 0,
+                                'lembur' => $dbPayroll->lembur ?? 0,
+                                'insentif_pajak' => $dbPayroll->tunjangan_pajak ?? 0,
+                                'insentif_air_minum' => $dbPayroll->tunjangan_air_minum ?? 0,
+                                'insentif_komunikasi' => $dbPayroll->tunjangan_komunikasi ?? 0,
+                                'potongan_sanksi_perusahaan' => $dbPayroll->potongan_sanksi_perusahaan ?? 0,
+                                'potongan_dapenma' => $dbPayroll->potongan_dapenma ?? 0,
+                                'potongan_bpjs_tenaga_kerja' => $dbPayroll->potongan_bpjs_tenaga_kerja ?? 0,
+                                'potongan_bpjs_kesehatan' => $dbPayroll->potongan_bpjs_kesehatan ?? 0,
+                                'potongan_perumahan' => $dbPayroll->potongan_perumahan ?? 0,
+                                'potongan_pajak' => $dbPayroll->potongan_pajak ?? 0,
+                                'potongan_korpri' => $dbPayroll->potongan_korpri ?? 0,
+                                'created_at' => now(),
+                            ]
+                        );
+                    } catch (\Throwable $e) {
+                        \Illuminate\Support\Facades\Log::warning('Sync to insentif table failed: ' . $e->getMessage());
+                    }
+                }
+            }
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::warning('DB payroll update status failed: ' . $e->getMessage());
         }

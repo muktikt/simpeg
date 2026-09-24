@@ -479,6 +479,15 @@
         </div>
     @else
         <div class="tab-panel {{ $type === $defaultTab ? 'active' : '' }}" data-panel="{{ $type }}">
+            @if ($type === 'keluarga')
+                <div class="toolbar" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+                    <div style="font-size:13px; color:var(--text-muted);">Daftar data keluarga yang tercatat untuk tunjangan & PTKP.</div>
+                    <button type="button" class="btn btn-primary btn-sm" onclick="document.getElementById('modal-tambah-keluarga').style.display='flex'">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M12 5v14M5 12h14"/></svg>
+                        Tambah Anggota Keluarga
+                    </button>
+                </div>
+            @endif
             <div class="table-card">
                 <table class="data-table">
                     <thead>
@@ -486,6 +495,9 @@
                             @foreach ($detailTypes[$type]['fields'] as $field)
                                 <th>{{ $field['label'] }}</th>
                             @endforeach
+                            @if ($type === 'keluarga')
+                                <th style="width:1%"></th>
+                            @endif
                         </tr>
                     </thead>
                     <tbody>
@@ -494,10 +506,23 @@
                                 @foreach ($detailTypes[$type]['fields'] as $field)
                                     <td>{{ $item[$field['key']] ?? '-' }}</td>
                                 @endforeach
+                                @if ($type === 'keluarga' && !empty($item['id']))
+                                    <td>
+                                        <div class="row-actions">
+                                            <form action="{{ route('profile.keluarga.destroy', $item['id']) }}" method="POST" onsubmit="return confirmSubmit(event, 'Hapus anggota keluarga ini?', 'Konfirmasi Hapus', 'danger', 'Ya, Hapus');" style="margin:0;">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="btn btn-danger btn-sm">Hapus</button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                @elseif ($type === 'keluarga')
+                                    <td></td>
+                                @endif
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="{{ count($detailTypes[$type]['fields']) }}">
+                                <td colspan="{{ count($detailTypes[$type]['fields']) + ($type === 'keluarga' ? 1 : 0) }}">
                                     <div class="table-empty">Belum ada data {{ strtolower($label) }}.</div>
                                 </td>
                             </tr>
@@ -547,7 +572,42 @@
     </div>
 </div>
 @endif
- 
+
+{{-- Modal Tambah Keluarga (Pegawai) --}}
+<div id="modal-tambah-keluarga" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:999; justify-content:center; align-items:center;">
+    <div style="background:#fff; width:90%; max-width:480px; border-radius:12px; padding:24px; box-shadow:0 10px 25px rgba(0,0,0,0.2);">
+        <h3 style="margin-top:0; font-size:18px; margin-bottom:6px; color:#0F2A3D;">Tambah Anggota Keluarga</h3>
+        <p style="font-size:13px; color:var(--text-muted); margin-bottom:18px;">Lengkapi data anggota keluarga untuk keperluan tunjangan dan pajak PTKP.</p>
+        <form method="POST" action="{{ route('profile.keluarga.store') }}">
+            @csrf
+            <div class="field" style="margin-bottom:14px;">
+                <label style="font-size:13px; font-weight:600; display:block; margin-bottom:6px;">Nama Lengkap</label>
+                <input type="text" name="nama" required placeholder="Contoh: Siti Aisyah" style="width:100%; padding:9px 12px; border:1px solid #cbd5e1; border-radius:8px; font-size:14px;">
+            </div>
+            <div class="field" style="margin-bottom:14px;">
+                <label style="font-size:13px; font-weight:600; display:block; margin-bottom:6px;">Hubungan Keluarga</label>
+                <select name="hubungan" required style="width:100%; padding:9px 12px; border:1px solid #cbd5e1; border-radius:8px; font-size:14px;">
+                    <option value="Istri/Suami">Istri/Suami</option>
+                    <option value="Anak">Anak</option>
+                    <option value="Orang Tua">Orang Tua</option>
+                </select>
+            </div>
+            <div class="field" style="margin-bottom:14px;">
+                <label style="font-size:13px; font-weight:600; display:block; margin-bottom:6px;">Tanggal Lahir</label>
+                <input type="date" name="tgl_lahir" required style="width:100%; padding:9px 12px; border:1px solid #cbd5e1; border-radius:8px; font-size:14px;">
+            </div>
+            <div class="field" style="margin-bottom:22px;">
+                <label style="font-size:13px; font-weight:600; display:block; margin-bottom:6px;">Pekerjaan / Status Kuliah (Khusus Anak)</label>
+                <input type="text" name="keterangan" placeholder="Contoh: Kuliah / Pelajar / Karyawan Swasta" style="width:100%; padding:9px 12px; border:1px solid #cbd5e1; border-radius:8px; font-size:14px;">
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:8px;">
+                <button type="button" class="btn btn-outline" onclick="document.getElementById('modal-tambah-keluarga').style.display='none'">Batal</button>
+                <button type="submit" class="btn btn-primary">Simpan Anggota Keluarga</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 {{-- Modal generik untuk Diklat & Sertifikasi (CV) --}}
 <div class="modal-overlay" id="cv-modal-overlay">
     <div class="modal-card form-modal">

@@ -116,19 +116,65 @@ class PegawaiController extends Controller
         session()->put('dummy_pegawai', $data);
     }
 
-    protected function find(int $id): ?array
+    public function find(int $id): ?array
     {
         $pegawai = collect($this->all())->firstWhere('id', $id);
         if ($pegawai) {
             // Muat relasi detail hanya untuk pegawai yang dibuka ini (on-demand)
-            if (!empty($pegawai['db_id']) && empty($pegawai['keluarga'])) {
+            if (!empty($pegawai['db_id'])) {
                 try {
-                    $pegawai['keluarga'] = \Illuminate\Support\Facades\DB::table('keluarga')->where('pegawai_id', $pegawai['db_id'])->get()->toArray();
-                    $pegawai['pendidikan'] = \Illuminate\Support\Facades\DB::table('pendidikan')->where('pegawai_id', $pegawai['db_id'])->get()->toArray();
-                    $pegawai['golongan'] = \Illuminate\Support\Facades\DB::table('riwayat_golongan')->where('pegawai_id', $pegawai['db_id'])->get()->toArray();
-                    $pegawai['jabatan_riwayat'] = \Illuminate\Support\Facades\DB::table('riwayat_jabatan')->where('pegawai_id', $pegawai['db_id'])->get()->toArray();
-                    $pegawai['prestasi'] = \Illuminate\Support\Facades\DB::table('prestasi')->where('pegawai_id', $pegawai['db_id'])->get()->toArray();
-                } catch (\Throwable $e) {}
+                    $pegawai['keluarga'] = \Illuminate\Support\Facades\DB::table('keluarga')
+                        ->where('pegawai_id', $pegawai['db_id'])
+                        ->get()
+                        ->map(function ($r) {
+                            $arr = (array) $r;
+                            $arr['tgl_lahir'] = $arr['tgl_lahir'] ?? $arr['tanggal_lahir'] ?? '-';
+                            $arr['tanggal_lahir'] = $arr['tanggal_lahir'] ?? $arr['tgl_lahir'] ?? '-';
+                            $arr['keterangan'] = $arr['keterangan'] ?? $arr['pekerjaan'] ?? '-';
+                            $arr['pekerjaan'] = $arr['pekerjaan'] ?? $arr['keterangan'] ?? '-';
+                            return $arr;
+                        })
+                        ->toArray();
+
+                    $pegawai['pendidikan'] = \Illuminate\Support\Facades\DB::table('pendidikan')
+                        ->where('pegawai_id', $pegawai['db_id'])
+                        ->get()
+                        ->map(function ($r) {
+                            $arr = (array) $r;
+                            $arr['institusi'] = $arr['institusi'] ?? $arr['nama_sekolah'] ?? '-';
+                            $arr['nama_sekolah'] = $arr['nama_sekolah'] ?? $arr['institusi'] ?? '-';
+                            return $arr;
+                        })
+                        ->toArray();
+
+                    $pegawai['golongan'] = \Illuminate\Support\Facades\DB::table('riwayat_golongan')
+                        ->where('pegawai_id', $pegawai['db_id'])
+                        ->get()
+                        ->map(function ($r) {
+                            $arr = (array) $r;
+                            $arr['pangkat'] = $arr['pangkat'] ?? $arr['golongan'] ?? '-';
+                            return $arr;
+                        })
+                        ->toArray();
+
+                    $pegawai['jabatan_riwayat'] = \Illuminate\Support\Facades\DB::table('riwayat_jabatan')
+                        ->where('pegawai_id', $pegawai['db_id'])
+                        ->get()
+                        ->map(function ($r) {
+                            $arr = (array) $r;
+                            $arr['unit_kerja'] = $arr['unit_kerja'] ?? '-';
+                            return $arr;
+                        })
+                        ->toArray();
+
+                    $pegawai['prestasi'] = \Illuminate\Support\Facades\DB::table('prestasi')
+                        ->where('pegawai_id', $pegawai['db_id'])
+                        ->get()
+                        ->map(fn ($r) => (array) $r)
+                        ->toArray();
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::warning('DB load pegawai detail relations failed: ' . $e->getMessage());
+                }
             }
 
             // Muat dokumen resmi riil dari database (tabel dokumen_pegawai)

@@ -53,10 +53,9 @@ class ProfileController extends Controller
     public function show()
     {
         $userLogin = session('simpeg_user');
- 
         $allPegawai = app(PegawaiController::class)->all();
         $pegawai = collect($allPegawai)->firstWhere('nik', $userLogin['nik']);
- 
+
         if (! $pegawai) {
             $pegawai = [
                 'id' => 999,
@@ -74,8 +73,32 @@ class ProfileController extends Controller
                 'pendidikan' => [],
                 'prestasi' => [],
             ];
+        } else {
+            // Muat relasi lengkap dari database (keluarga, golongan, jabatan, dll)
+            $detailData = app(PegawaiController::class)->find($pegawai['id']);
+            if ($detailData) {
+                $pegawai = array_merge($pegawai, $detailData);
+            }
         }
- 
+
+        // Pastikan keluarga selalu terisi jika ada di DB
+        if (empty($pegawai['keluarga']) && !empty($pegawai['db_id'])) {
+            try {
+                $pegawai['keluarga'] = \Illuminate\Support\Facades\DB::table('keluarga')
+                    ->where('pegawai_id', $pegawai['db_id'])
+                    ->get()
+                    ->map(function ($r) {
+                        $arr = (array) $r;
+                        $arr['tgl_lahir'] = $arr['tgl_lahir'] ?? $arr['tanggal_lahir'] ?? '-';
+                        $arr['tanggal_lahir'] = $arr['tanggal_lahir'] ?? $arr['tgl_lahir'] ?? '-';
+                        $arr['keterangan'] = $arr['keterangan'] ?? $arr['pekerjaan'] ?? '-';
+                        $arr['pekerjaan'] = $arr['pekerjaan'] ?? $arr['keterangan'] ?? '-';
+                        return $arr;
+                    })
+                    ->toArray();
+            } catch (\Throwable $e) {}
+        }
+
         $detailTypes = [];
         foreach (PegawaiDetailController::TYPES as $type) {
             $detailTypes[$type] = PegawaiDetailController::fieldConfig($type);
@@ -459,6 +482,53 @@ class ProfileController extends Controller
         session()->put('dummy_userakses', $users);
  
         return redirect()->route('profile.show')->with('success', 'Password berhasil diubah.');
+    }
+
+    public function storeKeluarga(Request $request)
+    {
+        $validated = $request->validate([
+            'nama' => 'required|string|max:150',
+            'hubungan' => 'required|string|max:50',
+            'tgl_lahir' => 'nullable|date',
+            'keterangan' => 'nullable|string|max:100',
+        ]);
+
+        $userLogin = session('simpeg_user');
+        $dbPeg = \Illuminate\Support\Facades\DB::table('pegawai')->where('nik', $userLogin['nik'])->first();
+
+        if ($dbPeg) {
+            \Illuminate\Support\Facades\DB::table('keluarga')->insert([
+                'pegawai_id' => $dbPeg->id,
+                'nama' => $validated['nama'],
+                'hubungan' => $validated['hubungan'],
+                'tanggal_lahir' => $validated['tgl_lahir'] ?? null,
+                'pekerjaan' => $validated['keterangan'] ?? '-',
+                'created_at' => now(),
+            ]);
+
+            \Illuminate\Support\Facades\Cache::forget('simpeg_all_pegawai_list');
+            \Illuminate\Support\Facades\Cache::forget('pegawai_master_cache');
+        }
+
+        return redirect()->route('profile.show')->with('success', 'Data anggota keluarga berhasil ditambahkan.');
+    }
+
+    public function destroyKeluarga(int $id)
+    {
+        $userLogin = session('simpeg_user');
+        $dbPeg = \Illuminate\Support\Facades\DB::table('pegawai')->where('nik', $userLogin['nik'])->first();
+
+        if ($dbPeg) {
+            \Illuminate\Support\Facades\DB::table('keluarga')
+                ->where('id', $id)
+                ->where('pegawai_id', $dbPeg->id)
+                ->delete();
+
+            \Illuminate\Support\Facades\Cache::forget('simpeg_all_pegawai_list');
+            \Illuminate\Support\Facades\Cache::forget('pegawai_master_cache');
+        }
+
+        return redirect()->route('profile.show')->with('success', 'Data anggota keluarga berhasil dihapus.');
     }
 }
  

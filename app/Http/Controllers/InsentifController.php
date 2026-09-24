@@ -22,27 +22,51 @@ class InsentifController extends Controller
      */
     protected function ambilData(Request $request): array
     {
-        $sumber = $request->get('sumber', 'gaji13');
+        $sumber = $request->get('sumber', 'gaji_bulanan');
         $tahun = (int) $request->get('tahun', now()->year);
-        $bulan = null;
+        $bulan = (int) $request->get('bulan', now()->month);
 
         if ($sumber === 'gaji_bulanan') {
-            $bulan = (int) $request->get('bulan', now()->month);
+            // Ambil dari GajiProsesController yang membaca database Supabase tabel 'payroll'
+            $allGaji = app(GajiProsesController::class)->all();
+            if (empty($allGaji)) {
+                $allGaji = session('dummy_gaji_proses', []);
+            }
 
-            $data = collect(session('dummy_gaji_proses', []))
-                ->where('bulan', $bulan)
-                ->where('tahun', $tahun)
-                ->filter(fn ($row) => $row['status'] === 'terbit');
+            $data = collect($allGaji)
+                ->filter(function ($row) use ($bulan, $tahun) {
+                    $mMatch = ((int) ($row['bulan'] ?? 0)) === $bulan;
+                    $yMatch = ((int) ($row['tahun'] ?? 0)) === $tahun;
+                    $status = strtolower($row['status'] ?? '');
+                    $statusMatch = in_array($status, ['terbit', 'diterbitkan'], true);
+
+                    return $mMatch && $yMatch && $statusMatch;
+                });
         } else {
-            $data = collect(session('dummy_gaji13', []))
-                ->where('tahun', $tahun)
-                ->filter(fn ($row) => $row['status'] === 'terbit');
+            // Ambil dari GajiTigabelasController yang membaca tabel gaji_13 / payroll
+            $allGaji13 = app(GajiTigabelasController::class)->all();
+            if (empty($allGaji13)) {
+                $allGaji13 = session('dummy_gaji13', []);
+            }
+
+            $data = collect($allGaji13)
+                ->filter(function ($row) use ($tahun) {
+                    $yMatch = ((int) ($row['tahun'] ?? 0)) === $tahun;
+                    $status = strtolower($row['status'] ?? '');
+                    return $yMatch && in_array($status, ['terbit', 'diterbitkan'], true);
+                });
         }
 
         $pegawaiList = app(PegawaiController::class)->all();
         $data = $data->map(function ($row) use ($pegawaiList) {
-            $p = collect($pegawaiList)->firstWhere('id', $row['pegawai_id']);
-            $row['unit_kerja'] = $p['unit_kerja'] ?? '-';
+            $p = collect($pegawaiList)->first(function ($item) use ($row) {
+                return (!empty($row['pegawai_id']) && (($item['id'] ?? null) == $row['pegawai_id'] || ($item['db_id'] ?? null) == $row['pegawai_id']))
+                    || (!empty($row['nik']) && ($item['nik'] ?? null) == $row['nik']);
+            });
+
+            $row['unit_kerja'] = $p['unit_kerja'] ?? ($row['unit_kerja'] ?? '-');
+            $row['nama'] = $row['nama'] ?? ($p['nama'] ?? 'Pegawai');
+            $row['nik'] = $row['nik'] ?? ($p['nik'] ?? '-');
 
             return $row;
         });
@@ -64,14 +88,45 @@ class InsentifController extends Controller
         $riwayatInsentif = [];
 
         if ($userLogin['userlevel'] === '5' || $request->has('my')) {
-            $data = $data->where('nik', $userLogin['nik']);
+            $myNik = $userLogin['nik'] ?? '';
+            $data = $data->filter(fn ($r) => ($r['nik'] ?? '') === $myNik)->values();
 
-            // Buat data riwayat insentif dummy untuk pegawai login
-            $riwayatInsentif = [
-                ['judul' => 'Insentif Kinerja Triwulan II', 'periode' => 'Juni 2026', 'nominal' => 750000, 'icon' => '⭐'],
-                ['judul' => 'Insentif Kehadiran', 'periode' => 'Mei 2026 &middot; Nihil Telat', 'nominal' => 200000, 'icon' => '🔆'],
-                ['judul' => 'Insentif Kinerja Triwulan I', 'periode' => 'Maret 2026', 'nominal' => 600000, 'icon' => '☑️'],
-            ];
+            // Ambil seluruh riwayat gaji & lembur yang sudah diterbitkan untuk pegawai ini
+            $allMyPayrolls = collect(app(GajiProsesController::class)->all())
+                ->filter(function ($row) use ($myNik) {
+                    $status = strtolower($row['status'] ?? '');
+                    return in_array($status, ['terbit', 'diterbitkan'], true)
+                        && (($row['nik'] ?? '') === $myNik);
+                })
+                ->sortByDesc(fn ($r) => ((int) ($r['tahun'] ?? 0)) * 100 + ((int) ($r['bulan'] ?? 0)))
+                ->values();
+
+            $riwayatInsentif = [];
+            foreach ($allMyPayrolls as $pRow) {
+                $pBulan = AbsensiController::BULAN[(int) ($pRow['bulan'] ?? 0)] ?? ('Bulan ' . ($pRow['bulan'] ?? ''));
+                $pTahun = $pRow['tahun'] ?? now()->year;
+                $pNominal = (int) ($pRow['gaji_bersih'] ?? $pRow['total_pendapatan'] ?? 0);
+                $pLembur = (int) ($pRow['lembur'] ?? 0);
+
+                $desc = "$pBulan $pTahun";
+                if ($pLembur > 0) {
+                    $desc .= " &middot; Termasuk Lembur Rp " . number_format($pLembur, 0, ',', '.');
+                }
+
+                $riwayatInsentif[] = [
+                    'judul' => 'Insentif & Payroll ' . $pBulan,
+                    'periode' => $desc,
+                    'nominal' => $pNominal,
+                    'lembur' => $pLembur,
+                    'icon' => '⭐',
+                ];
+            }
+
+            if (empty($riwayatInsentif)) {
+                $riwayatInsentif = [
+                    ['judul' => 'Insentif Kinerja', 'periode' => 'Belum ada payroll diterbitkan', 'nominal' => 0, 'lembur' => 0, 'icon' => '🔆'],
+                ];
+            }
         }
 
         $data = $data->sortBy('nama')->values();

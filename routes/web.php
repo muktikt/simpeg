@@ -382,6 +382,8 @@ Route::middleware(['simpeg.auth'])->group(function () {
         Route::get('/', [ProfileController::class, 'show'])->name('show');
         Route::put('/password', [ProfileController::class, 'updatePassword'])->name('update-password');
         Route::post('/dokumen', [ProfileController::class, 'uploadDokumen'])->name('upload-dokumen');
+        Route::post('/keluarga', [ProfileController::class, 'storeKeluarga'])->name('keluarga.store');
+        Route::delete('/keluarga/{id}', [ProfileController::class, 'destroyKeluarga'])->whereNumber('id')->name('keluarga.destroy');
         
         // Curriculum Vitae (CV) - diisi mandiri oleh pegawai yang login.
         Route::put('/cv/biodata', [ProfileController::class, 'updateBiodata'])->name('cv.biodata');

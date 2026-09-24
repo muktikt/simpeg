@@ -43,18 +43,24 @@
 @if (session('simpeg_user.userlevel') === '5' || request('my'))
     @php
         $item = $data->first();
-        $insentifNominal = $item ? ($item[$nominalKey] ?? 750000) : 750000;
-        $bulanNama = \App\Http\Controllers\AbsensiController::BULAN[$bulan] ?? 'Juni';
+        $insentifNominal = $item ? ($item[$nominalKey] ?? 0) : 0;
+        $bulanNama = \App\Http\Controllers\AbsensiController::BULAN[$bulan] ?? 'Bulan ' . $bulan;
+        $lemburNominal = $item ? ($item['lembur'] ?? 0) : 0;
     @endphp
 
     <!-- Banner Insentif (Matching Theme SIMPEG: Navy & Sky Blue) -->
     <div style="background: linear-gradient(135deg, var(--navy) 0%, var(--navy-2) 50%, var(--teal-dark) 100%); color: white; padding: 24px 28px; border-radius: 16px; margin-bottom: 24px; box-shadow: var(--shadow-md); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
         <div>
-            <div style="font-size: 14px; font-weight: 500; opacity: 0.85; margin-bottom: 4px;">Insentif &middot; {{ $bulanNama }} {{ $tahun }}</div>
+            <div style="font-size: 14px; font-weight: 500; opacity: 0.85; margin-bottom: 4px;">Insentif & Payroll &middot; {{ $bulanNama }} {{ $tahun }}</div>
             <div style="font-size: 32px; font-weight: 700; font-family: 'Space Grotesk', sans-serif;">
                 Rp {{ number_format($insentifNominal, 0, ',', '.') }}
             </div>
-            <div style="font-size: 13px; opacity: 0.85; margin-top: 2px;">Insentif Kinerja Triwulan II</div>
+            <div style="font-size: 13px; opacity: 0.85; margin-top: 4px;">
+                Status: {{ $item ? 'Diterbitkan' : 'Belum Ada Payroll Diterbitkan' }}
+                @if ($lemburNominal > 0)
+                    &middot; Termasuk Uang Lembur: <b style="color:#fef08a;">Rp {{ number_format($lemburNominal, 0, ',', '.') }}</b>
+                @endif
+            </div>
         </div>
     </div>
 
