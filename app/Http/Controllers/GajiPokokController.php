@@ -23,16 +23,34 @@ class GajiPokokController extends Controller
         return storage_path('app/gaji_pokok.json');
     }
 
+    protected function defaultData(): array
+    {
+        return [
+            ['id' => 1, 'golongan' => 'II/C', 'masa_kerja' => '0-5 tahun', 'nominal' => 2900000],
+            ['id' => 2, 'golongan' => 'II/D', 'masa_kerja' => '0-5 tahun', 'nominal' => 3200000],
+            ['id' => 3, 'golongan' => 'II/D', 'masa_kerja' => '6-10 tahun', 'nominal' => 3600000],
+            ['id' => 4, 'golongan' => 'III/A', 'masa_kerja' => '0-5 tahun', 'nominal' => 3800000],
+            ['id' => 5, 'golongan' => 'III/A', 'masa_kerja' => '6-10 tahun', 'nominal' => 4300000],
+            ['id' => 6, 'golongan' => 'III/B', 'masa_kerja' => '0-5 tahun', 'nominal' => 4100000],
+            ['id' => 7, 'golongan' => 'III/B', 'masa_kerja' => '6-10 tahun', 'nominal' => 4600000],
+            ['id' => 8, 'golongan' => 'IV/A', 'masa_kerja' => '0-5 tahun', 'nominal' => 5200000],
+            ['id' => 9, 'golongan' => 'IV/A', 'masa_kerja' => '6-10 tahun', 'nominal' => 5800000],
+            ['id' => 10, 'golongan' => 'IV/B', 'masa_kerja' => '0-5 tahun', 'nominal' => 6500000],
+        ];
+    }
+
     protected function all(): array
     {
         $file = $this->storageFile();
         if (file_exists($file)) {
             $data = json_decode(file_get_contents($file), true);
-            if (is_array($data)) {
+            if (is_array($data) && !empty($data)) {
                 return $data;
             }
         }
-        return [];
+        $defaults = $this->defaultData();
+        $this->save($defaults);
+        return $defaults;
     }
 
     protected function save(array $data): void
