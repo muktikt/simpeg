@@ -29,9 +29,17 @@ class ApiPegawaiController extends Controller
     protected function getPegawaiByRequest(Request $request)
     {
         $nik = $request->header('X-NIK') ?? $request->query('nik');
+        $pegawaiId = $request->header('X-Pegawai-Id') ?? $request->query('pegawai_id') ?? $request->query('id');
 
         if ($nik) {
             $pegawai = DB::table('pegawai')->where('nik', $nik)->first();
+            if ($pegawai) {
+                return $pegawai;
+            }
+        }
+
+        if ($pegawaiId) {
+            $pegawai = DB::table('pegawai')->where('id', $pegawaiId)->first();
             if ($pegawai) {
                 return $pegawai;
             }
@@ -613,10 +621,20 @@ class ApiPegawaiController extends Controller
         }
 
         try {
+            $pegawaiUuid = ($pegawai && ! empty($pegawai->id) && \Illuminate\Support\Str::isUuid((string) $pegawai->id))
+                ? (string) $pegawai->id
+                : null;
+            $nik = (string) ($pegawai->nik ?? '');
+
             $dokumenList = DB::table('dokumen_pegawai')
-                ->where(function ($q) use ($pegawai) {
-                    $q->where('pegawai_id', $pegawai->id)
-                      ->orWhereNull('pegawai_id');
+                ->where(function ($q) use ($pegawaiUuid, $nik) {
+                    if ($pegawaiUuid) {
+                        $q->where('pegawai_id', $pegawaiUuid);
+                    }
+                    if (! empty($nik)) {
+                        $q->orWhere('pegawai_id', $nik);
+                    }
+                    $q->orWhereNull('pegawai_id');
                 })
                 ->orderByDesc('created_at')
                 ->get()
@@ -630,11 +648,22 @@ class ApiPegawaiController extends Controller
                         }
                     }
 
+                    // Normalisasi kategori agar terbaca 'SK' atau 'Diklat' di Mobile
+                    $rawKategori = strtolower(trim($d->kategori ?? ''));
+                    $cleanKategori = 'Umum';
+                    if (in_array($rawKategori, ['sk', 'surat_kerja'], true)) {
+                        $cleanKategori = 'SK';
+                    } elseif (in_array($rawKategori, ['diklat', 'surat_diklat'], true)) {
+                        $cleanKategori = 'Diklat';
+                    } elseif (! empty($d->kategori)) {
+                        $cleanKategori = $d->kategori;
+                    }
+
                     return [
                         'id' => $d->id,
                         'pegawai_id' => $d->pegawai_id,
                         'judul' => $d->judul ?? 'Dokumen Resmi Kepegawaian',
-                        'kategori' => $d->kategori ?? 'SK',
+                        'kategori' => $cleanKategori,
                         'nomor' => $d->nomor ?? '-',
                         'file_url' => $fileUrl,
                         'file_nama' => $d->file_nama ?? 'dokumen.pdf',

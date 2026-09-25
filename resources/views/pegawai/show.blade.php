@@ -231,11 +231,11 @@
                         
                         <div class="doc-card-actions">
                             @if (!empty($pegawai['surat_kerja']))
-                                <button type="button" class="btn-doc-view" onclick="viewFileModal('{{ $pegawai['surat_kerja']['judul'] }}', '{{ $pegawai['surat_kerja']['file_name'] }}')">
+                                <button type="button" class="btn-doc-view" onclick="viewFileModal('{{ addslashes($pegawai['surat_kerja']['judul']) }}', '{{ addslashes($pegawai['surat_kerja']['file_name']) }}', '{{ $pegawai['surat_kerja']['file_url'] ?? '#' }}')">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                                     View File
                                 </button>
-                                <a href="{{ $pegawai['surat_kerja']['file_url'] ?? '#' }}" target="_blank" class="btn-doc-download">
+                                <a href="{{ !empty($pegawai['surat_kerja']['id']) ? route('dokumen-surat.download', ['id' => $pegawai['surat_kerja']['id']]) : ($pegawai['surat_kerja']['file_url'] ?? '#') }}" target="_blank" download class="btn-doc-download">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                                     Download
                                 </a>
@@ -269,11 +269,11 @@
                         
                         <div class="doc-card-actions">
                             @if (!empty($pegawai['surat_diklat']))
-                                <button type="button" class="btn-doc-view" onclick="viewFileModal('{{ $pegawai['surat_diklat']['judul'] }}', '{{ $pegawai['surat_diklat']['file_name'] }}')">
+                                <button type="button" class="btn-doc-view" onclick="viewFileModal('{{ addslashes($pegawai['surat_diklat']['judul']) }}', '{{ addslashes($pegawai['surat_diklat']['file_name']) }}', '{{ $pegawai['surat_diklat']['file_url'] ?? '#' }}')">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                                     View File
                                 </button>
-                                <a href="{{ $pegawai['surat_diklat']['file_url'] ?? '#' }}" target="_blank" class="btn-doc-download">
+                                <a href="{{ !empty($pegawai['surat_diklat']['id']) ? route('dokumen-surat.download', ['id' => $pegawai['surat_diklat']['id']]) : ($pegawai['surat_diklat']['file_url'] ?? '#') }}" target="_blank" download class="btn-doc-download">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                                     Download
                                 </a>
@@ -382,18 +382,26 @@
 @endif
 
 <div id="modal-view-file-pegawai" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:9999; justify-content:center; align-items:center;">
-    <div style="background:#fff; width:90%; max-width:600px; border-radius:16px; padding:24px; box-shadow:0 10px 30px rgba(0,0,0,0.3);">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; border-bottom:1px solid #e2e8f0; padding-bottom:12px;">
-            <h3 id="view-file-title-pegawai" style="margin:0; font-size:16px; font-family:'Space Grotesk',sans-serif; color:#0F2A3D;">Preview Dokumen</h3>
-            <button type="button" onclick="document.getElementById('modal-view-file-pegawai').style.display='none'" style="background:none; border:none; font-size:20px; cursor:pointer;">&times;</button>
+    <div style="background:#fff; width:90%; max-width:750px; border-radius:12px; padding:24px; box-shadow:0 10px 30px rgba(0,0,0,0.3); max-height:90vh; display:flex; flex-direction:column;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; border-bottom:1px solid #e2e8f0; padding-bottom:10px;">
+            <h3 id="view-file-title-pegawai" style="margin:0; font-size:16px; font-weight:700; color:#0F2A3D;">Preview Dokumen</h3>
+            <button type="button" onclick="document.getElementById('modal-view-file-pegawai').style.display='none'" style="background:none; border:none; font-size:24px; line-height:1; cursor:pointer; color:#64748b;">&times;</button>
         </div>
-        <div style="background:#f8fafc; border:1px dashed #cbd5e1; padding:40px 20px; text-align:center; border-radius:12px; margin-bottom:20px;">
-            <svg style="width:48px; height:48px; color:#0284c7; margin-bottom:12px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+
+        <div id="view-file-placeholder-pegawai" style="background:#f8fafc; border:1px dashed #cbd5e1; padding:40px 20px; text-align:center; border-radius:8px; margin-bottom:16px;">
+            <svg style="width:48px; height:48px; color:#64748b; margin-bottom:8px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
             <p style="font-weight:600; color:#334155; margin-bottom:4px; font-size:15px;" id="view-file-name-pegawai">Dokumen.pdf</p>
-            <p style="font-size:13px; color:#64748b;">File PDF / Gambar telah diverifikasi oleh Admin SDM</p>
+            <p style="font-size:13px; color:#64748b;">Berkas fisik belum diunggah oleh Admin SDM.</p>
         </div>
-        <div style="display:flex; justify-content:flex-end;">
-            <button type="button" class="btn btn-primary" onclick="document.getElementById('modal-view-file-pegawai').style.display='none'">Tutup Preview</button>
+
+        <div id="view-file-real-preview-pegawai" style="display:none; margin-bottom:16px; flex:1; min-height:450px;">
+            <iframe id="view-file-iframe-pegawai" style="display:none; width:100%; height:450px; border:1px solid #e2e8f0; border-radius:8px;"></iframe>
+            <img id="view-file-img-pegawai" style="display:none; width:100%; max-height:450px; object-fit:contain; border:1px solid #e2e8f0; border-radius:8px;">
+        </div>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; padding-top:8px;">
+            <a id="view-file-open-new-tab-pegawai" href="#" target="_blank" style="display:none; font-size:13px; color:#0284c7; font-weight:600; text-decoration:none;">Buka di tab baru &rarr;</a>
+            <button type="button" class="btn btn-primary" style="margin-left:auto;" onclick="document.getElementById('modal-view-file-pegawai').style.display='none'">Tutup Preview</button>
         </div>
     </div>
 </div>
@@ -404,12 +412,44 @@ function switchTab(type) {
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.dataset.panel === type));
 }
 
-function viewFileModal(judul, filename) {
+function viewFileModal(judul, filename, fileUrl) {
     const titleEl = document.getElementById('view-file-title-pegawai') || document.getElementById('view-file-title');
     const nameEl = document.getElementById('view-file-name-pegawai') || document.getElementById('view-file-name');
     const modalEl = document.getElementById('modal-view-file-pegawai') || document.getElementById('modal-view-file');
+    const placeholder = document.getElementById('view-file-placeholder-pegawai') || document.getElementById('view-file-placeholder');
+    const realPreview = document.getElementById('view-file-real-preview-pegawai') || document.getElementById('view-file-real-preview');
+    const iframe = document.getElementById('view-file-iframe-pegawai') || document.getElementById('view-file-iframe');
+    const img = document.getElementById('view-file-img-pegawai') || document.getElementById('view-file-img');
+    const openNewTab = document.getElementById('view-file-open-new-tab-pegawai') || document.getElementById('view-file-open-new-tab');
+
     if (titleEl) titleEl.innerText = 'Preview: ' + judul;
     if (nameEl) nameEl.innerText = filename;
+
+    const hasRealFile = fileUrl && fileUrl !== '#' && fileUrl.trim() !== '';
+
+    if (iframe) { iframe.style.display = 'none'; iframe.src = ''; }
+    if (img) { img.style.display = 'none'; img.src = ''; }
+
+    if (hasRealFile) {
+        if (placeholder) placeholder.style.display = 'none';
+        if (realPreview) realPreview.style.display = 'block';
+        if (openNewTab) {
+            openNewTab.style.display = 'inline-block';
+            openNewTab.href = fileUrl;
+        }
+
+        const isImage = /\.(png|jpe?g|gif|webp)$/i.test(fileUrl);
+        if (isImage) {
+            if (img) { img.src = fileUrl; img.style.display = 'block'; }
+        } else {
+            if (iframe) { iframe.src = fileUrl; iframe.style.display = 'block'; }
+        }
+    } else {
+        if (placeholder) placeholder.style.display = 'block';
+        if (realPreview) realPreview.style.display = 'none';
+        if (openNewTab) openNewTab.style.display = 'none';
+    }
+
     if (modalEl) modalEl.style.display = 'flex';
 }
 </script>

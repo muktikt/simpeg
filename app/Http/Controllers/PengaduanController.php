@@ -264,6 +264,13 @@ class PengaduanController extends Controller
             return back()->with('error', 'Gagal mengirim pengaduan: ' . $e->getMessage());
         }
 
+        $this->notifyPengaduanUpdate(
+            $id,
+            'Pengaduan Berhasil Dikirim 📩',
+            "Pengaduan Anda ($nomorPengaduan) berhasil diterima dan menunggu verifikasi.",
+            ['kadiv', 'kspi', 'sdm']
+        );
+
         return back()->with('success', "Pengaduan berhasil dikirim dengan nomor $nomorPengaduan.");
     }
 
@@ -339,6 +346,8 @@ class PengaduanController extends Controller
             'keterangan' => $request->catatan,
             'tanggal' => $now,
         ]);
+
+        $this->notifyPengaduanUpdate($id, 'Pengaduan Diverifikasi Kadiv', "Pengaduan $id telah diverifikasi Kadiv dan diteruskan ke KSPI.", ['kspi']);
 
         return redirect()->route('pengaduan.detail', $id)->with('success', 'Pengaduan berhasil diverifikasi dan diteruskan ke KSPI.');
     }
@@ -685,6 +694,8 @@ class PengaduanController extends Controller
             'tanggal' => $now,
         ]);
 
+        $this->notifyPengaduanUpdate($id, 'Pengaduan Selesai Ditindaklanjuti ✅', "Hasil investigasi pengaduan $id telah disetujui Direktur Utama dan selesai.");
+
         return redirect()->route('pengaduan.detail', $id)->with('success', 'Hasil investigasi dan rekomendasi sanksi disetujui Direktur Utama.');
     }
 
@@ -717,6 +728,36 @@ class PengaduanController extends Controller
             'tanggal' => $now,
         ]);
 
+        $this->notifyPengaduanUpdate($id, 'Pengaduan Diminta Peninjauan Kembali', "Direktur Utama meminta peninjauan kembali atas pengaduan $id.", ['kspi']);
+
         return redirect()->route('pengaduan.detail', $id)->with('success', 'Permintaan peninjauan kembali telah dikirim ke KSPI.');
+    }
+
+    /**
+     * Helper Push Notification OneSignal untuk progress Pengaduan.
+     */
+    protected function notifyPengaduanUpdate($pengaduanId, string $statusJudul, string $pesan, ?array $notifyRoles = null)
+    {
+        try {
+            $p = DB::table('pengaduan_pegawai')->where('id', $pengaduanId)->first();
+            if ($p && ! empty($p->nik)) {
+                \App\Services\OneSignalService::kirimNotifikasiPegawai(
+                    $p->nik,
+                    $statusJudul,
+                    $pesan,
+                    ['type' => 'pengaduan', 'id' => (string) $pengaduanId, 'nomor' => $p->nomor_pengaduan ?? '']
+                );
+            }
+            if (! empty($notifyRoles)) {
+                \App\Services\OneSignalService::kirimNotifikasiRole(
+                    $notifyRoles,
+                    $statusJudul,
+                    $pesan,
+                    ['type' => 'pengaduan', 'id' => (string) $pengaduanId, 'nomor' => $p->nomor_pengaduan ?? '']
+                );
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('OneSignal notify pengaduan failed: ' . $e->getMessage());
+        }
     }
 }

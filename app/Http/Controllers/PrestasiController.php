@@ -182,23 +182,36 @@ class PrestasiController extends Controller
         ]);
 
         // 2. Sinkron ke tabel lembur jika jam_lembur > 0
+        //    Gunakan akumulasi (tambah) agar tidak menimpa data dari proses gaji.
         if ($jamLembur > 0) {
             try {
                 $tglCarbon = \Illuminate\Support\Carbon::parse($validated['tanggal']);
                 $bulanNama = AbsensiController::BULAN[$tglCarbon->month] ?? $tglCarbon->translatedFormat('F');
                 $periodeLembur = "{$bulanNama} {$tglCarbon->year}";
 
-                \Illuminate\Support\Facades\DB::table('lembur')->updateOrInsert(
-                    [
+                $existing = \Illuminate\Support\Facades\DB::table('lembur')
+                    ->where('pegawai_id', $dbPegId)
+                    ->where('bulan', $periodeLembur)
+                    ->first();
+
+                if ($existing) {
+                    // Akumulasi jam & uang lembur, bukan overwrite
+                    \Illuminate\Support\Facades\DB::table('lembur')
+                        ->where('pegawai_id', $dbPegId)
+                        ->where('bulan', $periodeLembur)
+                        ->update([
+                            'jam_lembur' => \Illuminate\Support\Facades\DB::raw('jam_lembur + ' . (int) round($jamLembur)),
+                            'uang_lembur' => \Illuminate\Support\Facades\DB::raw('uang_lembur + ' . $nominalLembur),
+                        ]);
+                } else {
+                    \Illuminate\Support\Facades\DB::table('lembur')->insert([
                         'pegawai_id' => $dbPegId,
                         'bulan' => $periodeLembur,
-                    ],
-                    [
                         'jam_lembur' => (int) round($jamLembur),
                         'uang_lembur' => $nominalLembur,
                         'created_at' => now(),
-                    ]
-                );
+                    ]);
+                }
             } catch (\Throwable $e) {
                 \Illuminate\Support\Facades\Log::warning('Sync prestasi lembur to lembur table failed: ' . $e->getMessage());
             }
@@ -275,17 +288,28 @@ class PrestasiController extends Controller
                 $bulanNama = AbsensiController::BULAN[$tglCarbon->month] ?? $tglCarbon->translatedFormat('F');
                 $periodeLembur = "{$bulanNama} {$tglCarbon->year}";
 
-                \Illuminate\Support\Facades\DB::table('lembur')->updateOrInsert(
-                    [
+                $existing = \Illuminate\Support\Facades\DB::table('lembur')
+                    ->where('pegawai_id', $dbPegId)
+                    ->where('bulan', $periodeLembur)
+                    ->first();
+
+                if ($existing) {
+                    \Illuminate\Support\Facades\DB::table('lembur')
+                        ->where('pegawai_id', $dbPegId)
+                        ->where('bulan', $periodeLembur)
+                        ->update([
+                            'jam_lembur' => \Illuminate\Support\Facades\DB::raw('jam_lembur + ' . (int) round($jamLembur)),
+                            'uang_lembur' => \Illuminate\Support\Facades\DB::raw('uang_lembur + ' . $nominalLembur),
+                        ]);
+                } else {
+                    \Illuminate\Support\Facades\DB::table('lembur')->insert([
                         'pegawai_id' => $dbPegId,
                         'bulan' => $periodeLembur,
-                    ],
-                    [
                         'jam_lembur' => (int) round($jamLembur),
                         'uang_lembur' => $nominalLembur,
                         'created_at' => now(),
-                    ]
-                );
+                    ]);
+                }
             } catch (\Throwable $e) {}
         }
 

@@ -40,4 +40,9 @@ return [
         'jwt_secret' => env('JWT_SECRET'),
     ],
 
+    'onesignal' => [
+        'app_id' => env('ONESIGNAL_APP_ID', 'b7556b90-2f97-44f2-93e2-bd94abe8229e'),
+        'rest_api_key' => env('ONESIGNAL_REST_API_KEY'),
+    ],
+
 ];

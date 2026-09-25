@@ -609,6 +609,25 @@ class GajiProsesController extends Controller
                     } catch (\Throwable $e) {
                         \Illuminate\Support\Facades\Log::warning('Sync to insentif table failed: ' . $e->getMessage());
                     }
+
+                    // 3. Kirim Push Notification ke HP Pegawai via OneSignal saat Gaji Terbit
+                    try {
+                        $targetNik = $row['nik'] ?? null;
+                        if (! $targetNik && ! empty($dbPayroll->pegawai_id)) {
+                            $targetNik = \Illuminate\Support\Facades\DB::table('pegawai')->where('id', $dbPayroll->pegawai_id)->value('nik');
+                        }
+                        if ($targetNik) {
+                            $periodeLabel = $dbPayroll->periode ?? (($row['bulan'] ?? '') . ' ' . ($row['tahun'] ?? ''));
+                            \App\Services\OneSignalService::kirimNotifikasiPegawai(
+                                $targetNik,
+                                'Gaji Masuk (' . $periodeLabel . ') 💳',
+                                'Gaji bulan ' . $periodeLabel . ' telah diterbitkan. Silakan periksa slip gaji Anda di aplikasi SIMPEG.',
+                                ['type' => 'gaji', 'periode' => $periodeLabel]
+                            );
+                        }
+                    } catch (\Throwable $e) {
+                        \Illuminate\Support\Facades\Log::warning('OneSignal push gaji failed: ' . $e->getMessage());
+                    }
                 }
             }
         } catch (\Throwable $e) {

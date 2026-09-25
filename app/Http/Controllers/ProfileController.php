@@ -183,23 +183,50 @@ class ProfileController extends Controller
      * Dokumen Surat), lalu tempelkan ke array $pegawai supaya bisa dipakai
      * di halaman Profile Saya (view file & download beneran berfungsi).
      */
+    protected function normalizeFileUrl(?string $url): string
+    {
+        if (empty($url) || $url === '#') {
+            return '#';
+        }
+        $parsed = parse_url($url);
+        $path = $parsed['path'] ?? '';
+        if (! empty($path) && str_starts_with($path, '/uploads/')) {
+            return asset(ltrim($path, '/'));
+        }
+        return $url;
+    }
+
+    /**
+     * Ambil data dokumen resmi (Surat Kerja & Surat Diklat) milik pegawai
+     * dari tabel dokumen_pegawai (yang diisi Admin SDM lewat menu
+     * Dokumen Surat), lalu tempelkan ke array $pegawai supaya bisa dipakai
+     * di halaman Profile Saya (view file & download beneran berfungsi).
+     */
     protected function attachDokumenResmi(array $pegawai): array
     {
-        $pegawaiDbId = $pegawai['db_id'] ?? null;
- 
-        if (! $pegawaiDbId) {
-            return $pegawai;
+        $dbId = $pegawai['db_id'] ?? null;
+        if (! $dbId && ! empty($pegawai['nik'])) {
+            $dbId = DB::table('pegawai')->where('nik', (string) $pegawai['nik'])->value('id');
         }
- 
+        $validUuid = ($dbId && \Illuminate\Support\Str::isUuid((string) $dbId)) ? (string) $dbId : null;
+
         try {
-            $docs = DB::table('dokumen_pegawai')->where('pegawai_id', $pegawaiDbId)->get();
+            $docs = DB::table('dokumen_pegawai')
+                ->where(function ($q) use ($validUuid) {
+                    if ($validUuid) {
+                        $q->where('pegawai_id', $validUuid);
+                    } else {
+                        $q->whereRaw('1=0');
+                    }
+                })
+                ->get();
         } catch (\Throwable $e) {
             return $pegawai;
         }
- 
+
         $skDoc = $docs->first(fn ($d) => in_array(strtolower($d->kategori ?? ''), ['sk', 'surat_kerja'], true));
         $diklatDoc = $docs->first(fn ($d) => in_array(strtolower($d->kategori ?? ''), ['diklat', 'surat_diklat'], true));
- 
+
         if ($skDoc) {
             $pegawai['surat_kerja'] = [
                 'id' => $skDoc->id,
@@ -207,10 +234,10 @@ class ProfileController extends Controller
                 'judul' => $skDoc->judul,
                 'tgl_terbit' => ! empty($skDoc->created_at) ? substr((string) $skDoc->created_at, 0, 10) : null,
                 'file_name' => $skDoc->file_nama,
-                'file_url' => $skDoc->file_url ?: '#',
+                'file_url' => $this->normalizeFileUrl($skDoc->file_url),
             ];
         }
- 
+
         if ($diklatDoc) {
             $pegawai['surat_diklat'] = [
                 'id' => $diklatDoc->id,
@@ -218,13 +245,13 @@ class ProfileController extends Controller
                 'judul' => $diklatDoc->judul,
                 'tgl_terbit' => ! empty($diklatDoc->created_at) ? substr((string) $diklatDoc->created_at, 0, 10) : null,
                 'file_name' => $diklatDoc->file_nama,
-                'file_url' => $diklatDoc->file_url ?: '#',
+                'file_url' => $this->normalizeFileUrl($diklatDoc->file_url),
             ];
         }
- 
+
         return $pegawai;
     }
- 
+
     /**
      * Unduh berkas fisik Surat Kerja (SK) / Surat Diklat milik pegawai yang
      * sedang login. Hanya bisa mengunduh dokumen milik dirinya sendiri
@@ -235,34 +262,42 @@ class ProfileController extends Controller
     public function downloadDokumen(string $jenis)
     {
         abort_unless(in_array($jenis, ['sk', 'diklat'], true), 404);
- 
+
         $pegawai = $this->currentPegawai();
-        $pegawaiDbId = $pegawai['db_id'] ?? null;
-        $kategoriDb = $jenis === 'sk' ? 'SK' : 'Diklat';
- 
-        $doc = null;
-        if ($pegawaiDbId) {
-            try {
-                $doc = DB::table('dokumen_pegawai')
-                    ->where('pegawai_id', $pegawaiDbId)
-                    ->where('kategori', $kategoriDb)
-                    ->first();
-            } catch (\Throwable $e) {
-                $doc = null;
-            }
+        $dbId = $pegawai['db_id'] ?? null;
+        if (! $dbId && ! empty($pegawai['nik'])) {
+            $dbId = DB::table('pegawai')->where('nik', (string) $pegawai['nik'])->value('id');
         }
- 
+        $validUuid = ($dbId && \Illuminate\Support\Str::isUuid((string) $dbId)) ? (string) $dbId : null;
+        $kategoriDb = $jenis === 'sk' ? 'SK' : 'Diklat';
+
+        $doc = null;
+        try {
+            $doc = DB::table('dokumen_pegawai')
+                ->where(function ($q) use ($validUuid) {
+                    if ($validUuid) {
+                        $q->where('pegawai_id', $validUuid);
+                    } else {
+                        $q->whereRaw('1=0');
+                    }
+                })
+                ->where('kategori', $kategoriDb)
+                ->first();
+        } catch (\Throwable $e) {
+            $doc = null;
+        }
+
         if ($doc && ! empty($doc->file_url) && $doc->file_url !== '#') {
             $parsedPath = parse_url($doc->file_url, PHP_URL_PATH);
             $relativePath = ltrim($parsedPath ?? '', '/');
             $fullPath = public_path($relativePath);
- 
+
             if (File::exists($fullPath)) {
                 return response()->download($fullPath, $doc->file_nama ?? 'Dokumen.pdf');
             }
         }
- 
-        return back()->with('error', 'Berkas fisik dokumen ini belum diunggah oleh Admin SDM.');
+
+        return app(DokumenSuratController::class)->cetak(request(), $doc->id ?? null);
     }
  
     public function uploadDokumen(Request $request)

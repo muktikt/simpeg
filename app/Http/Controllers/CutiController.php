@@ -90,6 +90,22 @@ class CutiController extends Controller
                 'status' => $validated['status'],
                 'updated_at' => now(),
             ]);
+
+            $cutiRow = DB::table('pengajuan_cuti')
+                ->leftJoin('pegawai', 'pengajuan_cuti.pegawai_id', '=', 'pegawai.id')
+                ->where('pengajuan_cuti.id', $id)
+                ->select('pengajuan_cuti.*', 'pegawai.nik')
+                ->first();
+
+            if ($cutiRow && ! empty($cutiRow->nik)) {
+                $statusLabel = $validated['status'] === 'DISETUJUI' ? 'Disetujui ✅' : 'Ditolak ❌';
+                \App\Services\OneSignalService::kirimNotifikasiPegawai(
+                    $cutiRow->nik,
+                    'Pengajuan Cuti ' . $statusLabel,
+                    'Pengajuan ' . ($cutiRow->jenis ?? 'cuti') . ' Anda telah ' . strtolower($validated['status']) . ' oleh SDM.',
+                    ['type' => 'cuti', 'id' => (string)$id, 'status' => $validated['status']]
+                );
+            }
         } catch (\Throwable $e) {
             // Fallback
         }

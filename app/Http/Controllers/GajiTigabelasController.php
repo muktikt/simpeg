@@ -465,6 +465,20 @@ class GajiTigabelasController extends Controller
             \Illuminate\Support\Facades\Log::warning('DB gaji_13 update status failed: ' . $e->getMessage());
         }
 
+        // Kirim Push Notification ke HP Pegawai via OneSignal saat Gaji 13 Terbit
+        if ($nextStatus === 'terbit' && ! empty($row['nik'])) {
+            try {
+                \App\Services\OneSignalService::kirimNotifikasiPegawai(
+                    $row['nik'],
+                    'Gaji ke-13 Telah Cair! 💰',
+                    'Gaji ke-13 Tahun ' . ($row['tahun'] ?? date('Y')) . ' telah diterbitkan. Silakan cek rincian di aplikasi SIMPEG.',
+                    ['type' => 'gaji_13', 'tahun' => (string)($row['tahun'] ?? date('Y'))]
+                );
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('OneSignal push Gaji 13 failed: ' . $e->getMessage());
+            }
+        }
+
         // Update juga di file lokal
         $localData = $this->getLocalData();
         if (! empty($localData)) {

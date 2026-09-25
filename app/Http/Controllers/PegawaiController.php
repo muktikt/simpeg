@@ -137,37 +137,40 @@ class PegawaiController extends Controller
             }
 
             // Muat dokumen resmi riil dari database (tabel dokumen_pegawai)
-            if (!empty($pegawai['db_id'])) {
-                try {
-                    $docs = \Illuminate\Support\Facades\DB::table('dokumen_pegawai')
-                        ->where('pegawai_id', $pegawai['db_id'])
-                        ->get();
+            $dbId = $pegawai['db_id'] ?? null;
+            $intId = (string) ($pegawai['id'] ?? '');
+            $nik = (string) ($pegawai['nik'] ?? '');
 
-                    $skDoc = $docs->first(fn ($d) => in_array(strtolower($d->kategori ?? ''), ['sk', 'surat_kerja'], true));
-                    $diklatDoc = $docs->first(fn ($d) => in_array(strtolower($d->kategori ?? ''), ['diklat', 'surat_diklat'], true));
+            try {
+                $docs = \Illuminate\Support\Facades\DB::table('dokumen_pegawai')
+                    ->where(function ($q) use ($dbId, $intId, $nik) {
+                        if ($dbId) $q->where('pegawai_id', $dbId);
+                        if ($intId) $q->orWhere('pegawai_id', $intId);
+                        if ($nik) $q->orWhere('pegawai_id', $nik);
+                    })
+                    ->get();
 
-                    $pegawai['surat_kerja'] = $skDoc ? [
-                        'id' => $skDoc->id,
-                        'nomor' => $skDoc->nomor,
-                        'judul' => $skDoc->judul,
-                        'tgl_terbit' => !empty($skDoc->created_at) ? substr((string)$skDoc->created_at, 0, 10) : null,
-                        'file_name' => $skDoc->file_nama,
-                        'file_url' => $skDoc->file_url ?: '#',
-                    ] : null;
+                $skDoc = $docs->first(fn ($d) => in_array(strtolower($d->kategori ?? ''), ['sk', 'surat_kerja'], true));
+                $diklatDoc = $docs->first(fn ($d) => in_array(strtolower($d->kategori ?? ''), ['diklat', 'surat_diklat'], true));
 
-                    $pegawai['surat_diklat'] = $diklatDoc ? [
-                        'id' => $diklatDoc->id,
-                        'nomor' => $diklatDoc->nomor,
-                        'judul' => $diklatDoc->judul,
-                        'tgl_terbit' => !empty($diklatDoc->created_at) ? substr((string)$diklatDoc->created_at, 0, 10) : null,
-                        'file_name' => $diklatDoc->file_nama,
-                        'file_url' => $diklatDoc->file_url ?: '#',
-                    ] : null;
-                } catch (\Throwable $e) {
-                    $pegawai['surat_kerja'] = null;
-                    $pegawai['surat_diklat'] = null;
-                }
-            } else {
+                $pegawai['surat_kerja'] = $skDoc ? [
+                    'id' => $skDoc->id,
+                    'nomor' => $skDoc->nomor,
+                    'judul' => $skDoc->judul,
+                    'tgl_terbit' => !empty($skDoc->created_at) ? substr((string)$skDoc->created_at, 0, 10) : null,
+                    'file_name' => $skDoc->file_nama,
+                    'file_url' => $this->normalizeFileUrl($skDoc->file_url),
+                ] : null;
+
+                $pegawai['surat_diklat'] = $diklatDoc ? [
+                    'id' => $diklatDoc->id,
+                    'nomor' => $diklatDoc->nomor,
+                    'judul' => $diklatDoc->judul,
+                    'tgl_terbit' => !empty($diklatDoc->created_at) ? substr((string)$diklatDoc->created_at, 0, 10) : null,
+                    'file_name' => $diklatDoc->file_nama,
+                    'file_url' => $this->normalizeFileUrl($diklatDoc->file_url),
+                ] : null;
+            } catch (\Throwable $e) {
                 $pegawai['surat_kerja'] = null;
                 $pegawai['surat_diklat'] = null;
             }
@@ -361,20 +364,50 @@ class PegawaiController extends Controller
     {
         $batasUsia = now()->subYears(21);
 
-        $data = collect($this->all())
-            ->flatMap(function ($p) {
-                return collect($p['keluarga'] ?? [])
-                    ->where('hubungan', 'Anak')
-                    ->map(fn ($anak) => array_merge($anak, [
-                        'nik_pegawai' => $p['nik'],
-                        'nama_pegawai' => $p['nama'],
-                    ]));
-            })
-            ->filter(fn ($anak) => ($anak['keterangan'] ?? '-') === 'Tidak Kuliah'
-                && \Illuminate\Support\Carbon::parse($anak['tgl_lahir'])->lte($batasUsia))
-            ->map(function ($anak) use ($batasUsia) {
-                $anak['usia'] = (int) \Illuminate\Support\Carbon::parse($anak['tgl_lahir'])->diffInYears(now());
+        // Ambil semua keluarga berhubungan 'Anak' langsung dari database,
+        // karena $this->all() tidak memuat relasi keluarga (selalu []).
+        try {
+            $keluargaRows = \Illuminate\Support\Facades\DB::table('keluarga')
+                ->join('pegawai', 'keluarga.pegawai_id', '=', 'pegawai.id')
+                ->select(
+                    'keluarga.*',
+                    'pegawai.nik as nik_pegawai',
+                    'pegawai.name as nama_pegawai'
+                )
+                ->whereRaw("LOWER(COALESCE(keluarga.hubungan, '')) = ?", ['anak'])
+                ->get();
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('DB keluarga query for laporan anak 21 failed: ' . $e->getMessage());
+            $keluargaRows = collect();
+        }
 
+        $data = $keluargaRows
+            ->map(function ($row) {
+                $arr = (array) $row;
+                $arr['tgl_lahir'] = $arr['tgl_lahir'] ?? $arr['tanggal_lahir'] ?? null;
+                $arr['keterangan'] = $arr['keterangan'] ?? $arr['pekerjaan'] ?? '-';
+                $arr['nama'] = $arr['nama'] ?? '-';
+                return $arr;
+            })
+            ->filter(function ($anak) use ($batasUsia) {
+                // Filter: keterangan = 'Tidak Kuliah' dan usia > 21 tahun
+                $keterangan = $anak['keterangan'] ?? '-';
+                $tglLahir = $anak['tgl_lahir'] ?? null;
+                if (empty($tglLahir) || $tglLahir === '-') return false;
+
+                try {
+                    return $keterangan === 'Tidak Kuliah'
+                        && \Illuminate\Support\Carbon::parse($tglLahir)->lte($batasUsia);
+                } catch (\Throwable $e) {
+                    return false;
+                }
+            })
+            ->map(function ($anak) {
+                try {
+                    $anak['usia'] = (int) \Illuminate\Support\Carbon::parse($anak['tgl_lahir'])->diffInYears(now());
+                } catch (\Throwable $e) {
+                    $anak['usia'] = 0;
+                }
                 return $anak;
             })
             ->sortBy('nama_pegawai')
@@ -432,5 +465,18 @@ class PegawaiController extends Controller
             'telp' => 'nullable|string|max:20',
             'alamat' => 'nullable|string|max:255',
         ]);
+    }
+
+    protected function normalizeFileUrl(?string $url): string
+    {
+        if (empty($url) || $url === '#') {
+            return '#';
+        }
+        $parsed = parse_url($url);
+        $path = $parsed['path'] ?? '';
+        if (! empty($path) && str_starts_with($path, '/uploads/')) {
+            return asset(ltrim($path, '/'));
+        }
+        return $url;
     }
 }

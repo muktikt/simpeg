@@ -7,15 +7,11 @@ $extraOrigins = array_filter(array_map('trim', explode(',', env('CORS_ALLOWED_OR
 
 return [
 
-    'paths' => ['api/*', 'sanctum/csrf-cookie'],
+    'paths' => ['api/*', 'sanctum/csrf-cookie', 'uploads/*'],
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => array_values(array_unique(array_merge([
-        'https://kranpay.pdam.local',
-        'http://kranpay.pdam.local',
-        'https://api.pdam.local',
-    ], $extraOrigins))),
+    'allowed_origins' => ['*'],
 
     'allowed_origins_patterns' => [],
 

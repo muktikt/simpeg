@@ -209,13 +209,16 @@ Route::middleware(['simpeg.auth'])->group(function () {
         Route::put('/', [SettingAplikasiController::class, 'update'])->name('update');
     });
 
-    // Dokumen Surat Pegawai (Unggah Dokumen untuk Admin SDM)
-    Route::prefix('dokumen-surat')->name('dokumen-surat.')->middleware(['simpeg.auth:1'])->group(function () {
-        Route::get('/', [DokumenSuratController::class, 'index'])->name('index');
-        Route::post('/upload', [DokumenSuratController::class, 'store'])->name('store');
-        Route::get('/download/{id?}', [DokumenSuratController::class, 'download'])->name('download');
-        Route::get('/cetak/{id?}', [DokumenSuratController::class, 'cetak'])->name('cetak');
-        Route::delete('/{pegawaiId}/{jenis}', [DokumenSuratController::class, 'destroy'])->name('destroy');
+    // Dokumen Surat Pegawai (Unggah & Kelola untuk Admin SDM, Unduh untuk semua user)
+    Route::prefix('dokumen-surat')->name('dokumen-surat.')->group(function () {
+        Route::get('/download/{id?}', [DokumenSuratController::class, 'download'])->middleware(['simpeg.auth'])->name('download');
+        Route::get('/cetak/{id?}', [DokumenSuratController::class, 'cetak'])->middleware(['simpeg.auth'])->name('cetak');
+
+        Route::middleware(['simpeg.auth:1'])->group(function () {
+            Route::get('/', [DokumenSuratController::class, 'index'])->name('index');
+            Route::post('/upload', [DokumenSuratController::class, 'store'])->name('store');
+            Route::delete('/{pegawaiId}/{jenis}', [DokumenSuratController::class, 'destroy'])->name('destroy');
+        });
     });
 
     // Perubahan NIK - Admin only.

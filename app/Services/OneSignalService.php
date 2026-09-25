@@ -87,4 +87,144 @@ class OneSignalService
             return false;
         }
     }
+
+    /**
+     * Kirim Push Notification ke satu atau beberapa NIK pegawai tertentu via OneSignal.
+     *
+     * @param string|array $niks NIK pegawai tunggal atau array NIK
+     * @param string $judul Judul Notifikasi
+     * @param string $isi Pesan Notifikasi
+     * @param array $customData Data tambahan untuk routing halaman saat diklik
+     * @return bool
+     */
+    public static function kirimNotifikasiPegawai(string|array $niks, string $judul, string $isi, array $customData = []): bool
+    {
+        $appId = config('services.onesignal.app_id') ?? env('ONESIGNAL_APP_ID', 'b7556b90-2f97-44f2-93e2-bd94abe8229e');
+        $restApiKey = config('services.onesignal.rest_api_key') ?? env('ONESIGNAL_REST_API_KEY');
+
+        if (empty($appId) || empty($niks)) {
+            Log::warning('OneSignal App ID atau NIK kosong.');
+            return false;
+        }
+
+        $nikList = is_array($niks) ? array_values(array_filter($niks)) : [trim((string)$niks)];
+        if (empty($nikList)) {
+            return false;
+        }
+
+        $nikList = array_map('strval', $nikList);
+        $cleanIsi = mb_substr(strip_tags($isi), 0, 160);
+
+        $payload = [
+            'app_id' => $appId,
+            'include_aliases' => [
+                'external_id' => $nikList,
+            ],
+            'include_external_user_ids' => $nikList,
+            'target_channel' => 'push',
+            'headings' => [
+                'en' => $judul,
+                'id' => $judul,
+            ],
+            'contents' => [
+                'en' => $cleanIsi,
+                'id' => $cleanIsi,
+            ],
+            'data' => array_merge([
+                'type' => $customData['type'] ?? 'umum',
+                'judul' => $judul,
+                'waktu' => now()->toIso8601String(),
+            ], $customData),
+        ];
+
+        try {
+            $request = Http::timeout(10);
+            if (!empty($restApiKey)) {
+                $request = $request->withHeaders([
+                    'Authorization' => 'Basic ' . $restApiKey,
+                ]);
+            }
+
+            $response = $request->post('https://onesignal.com/api/v1/notifications', $payload);
+
+            if ($response->successful()) {
+                Log::info('OneSignal Push Notification ke NIK (' . implode(',', $nikList) . ') berhasil: ' . $judul);
+                return true;
+            }
+
+            Log::warning('OneSignal Response Error: ' . $response->body());
+            return false;
+        } catch (\Throwable $e) {
+            Log::error('OneSignal Exception: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Kirim Push Notification ke seluruh pegawai dengan role tertentu.
+     */
+    public static function kirimNotifikasiRole(array $roles, string $judul, string $isi, array $customData = []): bool
+    {
+        $appId = config('services.onesignal.app_id') ?? env('ONESIGNAL_APP_ID', 'b7556b90-2f97-44f2-93e2-bd94abe8229e');
+        $restApiKey = config('services.onesignal.rest_api_key') ?? env('ONESIGNAL_REST_API_KEY');
+
+        if (empty($appId) || empty($roles)) {
+            return false;
+        }
+
+        $cleanIsi = mb_substr(strip_tags($isi), 0, 160);
+
+        $filters = [];
+        foreach (array_values($roles) as $index => $role) {
+            if ($index > 0) {
+                $filters[] = ['operator' => 'OR'];
+            }
+            $filters[] = [
+                'field' => 'tag',
+                'key' => 'role',
+                'relation' => '=',
+                'value' => strtolower(trim($role)),
+            ];
+        }
+
+        $payload = [
+            'app_id' => $appId,
+            'filters' => $filters,
+            'headings' => [
+                'en' => $judul,
+                'id' => $judul,
+            ],
+            'contents' => [
+                'en' => $cleanIsi,
+                'id' => $cleanIsi,
+            ],
+            'data' => array_merge([
+                'type' => $customData['type'] ?? 'umum',
+                'judul' => $judul,
+                'waktu' => now()->toIso8601String(),
+            ], $customData),
+        ];
+
+        try {
+            $request = Http::timeout(10);
+            if (!empty($restApiKey)) {
+                $request = $request->withHeaders([
+                    'Authorization' => 'Basic ' . $restApiKey,
+                ]);
+            }
+
+            $response = $request->post('https://onesignal.com/api/v1/notifications', $payload);
+
+            if ($response->successful()) {
+                Log::info('OneSignal Push Notification ke Role (' . implode(',', $roles) . ') berhasil: ' . $judul);
+                return true;
+            }
+
+            Log::warning('OneSignal Role Error: ' . $response->body());
+            return false;
+        } catch (\Throwable $e) {
+            Log::error('OneSignal Role Exception: ' . $e->getMessage());
+            return false;
+        }
+    }
 }

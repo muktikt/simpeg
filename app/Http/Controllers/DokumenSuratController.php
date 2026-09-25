@@ -56,7 +56,7 @@ class DokumenSuratController extends Controller
                 'judul' => $skDoc->judul ?? 'Surat Keputusan Pengangkatan ' . ($p['nama'] ?? 'Pegawai'),
                 'tgl_terbit' => !empty($skDoc->created_at) ? substr((string)$skDoc->created_at, 0, 10) : date('Y-m-d'),
                 'file_name' => $skDoc->file_nama ?? 'SK_' . str_replace(' ', '_', $p['nama'] ?? 'Pegawai') . '.pdf',
-                'file_url' => !empty($skDoc->file_url) ? $skDoc->file_url : '#',
+                'file_url' => !empty($skDoc->file_url) ? $this->normalizeFileUrl($skDoc->file_url) : '#',
             ] : null;
 
             $p['surat_diklat'] = $diklatDoc ? [
@@ -65,7 +65,7 @@ class DokumenSuratController extends Controller
                 'judul' => $diklatDoc->judul ?? 'Sertifikat Diklat Manajemen Kepegawaian & Pelayanan',
                 'tgl_terbit' => !empty($diklatDoc->created_at) ? substr((string)$diklatDoc->created_at, 0, 10) : date('Y-m-d'),
                 'file_name' => $diklatDoc->file_nama ?? 'Sertifikat_Diklat_' . str_replace(' ', '_', $p['nama'] ?? 'Pegawai') . '.pdf',
-                'file_url' => !empty($diklatDoc->file_url) ? $diklatDoc->file_url : '#',
+                'file_url' => !empty($diklatDoc->file_url) ? $this->normalizeFileUrl($diklatDoc->file_url) : '#',
             ] : null;
 
             return $p;
@@ -213,6 +213,21 @@ class DokumenSuratController extends Controller
         } catch (\Throwable $e) {
             return back()->with('error', 'Gagal menyimpan dokumen ke database: ' . $e->getMessage());
         }
+ 
+        // Kirim Push Notification ke HP Pegawai via OneSignal saat Dokumen Baru Diunggah
+        try {
+            $targetNik = $targetPegawai['nik'] ?? null;
+            if ($targetNik) {
+                \App\Services\OneSignalService::kirimNotifikasiPegawai(
+                    $targetNik,
+                    'Dokumen Resmi Baru Diterbitkan 📄',
+                    "{$kategoriLabel} Anda telah diunggah oleh SDM ({$validated['judul']}). Silakan periksa di menu Dokumen Resmi.",
+                    ['type' => 'dokumen', 'kategori' => $kategoriDb]
+                );
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('OneSignal push dokumen failed: ' . $e->getMessage());
+        }
 
         Cache::forget('simpeg_all_pegawai_list');
 
@@ -258,10 +273,20 @@ class DokumenSuratController extends Controller
     public function download(Request $request, $id = null)
     {
         $docId = $id ?: $request->get('id');
+        $pegawaiId = $request->get('pegawai_id');
+        $jenis = strtolower($request->get('jenis', ''));
 
         $doc = null;
         if ($docId) {
             $doc = DB::table('dokumen_pegawai')->where('id', $docId)->first();
+        } elseif ($pegawaiId && $jenis) {
+            $kategoriDb = in_array($jenis, ['sk', 'surat_kerja'], true) ? 'SK' : 'Diklat';
+            $doc = DB::table('dokumen_pegawai')
+                ->where(function ($q) use ($pegawaiId) {
+                    $q->where('pegawai_id', $pegawaiId);
+                })
+                ->where('kategori', $kategoriDb)
+                ->first();
         }
 
         if ($doc && ! empty($doc->file_url) && $doc->file_url !== '#') {
@@ -275,7 +300,7 @@ class DokumenSuratController extends Controller
         }
 
         // Fallback: Tampilkan / cetak lembar resmi
-        return $this->cetak($request, $id);
+        return $this->cetak($request, $docId ?: ($doc->id ?? null));
     }
 
     /**
@@ -332,7 +357,7 @@ class DokumenSuratController extends Controller
             'nomor' => $doc->nomor ?? ($isDiklat ? 'STP/SDM/2024/' . str_pad(($targetPegawai['id'] ?? 1) + 80, 3, '0', STR_PAD_LEFT) : 'SK/SDM/2024/' . str_pad($targetPegawai['id'] ?? 1, 3, '0', STR_PAD_LEFT)),
             'judul' => $doc->judul ?? ($isDiklat ? 'Sertifikat Diklat Manajemen Kepegawaian & Pelayanan' : 'Surat Keputusan Pengangkatan ' . ($targetPegawai['nama'] ?? 'Pegawai')),
             'tgl_terbit' => ! empty($doc->created_at) ? substr((string) $doc->created_at, 0, 10) : date('Y-m-d'),
-            'file_url' => $doc->file_url ?? '#',
+            'file_url' => $this->normalizeFileUrl($doc->file_url ?? '#'),
             'file_nama' => $doc->file_nama ?? 'Dokumen.pdf',
         ];
 
@@ -340,5 +365,18 @@ class DokumenSuratController extends Controller
             'doc' => $docData,
             'pegawai' => $targetPegawai,
         ]);
+    }
+
+    protected function normalizeFileUrl(?string $url): string
+    {
+        if (empty($url) || $url === '#') {
+            return '#';
+        }
+        $parsed = parse_url($url);
+        $path = $parsed['path'] ?? '';
+        if (! empty($path) && str_starts_with($path, '/uploads/')) {
+            return asset(ltrim($path, '/'));
+        }
+        return $url;
     }
 }
