@@ -279,13 +279,37 @@ class DokumenSuratController extends Controller
         $doc = null;
         if ($docId) {
             $doc = DB::table('dokumen_pegawai')->where('id', $docId)->first();
-        } elseif ($pegawaiId && $jenis) {
-            $kategoriDb = in_array($jenis, ['sk', 'surat_kerja'], true) ? 'SK' : 'Diklat';
+        }
+
+        if (! $doc && $pegawaiId && $jenis) {
+            $isDiklat = in_array($jenis, ['diklat', 'surat_diklat'], true);
+            $categories = $isDiklat ? ['diklat', 'surat_diklat'] : ['sk', 'surat_kerja'];
+
+            $pegawaiController = app(PegawaiController::class);
+            $allPegawai = $pegawaiController->all();
+            $targetPegawai = collect($allPegawai)->first(function ($p) use ($pegawaiId) {
+                return (string) ($p['id'] ?? '') === (string) $pegawaiId
+                    || (string) ($p['db_id'] ?? '') === (string) $pegawaiId
+                    || (string) ($p['nik'] ?? '') === (string) $pegawaiId;
+            });
+
+            $dbId = $targetPegawai['db_id'] ?? null;
+            $intId = (string) ($targetPegawai['id'] ?? $pegawaiId);
+            $nik = (string) ($targetPegawai['nik'] ?? '');
+
             $doc = DB::table('dokumen_pegawai')
-                ->where(function ($q) use ($pegawaiId) {
-                    $q->where('pegawai_id', $pegawaiId);
+                ->where(function ($q) use ($dbId, $intId, $nik) {
+                    if ($dbId) {
+                        $q->where('pegawai_id', $dbId);
+                    }
+                    if (! empty($nik)) {
+                        $q->orWhere('pegawai_id', $nik);
+                    }
+                    if (! empty($intId)) {
+                        $q->orWhere('pegawai_id', $intId);
+                    }
                 })
-                ->where('kategori', $kategoriDb)
+                ->whereIn(DB::raw('LOWER(kategori)'), $categories)
                 ->first();
         }
 
@@ -293,6 +317,19 @@ class DokumenSuratController extends Controller
             $parsedPath = parse_url($doc->file_url, PHP_URL_PATH);
             $relativePath = ltrim($parsedPath ?? '', '/');
             $fullPath = public_path($relativePath);
+
+            if (! File::exists($fullPath)) {
+                $baseName = basename($parsedPath);
+                $fullPath = public_path('uploads/dokumen/' . $baseName);
+            }
+
+            if (! File::exists($fullPath)) {
+                $cleanName = preg_replace('/^\d+_/', '', basename($parsedPath));
+                $matches = glob(public_path('uploads/dokumen/*') . $cleanName);
+                if (! empty($matches) && File::exists($matches[0])) {
+                    $fullPath = $matches[0];
+                }
+            }
 
             if (File::exists($fullPath)) {
                 return response()->download($fullPath, $doc->file_nama ?? 'Dokumen.pdf');

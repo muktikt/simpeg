@@ -644,6 +644,14 @@ class ApiPegawaiController extends Controller
                         $parsed = parse_url($fileUrl);
                         $path = $parsed['path'] ?? '';
                         if (! empty($path) && str_starts_with($path, '/uploads/')) {
+                            $fullPath = public_path(ltrim($path, '/'));
+                            if (! File::exists($fullPath)) {
+                                $cleanName = preg_replace('/^\d+_/', '', basename($path));
+                                $matches = glob(public_path('uploads/dokumen/*') . $cleanName);
+                                if (! empty($matches) && File::exists($matches[0])) {
+                                    $path = '/uploads/dokumen/' . basename($matches[0]);
+                                }
+                            }
                             $fileUrl = $request->getSchemeAndHttpHost() . $path;
                         }
                     }
@@ -698,6 +706,19 @@ class ApiPegawaiController extends Controller
         $parsedPath = parse_url($doc->file_url, PHP_URL_PATH);
         $relativePath = ltrim($parsedPath ?? '', '/');
         $fullPath = public_path($relativePath);
+
+        if (! File::exists($fullPath)) {
+            $baseName = basename($parsedPath);
+            $fullPath = public_path('uploads/dokumen/' . $baseName);
+        }
+
+        if (! File::exists($fullPath)) {
+            $cleanName = preg_replace('/^\d+_/', '', basename($parsedPath));
+            $matches = glob(public_path('uploads/dokumen/*') . $cleanName);
+            if (! empty($matches) && File::exists($matches[0])) {
+                $fullPath = $matches[0];
+            }
+        }
 
         if (File::exists($fullPath)) {
             return response()->download($fullPath, $doc->file_nama ?? 'Dokumen.pdf');

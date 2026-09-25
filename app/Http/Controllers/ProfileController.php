@@ -269,19 +269,26 @@ class ProfileController extends Controller
             $dbId = DB::table('pegawai')->where('nik', (string) $pegawai['nik'])->value('id');
         }
         $validUuid = ($dbId && \Illuminate\Support\Str::isUuid((string) $dbId)) ? (string) $dbId : null;
-        $kategoriDb = $jenis === 'sk' ? 'SK' : 'Diklat';
+        $nik = (string) ($pegawai['nik'] ?? '');
+        $intId = (string) ($pegawai['id'] ?? '');
+        $isDiklat = in_array($jenis, ['diklat', 'surat_diklat'], true);
+        $categories = $isDiklat ? ['diklat', 'surat_diklat'] : ['sk', 'surat_kerja'];
 
         $doc = null;
         try {
             $doc = DB::table('dokumen_pegawai')
-                ->where(function ($q) use ($validUuid) {
+                ->where(function ($q) use ($validUuid, $nik, $intId) {
                     if ($validUuid) {
                         $q->where('pegawai_id', $validUuid);
-                    } else {
-                        $q->whereRaw('1=0');
+                    }
+                    if (! empty($nik)) {
+                        $q->orWhere('pegawai_id', $nik);
+                    }
+                    if (! empty($intId)) {
+                        $q->orWhere('pegawai_id', $intId);
                     }
                 })
-                ->where('kategori', $kategoriDb)
+                ->whereIn(DB::raw('LOWER(kategori)'), $categories)
                 ->first();
         } catch (\Throwable $e) {
             $doc = null;
@@ -292,11 +299,25 @@ class ProfileController extends Controller
             $relativePath = ltrim($parsedPath ?? '', '/');
             $fullPath = public_path($relativePath);
 
+            if (! File::exists($fullPath)) {
+                $baseName = basename($parsedPath);
+                $fullPath = public_path('uploads/dokumen/' . $baseName);
+            }
+
+            if (! File::exists($fullPath)) {
+                $cleanName = preg_replace('/^\d+_/', '', basename($parsedPath));
+                $matches = glob(public_path('uploads/dokumen/*') . $cleanName);
+                if (! empty($matches) && File::exists($matches[0])) {
+                    $fullPath = $matches[0];
+                }
+            }
+
             if (File::exists($fullPath)) {
                 return response()->download($fullPath, $doc->file_nama ?? 'Dokumen.pdf');
             }
         }
 
+        request()->merge(['jenis' => $jenis, 'pegawai_id' => $pegawai['id'] ?? null]);
         return app(DokumenSuratController::class)->cetak(request(), $doc->id ?? null);
     }
  
