@@ -175,7 +175,7 @@ return [
         [
             'label' => 'Laporan Insentif',
             'icon' => 'report',
-            'roles' => ['1'],
+            'roles' => ['1', '2', '7'],
             'items' => [
                 ['label' => 'Cetak Slip Insentif', 'route_name' => 'insentif.laporan-slip'],
                 ['label' => 'Lap. Buku Besar Insentif', 'route_name' => 'insentif.laporan-buku-besar'],

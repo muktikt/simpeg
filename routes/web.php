@@ -192,12 +192,14 @@ Route::middleware(['simpeg.auth'])->group(function () {
         });
     });
 
-    // Insentif - Admin SDM only
+    // Insentif - Admin SDM (1), Keuangan (2), Direksi (7), Pegawai (5)
     Route::prefix('insentif')->name('insentif.')->group(function () {
-        Route::middleware(['simpeg.auth:1,5'])->group(function () {
+        Route::middleware(['simpeg.auth:1,2,5,7'])->group(function () {
             Route::get('/laporan/slip', [InsentifController::class, 'laporanSlip'])->name('laporan-slip');
+            Route::get('/slip/{id}', [InsentifController::class, 'show'])->whereNumber('id')->name('show');
+            Route::get('/{id}', [InsentifController::class, 'show'])->whereNumber('id');
         });
-        Route::middleware(['simpeg.auth:1'])->group(function () {
+        Route::middleware(['simpeg.auth:1,2,7'])->group(function () {
             Route::get('/laporan/buku-besar', [InsentifController::class, 'laporanBukuBesar'])->name('laporan-buku-besar');
             Route::get('/laporan/buku-besar-per-sub', [InsentifController::class, 'laporanBukuBesarPerSub'])->name('laporan-buku-besar-per-sub');
         });
