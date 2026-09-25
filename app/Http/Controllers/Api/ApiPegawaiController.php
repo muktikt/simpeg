@@ -628,11 +628,11 @@ class ApiPegawaiController extends Controller
 
             $dokumenList = DB::table('dokumen_pegawai')
                 ->where(function ($q) use ($pegawaiUuid, $nik) {
-                    if ($pegawaiUuid) {
+                    if ($pegawaiUuid && \Illuminate\Support\Str::isUuid((string) $pegawaiUuid)) {
                         $q->where('pegawai_id', $pegawaiUuid);
                     }
                     if (! empty($nik)) {
-                        $q->orWhere('pegawai_id', $nik);
+                        $q->orWhereRaw('pegawai_id::text = ?', [(string) $nik]);
                     }
                     $q->orWhereNull('pegawai_id');
                 })

@@ -282,10 +282,10 @@ class ProfileController extends Controller
                         $q->where('pegawai_id', $validUuid);
                     }
                     if (! empty($nik)) {
-                        $q->orWhere('pegawai_id', $nik);
+                        $q->orWhereRaw('pegawai_id::text = ?', [$nik]);
                     }
                     if (! empty($intId)) {
-                        $q->orWhere('pegawai_id', $intId);
+                        $q->orWhereRaw('pegawai_id::text = ?', [$intId]);
                     }
                 })
                 ->whereIn(DB::raw('LOWER(kategori)'), $categories)

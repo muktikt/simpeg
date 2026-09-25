@@ -299,14 +299,14 @@ class DokumenSuratController extends Controller
 
             $doc = DB::table('dokumen_pegawai')
                 ->where(function ($q) use ($dbId, $intId, $nik) {
-                    if ($dbId) {
+                    if ($dbId && \Illuminate\Support\Str::isUuid((string) $dbId)) {
                         $q->where('pegawai_id', $dbId);
                     }
                     if (! empty($nik)) {
-                        $q->orWhere('pegawai_id', $nik);
+                        $q->orWhereRaw('pegawai_id::text = ?', [$nik]);
                     }
                     if (! empty($intId)) {
-                        $q->orWhere('pegawai_id', $intId);
+                        $q->orWhereRaw('pegawai_id::text = ?', [$intId]);
                     }
                 })
                 ->whereIn(DB::raw('LOWER(kategori)'), $categories)
