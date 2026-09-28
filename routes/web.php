@@ -176,7 +176,9 @@ Route::middleware(['simpeg.auth'])->group(function () {
 
         Route::middleware(['simpeg.auth:1,2,7'])->group(function () {
             Route::get('/laporan/buku-besar', [GajiTigabelasController::class, 'laporanBukuBesar'])->name('laporan-buku-besar');
+            Route::get('/laporan/buku_besar', fn () => redirect()->route('gaji-tigabelas.laporan-buku-besar'));
             Route::get('/laporan/buku-besar-per-sub', [GajiTigabelasController::class, 'laporanBukuBesarPerSub'])->name('laporan-buku-besar-per-sub');
+            Route::get('/laporan/buku_besar_per_sub', fn () => redirect()->route('gaji-tigabelas.laporan-buku-besar-per-sub'));
         });
 
         Route::middleware(['simpeg.auth:1,7'])->group(function () {

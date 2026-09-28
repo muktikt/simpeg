@@ -216,6 +216,14 @@ class PrestasiController extends Controller
                             'updated_at' => now(),
                         ]);
                 }
+
+                // Sinkronkan juga ke tabel insentif jika ada
+                \Illuminate\Support\Facades\DB::table('insentif')
+                    ->where('pegawai_id', $dbPegId)
+                    ->where('periode', $periodeLembur)
+                    ->update([
+                        'lembur' => $nominalLembur,
+                    ]);
             } catch (\Throwable $e) {
                 \Illuminate\Support\Facades\Log::warning('Sync prestasi lembur to lembur table failed: ' . $e->getMessage());
             }
@@ -320,6 +328,14 @@ class PrestasiController extends Controller
                             'updated_at' => now(),
                         ]);
                 }
+
+                // Sinkronkan juga ke tabel insentif jika ada
+                \Illuminate\Support\Facades\DB::table('insentif')
+                    ->where('pegawai_id', $dbPegId)
+                    ->where('periode', $periodeLembur)
+                    ->update([
+                        'lembur' => $nominalLembur,
+                    ]);
             } catch (\Throwable $e) {
                 \Illuminate\Support\Facades\Log::warning('Sync update prestasi lembur failed: ' . $e->getMessage());
             }

@@ -613,51 +613,59 @@ class GajiProsesController extends Controller
             if ($nextStatus === 'terbit') {
                 $dbPayroll = \Illuminate\Support\Facades\DB::table('payroll')->where('id', $id)->first();
                 if ($dbPayroll && !empty($dbPayroll->pegawai_id)) {
-                    // 1. Sinkron ke tabel lembur jika ada lembur
-                    if (($dbPayroll->lembur ?? 0) > 0) {
-                        try {
-                            $rateLembur = PrestasiController::RATE_LEMBUR_PER_JAM;
-                            $jamLembur = max(1, (int) round(($dbPayroll->lembur ?? 0) / $rateLembur));
+                    // 1. Sinkron ke tabel lembur & payroll dari data resmi Prestasi SDM
+                    try {
+                        $rateLembur = PrestasiController::RATE_LEMBUR_PER_JAM;
+                        $prefix = sprintf('%04d-%02d', $dbPayroll->tahun, $dbPayroll->bulan);
+                        $monthPadded = str_pad($dbPayroll->bulan, 2, '0', STR_PAD_LEFT);
 
-                            // Cek apakah ada record manual dari Set Prestasi SDM untuk pegawai dan periode ini
-                            $existingPrestasi = \Illuminate\Support\Facades\DB::table('prestasi')
-                                ->where('pegawai_id', $dbPayroll->pegawai_id)
-                                ->where(function ($q) use ($dbPayroll) {
-                                    $prefix = sprintf('%04d-%02d', $dbPayroll->tahun, $dbPayroll->bulan);
-                                    $q->where('tanggal', 'like', "$prefix%")
-                                      ->orWhere('tanggal', 'like', "%{$dbPayroll->tahun}-" . str_pad($dbPayroll->bulan, 2, '0', STR_PAD_LEFT) . "-%");
-                                })
-                                ->orderByDesc('id')
-                                ->first();
+                        // Cek apakah ada record manual dari Set Prestasi SDM untuk pegawai dan periode ini
+                        $existingPrestasi = \Illuminate\Support\Facades\DB::table('prestasi')
+                            ->where('pegawai_id', $dbPayroll->pegawai_id)
+                            ->where(function ($q) use ($prefix, $dbPayroll, $monthPadded) {
+                                $q->where('tanggal', 'like', "$prefix%")
+                                  ->orWhere('tanggal', 'like', "%{$dbPayroll->tahun}-{$monthPadded}-%");
+                            })
+                            ->orderByDesc('id')
+                            ->first();
 
-                            if ($existingPrestasi) {
-                                $pMeta = json_decode($existingPrestasi->keterangan ?? '{}', true) ?: [];
-                                if (!empty($pMeta['jam_lembur'])) {
-                                    $jamLembur = $pMeta['jam_lembur'];
-                                }
-                            } else {
-                                // Jika di tabel lembur sudah ada record dengan jam_lembur yang diinput manual, jangan timpa jika nominalnya cocok
-                                $existingLembur = \Illuminate\Support\Facades\DB::table('lembur')
-                                    ->where('pegawai_id', $dbPayroll->pegawai_id)
-                                    ->where('bulan', $dbPayroll->periode)
-                                    ->first();
+                        $jamLembur = 0;
+                        $uangLembur = (int) ($dbPayroll->lembur ?? 0);
 
-                                if ($existingLembur && (int)$existingLembur->uang_lembur === (int)$dbPayroll->lembur && (float)$existingLembur->jam_lembur > 0) {
-                                    $jamLembur = $existingLembur->jam_lembur;
-                                }
-                            }
+                        if ($existingPrestasi) {
+                            $pMeta = json_decode($existingPrestasi->keterangan ?? '{}', true) ?: [];
+                            $jamLembur = (float) ($pMeta['jam_lembur'] ?? ($existingPrestasi->jam_lembur ?? 0));
+                            $uangLembur = (int) ($pMeta['nominal_lembur'] ?? round($jamLembur * $rateLembur));
+                        } elseif ($uangLembur > 0) {
+                            $jamLembur = max(1, (int) round($uangLembur / $rateLembur));
+                        }
 
+                        // Jika nominal lembur dari Prestasi berbeda dengan payroll, update payroll agar sinkron
+                        if ($uangLembur !== (int) ($dbPayroll->lembur ?? 0)) {
+                            $selisih = $uangLembur - (int) ($dbPayroll->lembur ?? 0);
+                            \Illuminate\Support\Facades\DB::table('payroll')
+                                ->where('id', $id)
+                                ->update([
+                                    'lembur' => $uangLembur,
+                                    'total_pendapatan' => \Illuminate\Support\Facades\DB::raw('total_pendapatan + ' . $selisih),
+                                    'gaji_bersih' => \Illuminate\Support\Facades\DB::raw('gaji_bersih + ' . $selisih),
+                                    'updated_at' => now(),
+                                ]);
+                            $dbPayroll->lembur = $uangLembur;
+                        }
+
+                        if ($jamLembur > 0 || $uangLembur > 0) {
                             \Illuminate\Support\Facades\DB::table('lembur')->updateOrInsert(
                                 ['pegawai_id' => $dbPayroll->pegawai_id, 'bulan' => $dbPayroll->periode],
                                 [
                                     'jam_lembur' => $jamLembur,
-                                    'uang_lembur' => $dbPayroll->lembur,
+                                    'uang_lembur' => $uangLembur,
                                     'created_at' => now(),
                                 ]
                             );
-                        } catch (\Throwable $e) {
-                            \Illuminate\Support\Facades\Log::warning('Sync to lembur table failed: ' . $e->getMessage());
                         }
+                    } catch (\Throwable $e) {
+                        \Illuminate\Support\Facades\Log::warning('Sync to lembur table failed: ' . $e->getMessage());
                     }
 
                     // 2. Sinkron ke tabel insentif
@@ -685,6 +693,16 @@ class GajiProsesController extends Controller
                                 'potongan_perumahan' => $dbPayroll->potongan_perumahan ?? 0,
                                 'potongan_pajak' => $dbPayroll->potongan_pajak ?? 0,
                                 'potongan_korpri' => $dbPayroll->potongan_korpri ?? 0,
+                                'potongan_koperasi' => $dbPayroll->potongan_koperasi ?? 0,
+                                'potongan_darma_wanita' => $dbPayroll->potongan_darma_wanita ?? ($dbPayroll->potongan_darmawanita ?? 0),
+                                'potongan_rekening_air_minum' => $dbPayroll->potongan_rekening_air_minum ?? ($dbPayroll->potongan_ledeng ?? 0),
+                                'potongan_kas' => $dbPayroll->potongan_kas ?? 0,
+                                'potongan_bank_bjb' => $dbPayroll->potongan_bank_bjb ?? ($dbPayroll->potongan_bjb ?? 0),
+                                'potongan_bank_bjbs' => $dbPayroll->potongan_bank_bjbs ?? ($dbPayroll->potongan_bjbs ?? 0),
+                                'potongan_bank_btn' => $dbPayroll->potongan_bank_btn ?? ($dbPayroll->potongan_btn ?? 0),
+                                'potongan_bank_bpr' => $dbPayroll->potongan_bank_bpr ?? ($dbPayroll->potongan_bpr ?? 0),
+                                'potongan_asuransi' => $dbPayroll->potongan_asuransi ?? 0,
+                                'potongan_zakat_profesi' => $dbPayroll->potongan_zakat_profesi ?? ($dbPayroll->potongan_zakat ?? 0),
                                 'created_at' => now(),
                             ]
                         );

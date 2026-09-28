@@ -343,32 +343,54 @@ class ApiPegawaiController extends Controller
             return response()->json(['success' => false, 'message' => 'Pegawai tidak ditemukan.'], 404);
         }
 
+        $sumber = $request->get('sumber', 'gaji_bulanan');
         $items = collect();
 
-        // 1. Coba cari di tabel insentif terlebih dahulu
-        try {
-            $fromInsentif = DB::table('insentif')
-                ->where('pegawai_id', $pegawai->id)
-                ->orderByDesc('created_at')
-                ->get();
-            if ($fromInsentif->isNotEmpty()) {
-                $items = $fromInsentif;
-            }
-        } catch (\Throwable $e) {
-            // Abaikan jika tabel tidak ada
+        // Jika request sumber gaji13
+        if ($sumber === 'gaji13') {
+            try {
+                $fromGaji13 = DB::table('gaji_13')
+                    ->where('pegawai_id', $pegawai->id)
+                    ->whereIn(DB::raw('LOWER(status)'), ['terbit', 'diterbitkan'])
+                    ->orderByDesc('tahun')
+                    ->get();
+                if ($fromGaji13->isNotEmpty()) {
+                    $items = $fromGaji13;
+                }
+            } catch (\Throwable $e) {}
         }
 
-        // 2. Jika di tabel insentif belum ada, ambil dari tabel payroll (sumber resmi data insentif PDAM)
+        // 1. Prioritas Utama: Ambil dari tabel payroll yang sudah terbit / final
+        // Sesuai sistem resmi PERUMDAM Tirta Darma Ayu, tabel payroll adalah Single Source of Truth
+        // yang memuat komponen insentif serta rincian seluruh potongan (koperasi, bank, kas, dll).
         if ($items->isEmpty()) {
             try {
                 $fromPayroll = DB::table('payroll')
                     ->where('pegawai_id', $pegawai->id)
+                    ->whereIn(DB::raw('LOWER(status)'), ['terbit', 'diterbitkan'])
                     ->orderByDesc('tahun')
                     ->orderByDesc('bulan')
                     ->get();
-                $items = $fromPayroll;
+                if ($fromPayroll->isNotEmpty()) {
+                    $items = $fromPayroll;
+                }
             } catch (\Throwable $e) {
                 // Abaikan jika query payroll gagal
+            }
+        }
+
+        // 2. Fallback: Jika di payroll belum ada data terbit, coba ambil dari tabel insentif
+        if ($items->isEmpty()) {
+            try {
+                $fromInsentif = DB::table('insentif')
+                    ->where('pegawai_id', $pegawai->id)
+                    ->orderByDesc('created_at')
+                    ->get();
+                if ($fromInsentif->isNotEmpty()) {
+                    $items = $fromInsentif;
+                }
+            } catch (\Throwable $e) {
+                // Abaikan jika tabel tidak ada
             }
         }
 
@@ -379,6 +401,71 @@ class ApiPegawaiController extends Controller
         ];
 
         $formattedList = $items->map(function ($r) use ($bulanNames, $pegawai) {
+            $isGaji13 = isset($r->gaji13_diterima) || isset($r->pembagi_insentif) || (isset($r->kategori) && $r->kategori === 'gaji13');
+            if ($isGaji13) {
+                $pemecahan = \App\Http\Controllers\GajiTigabelasController::hitungPemecahanGaji13((array) $r);
+                $ins = $pemecahan['insentif'];
+                $tahun = (int) ($r->tahun ?? date('Y'));
+                $periode = "Gaji 13 Tahun $tahun";
+
+                return [
+                    'id' => $r->id,
+                    'pegawai_id' => $pegawai->id,
+                    'nik' => $pegawai->nik,
+                    'nama' => $pegawai->name,
+                    'jabatan' => $pegawai->jabatan,
+                    'unit_kerja' => $pegawai->unit_kerja,
+                    'golongan' => $pegawai->golongan,
+                    'periode' => $periode,
+                    'bulan' => 0,
+                    'tahun' => $tahun,
+                    'status' => 'Terbit & Final',
+                    'disetujui_oleh' => $r->disetujui_oleh ?? 'Nurpan, S.E., M.Si.',
+                    // Penerimaan
+                    'insentif_jabatan' => $ins['insentif_jabatan'],
+                    'insentif_prestasi' => $ins['insentif_prestasi'],
+                    'insentif_transportasi' => $ins['insentif_transportasi'],
+                    'insentif_pangan' => $ins['insentif_pangan'],
+                    'insentif_bpjs_kesehatan' => $ins['insentif_bpjs_kesehatan'],
+                    'insentif_perumahan' => $ins['insentif_perumahan'],
+                    'insentif_bpjs_tenaga_kerja' => $ins['insentif_bpjs_tenaga_kerja'],
+                    'insentif_perusahaan' => $ins['insentif_perusahaan'],
+                    'lembur' => $ins['lembur'],
+                    'insentif_pajak' => $ins['insentif_pajak'],
+                    'insentif_air_minum' => $ins['insentif_air_minum'],
+                    'insentif_komunikasi' => $ins['insentif_komunikasi'],
+                    'total_insentif' => $ins['total_insentif'],
+                    'insentif_bruto' => $ins['total_insentif'],
+                    // Potongan Insentif
+                    'potongan_sanksi_perusahaan' => $ins['potongan_sanksi_perusahaan'],
+                    'potongan_trandist_pmi_lain' => $ins['potongan_trandist_pmi_lain'],
+                    'potongan_dapenma' => $ins['potongan_dapenma'],
+                    'potongan_bpjs_tenaga_kerja' => $ins['potongan_bpjs_tenaga_kerja'],
+                    'potongan_perumahan' => $ins['potongan_perumahan'],
+                    'potongan_tunjangan_perusahaan' => $ins['potongan_tunjangan_perusahaan'],
+                    'potongan_korpri' => $ins['potongan_korpri'],
+                    'potongan_pajak' => $ins['potongan_pajak'],
+                    'potongan_bpjs_kesehatan' => $ins['potongan_bpjs_kesehatan'],
+                    // Potongan Non-Insentif
+                    'potongan_koperasi' => $ins['potongan_koperasi'],
+                    'potongan_darma_wanita' => $ins['potongan_darma_wanita'],
+                    'potongan_rekening_air_minum' => $ins['potongan_rekening_air_minum'],
+                    'potongan_kas' => $ins['potongan_kas'],
+                    'potongan_bank_bjb' => $ins['potongan_bank_bjb'],
+                    'potongan_bank_bjbs' => $ins['potongan_bank_bjbs'],
+                    'potongan_bank_btn' => $ins['potongan_bank_btn'],
+                    'potongan_bank_bpr' => $ins['potongan_bank_bpr'],
+                    'potongan_asuransi' => $ins['potongan_asuransi'],
+                    'potongan_zakat_profesi' => $ins['potongan_zakat_profesi'],
+                    // Totals
+                    'total_potongan_insentif' => $ins['total_potongan_insentif'],
+                    'total_potongan_non_insentif' => $ins['total_potongan_non_insentif'],
+                    'total_potongan' => $ins['total_potongan'],
+                    'insentif_diterima' => $ins['insentif_diterima'],
+                    'gaji_bersih' => $ins['insentif_diterima'],
+                ];
+            }
+
             $bulan = (int) ($r->bulan ?? (isset($r->created_at) ? date('n', strtotime($r->created_at)) : 1));
             $tahun = (int) ($r->tahun ?? (isset($r->created_at) ? date('Y', strtotime($r->created_at)) : (int) date('Y')));
             $bName = $bulanNames[$bulan] ?? ('Bulan ' . $bulan);
