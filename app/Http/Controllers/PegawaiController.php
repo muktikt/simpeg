@@ -360,9 +360,11 @@ class PegawaiController extends Controller
      * mana yang tunjangan keluarganya perlu dihentikan (biasanya tunjangan
      * anak berhenti di usia 21 kecuali masih kuliah).
      */
-    public function laporanAnakDiatas21()
+    public function laporanAnakDiatas21(?Request $request = null)
     {
+        $request = $request ?? request();
         $batasUsia = now()->subYears(21);
+        $statusFilter = $request->get('status', 'semua');
 
         // Ambil semua keluarga berhubungan 'Anak' langsung dari database,
         // karena $this->all() tidak memuat relasi keluarga (selalu []).
@@ -389,22 +391,40 @@ class PegawaiController extends Controller
                 $arr['nama'] = $arr['nama'] ?? '-';
                 return $arr;
             })
-            ->filter(function ($anak) use ($batasUsia) {
-                // Filter: keterangan = 'Tidak Kuliah' dan usia > 21 tahun
-                $keterangan = $anak['keterangan'] ?? '-';
+            ->filter(function ($anak) use ($batasUsia, $statusFilter) {
                 $tglLahir = $anak['tgl_lahir'] ?? null;
                 if (empty($tglLahir) || $tglLahir === '-') return false;
 
                 try {
-                    return $keterangan === 'Tidak Kuliah'
-                        && \Illuminate\Support\Carbon::parse($tglLahir)->lte($batasUsia);
+                    $carbonLahir = \Illuminate\Support\Carbon::parse($tglLahir);
+                    // Tampilkan anak yang berusia >= 21 tahun (baik eksak maupun tahun kalender)
+                    $isDiatas21 = $carbonLahir->lte($batasUsia) || (now()->year - $carbonLahir->year >= 21);
+                    if (! $isDiatas21) {
+                        return false;
+                    }
+
+                    if ($statusFilter !== 'semua') {
+                        $ket = strtolower($anak['keterangan'] ?? '');
+                        if ($statusFilter === 'kuliah') {
+                            return str_contains($ket, 'kuliah') && ! str_contains($ket, 'tidak');
+                        } elseif ($statusFilter === 'tidak-kuliah') {
+                            return str_contains($ket, 'tidak');
+                        }
+                    }
+
+                    return true;
                 } catch (\Throwable $e) {
                     return false;
                 }
             })
             ->map(function ($anak) {
                 try {
-                    $anak['usia'] = (int) \Illuminate\Support\Carbon::parse($anak['tgl_lahir'])->diffInYears(now());
+                    $carbonLahir = \Illuminate\Support\Carbon::parse($anak['tgl_lahir']);
+                    $usia = (int) $carbonLahir->diffInYears(now());
+                    if ($usia < 21 && (now()->year - $carbonLahir->year >= 21)) {
+                        $usia = now()->year - $carbonLahir->year;
+                    }
+                    $anak['usia'] = $usia;
                 } catch (\Throwable $e) {
                     $anak['usia'] = 0;
                 }
@@ -413,7 +433,7 @@ class PegawaiController extends Controller
             ->sortBy('nama_pegawai')
             ->values();
 
-        return view('pegawai.laporan-anak', compact('data'));
+        return view('pegawai.laporan-anak', compact('data', 'statusFilter'));
     }
 
     /**

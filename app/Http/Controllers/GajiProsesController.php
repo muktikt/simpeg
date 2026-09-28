@@ -154,6 +154,47 @@ class GajiProsesController extends Controller
         $totalPotongan = (float) ($r->total_potongan ?? 0);
         $gajiBersih = (float) ($r->gaji_bersih ?? 0);
 
+        $lemburPayroll = (float) ($r->lembur ?? 0);
+        $jamLembur = 0;
+        $lemburFinal = $lemburPayroll;
+
+        if (!empty($r->pegawai_id)) {
+            $tahunRow = (int) ($r->tahun ?? now()->year);
+            $bulanRow = (int) ($r->bulan ?? now()->month);
+            $prefix = sprintf('%04d-%02d', $tahunRow, $bulanRow);
+            $monthPadded = str_pad($bulanRow, 2, '0', STR_PAD_LEFT);
+
+            try {
+                $pRow = \Illuminate\Support\Facades\DB::table('prestasi')
+                    ->where('pegawai_id', $r->pegawai_id)
+                    ->where(function ($q) use ($prefix, $tahunRow, $bulanRow, $monthPadded) {
+                        $q->where('tanggal', 'like', "$prefix%")
+                          ->orWhere('tanggal', 'like', "%$tahunRow-$monthPadded-%")
+                          ->orWhere('tanggal', 'like', "%$tahunRow-$bulanRow-%");
+                    })
+                    ->orderByDesc('id')
+                    ->first();
+
+                if ($pRow) {
+                    $meta = json_decode($pRow->keterangan ?? '{}', true) ?: [];
+                    $jamLembur = (float) ($meta['jam_lembur'] ?? ($pRow->jam_lembur ?? 0));
+                    $lemburFinal = (float) ($meta['nominal_lembur'] ?? round($jamLembur * PrestasiController::RATE_LEMBUR_PER_JAM));
+                } else {
+                    $bulanNama = AbsensiController::BULAN[$bulanRow] ?? '';
+                    $lRow = \Illuminate\Support\Facades\DB::table('lembur')
+                        ->where('pegawai_id', $r->pegawai_id)
+                        ->where(function ($q) use ($bulanNama, $tahunRow) {
+                            $q->where('bulan', 'ilike', "%$bulanNama $tahunRow%");
+                        })
+                        ->first();
+                    if ($lRow) {
+                        $jamLembur = (float) ($lRow->jam_lembur ?? 0);
+                        $lemburFinal = (float) ($lRow->uang_lembur ?? 0);
+                    }
+                }
+            } catch (\Throwable $e) {}
+        }
+
         if ($totalPendapatan <= 0) {
             $totalPendapatan = (float) ($r->gapok ?? 0)
                 + (float) ($r->tunjangan_istri ?? 0)
@@ -169,7 +210,12 @@ class GajiProsesController extends Controller
                 + (float) ($r->tunjangan_bpjs_kesehatan ?? 0)
                 + (float) ($r->tunjangan_komunikasi ?? 0)
                 + (float) ($r->tunjangan_pajak ?? 0)
-                + (float) ($r->lembur ?? 0);
+                + $lemburFinal;
+        } else {
+            // Sesuaikan total jika ada selisih lembur dari Prestasi
+            if ($lemburFinal !== $lemburPayroll) {
+                $totalPendapatan += ($lemburFinal - $lemburPayroll);
+            }
         }
 
         if ($totalPotongan <= 0) {
@@ -194,9 +240,7 @@ class GajiProsesController extends Controller
                 + (float) ($r->potongan_zakat_profesi ?? 0);
         }
 
-        if ($gajiBersih <= 0) {
-            $gajiBersih = $totalPendapatan - $totalPotongan;
-        }
+        $gajiBersih = $totalPendapatan - $totalPotongan;
 
         return [
             'id' => $r->id,
@@ -228,7 +272,8 @@ class GajiProsesController extends Controller
             'tunjangan_bpjskes' => (float) ($r->tunjangan_bpjs_kesehatan ?? $r->tunjangan_bpjskes ?? 0),
             'tunjangan_komunikasi' => (float) ($r->tunjangan_komunikasi ?? 0),
             'tunjangan_pajak' => (float) ($r->tunjangan_pajak ?? 0),
-            'lembur' => (float) ($r->lembur ?? 0),
+            'lembur' => $lemburFinal,
+            'jam_lembur' => $jamLembur,
 
             // Komponen Potongan
             'potongan_sanksi' => (float) ($r->potongan_sanksi_perusahaan ?? $r->potongan_sanksi ?? 0),
@@ -473,6 +518,9 @@ class GajiProsesController extends Controller
         $pegawai = $this->pegawaiById($validated['pegawai_id']);
         $keluargaCalc = $this->hitungKeluarga($validated['pegawai_id'], $request);
 
+        // Ambil nominal lembur resmi dari modul Prestasi SDM (bukan dari input manual)
+        $validated['lembur'] = (int) ($keluargaCalc['lembur'] ?? 0);
+
         $totalPendapatan = collect(array_keys(self::KOMPONEN_PENDAPATAN))
             ->sum(fn ($key) => (float) ($validated[$key] ?? 0));
 
@@ -630,14 +678,24 @@ class GajiProsesController extends Controller
                             ->first();
 
                         $jamLembur = 0;
-                        $uangLembur = (int) ($dbPayroll->lembur ?? 0);
+                        $uangLembur = 0;
 
                         if ($existingPrestasi) {
                             $pMeta = json_decode($existingPrestasi->keterangan ?? '{}', true) ?: [];
                             $jamLembur = (float) ($pMeta['jam_lembur'] ?? ($existingPrestasi->jam_lembur ?? 0));
                             $uangLembur = (int) ($pMeta['nominal_lembur'] ?? round($jamLembur * $rateLembur));
-                        } elseif ($uangLembur > 0) {
-                            $jamLembur = max(1, (int) round($uangLembur / $rateLembur));
+                        } else {
+                            $bulanNama = AbsensiController::BULAN[$dbPayroll->bulan] ?? '';
+                            $lRow = \Illuminate\Support\Facades\DB::table('lembur')
+                                ->where('pegawai_id', $dbPayroll->pegawai_id)
+                                ->where(function ($q) use ($bulanNama, $dbPayroll) {
+                                    $q->where('bulan', 'ilike', "%$bulanNama {$dbPayroll->tahun}%");
+                                })
+                                ->first();
+                            if ($lRow) {
+                                $jamLembur = (float) ($lRow->jam_lembur ?? 0);
+                                $uangLembur = (int) ($lRow->uang_lembur ?? 0);
+                            }
                         }
 
                         // Jika nominal lembur dari Prestasi berbeda dengan payroll, update payroll agar sinkron

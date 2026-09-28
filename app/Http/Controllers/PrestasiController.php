@@ -181,53 +181,8 @@ class PrestasiController extends Controller
             'created_at' => now(),
         ]);
 
-        // 2. Sinkron ke tabel lembur jika jam_lembur > 0
-        if ($jamLembur > 0) {
-            try {
-                $tglCarbon = \Illuminate\Support\Carbon::parse($validated['tanggal']);
-                $bulanNama = AbsensiController::BULAN[$tglCarbon->month] ?? $tglCarbon->translatedFormat('F');
-                $periodeLembur = "{$bulanNama} {$tglCarbon->year}";
-
-                // Update atau insert di tabel lembur resmi
-                \Illuminate\Support\Facades\DB::table('lembur')->updateOrInsert(
-                    ['pegawai_id' => $dbPegId, 'bulan' => $periodeLembur],
-                    [
-                        'jam_lembur' => (int) round($jamLembur),
-                        'uang_lembur' => $nominalLembur,
-                        'created_at' => now(),
-                    ]
-                );
-
-                // Sinkronkan juga ke tabel payroll jika draft/record gaji bulan ini sudah ada
-                $existingPayroll = \Illuminate\Support\Facades\DB::table('payroll')
-                    ->where('pegawai_id', $dbPegId)
-                    ->where('bulan', (int) $tglCarbon->month)
-                    ->where('tahun', (int) $tglCarbon->year)
-                    ->first();
-
-                if ($existingPayroll) {
-                    $selisihLembur = $nominalLembur - (int) ($existingPayroll->lembur ?? 0);
-                    \Illuminate\Support\Facades\DB::table('payroll')
-                        ->where('id', $existingPayroll->id)
-                        ->update([
-                            'lembur' => $nominalLembur,
-                            'total_pendapatan' => \Illuminate\Support\Facades\DB::raw('total_pendapatan + ' . $selisihLembur),
-                            'gaji_bersih' => \Illuminate\Support\Facades\DB::raw('gaji_bersih + ' . $selisihLembur),
-                            'updated_at' => now(),
-                        ]);
-                }
-
-                // Sinkronkan juga ke tabel insentif jika ada
-                \Illuminate\Support\Facades\DB::table('insentif')
-                    ->where('pegawai_id', $dbPegId)
-                    ->where('periode', $periodeLembur)
-                    ->update([
-                        'lembur' => $nominalLembur,
-                    ]);
-            } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::warning('Sync prestasi lembur to lembur table failed: ' . $e->getMessage());
-            }
-        }
+        // 2. Sinkron ke tabel lembur, payroll, dan insentif
+        static::syncPrestasiLemburToTables($dbPegId, $jamLembur, $nominalLembur, $validated['tanggal']);
 
         // 3. Clear cache pegawai
         \Illuminate\Support\Facades\Cache::forget('simpeg_all_pegawai_list');
@@ -294,51 +249,8 @@ class PrestasiController extends Controller
             'tingkat' => $validated['absensi'] ?? 'Perusahaan',
         ]);
 
-        if ($dbPegId && $jamLembur > 0) {
-            try {
-                $tglCarbon = \Illuminate\Support\Carbon::parse($validated['tanggal']);
-                $bulanNama = AbsensiController::BULAN[$tglCarbon->month] ?? $tglCarbon->translatedFormat('F');
-                $periodeLembur = "{$bulanNama} {$tglCarbon->year}";
-
-                // Update atau insert di tabel lembur resmi
-                \Illuminate\Support\Facades\DB::table('lembur')->updateOrInsert(
-                    ['pegawai_id' => $dbPegId, 'bulan' => $periodeLembur],
-                    [
-                        'jam_lembur' => (int) round($jamLembur),
-                        'uang_lembur' => $nominalLembur,
-                        'created_at' => now(),
-                    ]
-                );
-
-                // Sinkronkan juga ke tabel payroll jika draft/record gaji bulan ini sudah ada
-                $existingPayroll = \Illuminate\Support\Facades\DB::table('payroll')
-                    ->where('pegawai_id', $dbPegId)
-                    ->where('bulan', (int) $tglCarbon->month)
-                    ->where('tahun', (int) $tglCarbon->year)
-                    ->first();
-
-                if ($existingPayroll) {
-                    $selisihLembur = $nominalLembur - (int) ($existingPayroll->lembur ?? 0);
-                    \Illuminate\Support\Facades\DB::table('payroll')
-                        ->where('id', $existingPayroll->id)
-                        ->update([
-                            'lembur' => $nominalLembur,
-                            'total_pendapatan' => \Illuminate\Support\Facades\DB::raw('total_pendapatan + ' . $selisihLembur),
-                            'gaji_bersih' => \Illuminate\Support\Facades\DB::raw('gaji_bersih + ' . $selisihLembur),
-                            'updated_at' => now(),
-                        ]);
-                }
-
-                // Sinkronkan juga ke tabel insentif jika ada
-                \Illuminate\Support\Facades\DB::table('insentif')
-                    ->where('pegawai_id', $dbPegId)
-                    ->where('periode', $periodeLembur)
-                    ->update([
-                        'lembur' => $nominalLembur,
-                    ]);
-            } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::warning('Sync update prestasi lembur failed: ' . $e->getMessage());
-            }
+        if ($dbPegId) {
+            static::syncPrestasiLemburToTables($dbPegId, $jamLembur, $nominalLembur, $validated['tanggal']);
         }
 
         \Illuminate\Support\Facades\Cache::forget('simpeg_all_pegawai_list');
@@ -351,7 +263,13 @@ class PrestasiController extends Controller
     public function destroy(int $id)
     {
         try {
-            \Illuminate\Support\Facades\DB::table('prestasi')->where('id', $id)->delete();
+            $row = \Illuminate\Support\Facades\DB::table('prestasi')->where('id', $id)->first();
+            if ($row) {
+                \Illuminate\Support\Facades\DB::table('prestasi')->where('id', $id)->delete();
+                if (!empty($row->pegawai_id)) {
+                    static::syncPrestasiLemburToTables($row->pegawai_id, 0, 0, $row->tanggal ?? now()->toDateString());
+                }
+            }
         } catch (\Throwable $e) {}
 
         \Illuminate\Support\Facades\Cache::forget('simpeg_all_pegawai_list');
@@ -361,10 +279,81 @@ class PrestasiController extends Controller
         return redirect()->route('prestasi.index')->with('success', 'Data prestasi berhasil dihapus.');
     }
 
+    public static function syncPrestasiLemburToTables(string $dbPegId, float $jamLembur, int $nominalLembur, string $tanggal): void
+    {
+        try {
+            $tglCarbon = \Illuminate\Support\Carbon::parse($tanggal);
+            $bulan = (int) $tglCarbon->month;
+            $tahun = (int) $tglCarbon->year;
+            $bulanNama = AbsensiController::BULAN[$bulan] ?? $tglCarbon->translatedFormat('F');
+            $periodeLembur = "{$bulanNama} {$tahun}";
+
+            // 1. Update atau insert di tabel lembur resmi
+            if ($jamLembur > 0 || $nominalLembur > 0) {
+                \Illuminate\Support\Facades\DB::table('lembur')->updateOrInsert(
+                    ['pegawai_id' => $dbPegId, 'bulan' => $periodeLembur],
+                    [
+                        'jam_lembur' => (int) round($jamLembur),
+                        'uang_lembur' => $nominalLembur,
+                        'created_at' => now(),
+                    ]
+                );
+            } else {
+                \Illuminate\Support\Facades\DB::table('lembur')
+                    ->where('pegawai_id', $dbPegId)
+                    ->where(function ($q) use ($periodeLembur, $bulanNama, $tahun) {
+                        $q->where('bulan', $periodeLembur)
+                          ->orWhere('bulan', 'ilike', "%$bulanNama $tahun%");
+                    })
+                    ->update([
+                        'jam_lembur' => 0,
+                        'uang_lembur' => 0,
+                    ]);
+            }
+
+            // 2. Sinkronkan ke tabel payroll untuk SEMUA record pegawai ini di bulan & tahun ini
+            $payrolls = \Illuminate\Support\Facades\DB::table('payroll')
+                ->where('pegawai_id', $dbPegId)
+                ->where(function ($q) use ($bulan, $tahun, $periodeLembur) {
+                    $q->where(function ($sq) use ($bulan, $tahun) {
+                        $sq->where('bulan', $bulan)->where('tahun', $tahun);
+                    })->orWhere('periode', $periodeLembur)
+                      ->orWhere('periode', "$bulan-$tahun");
+                })
+                ->get();
+
+            foreach ($payrolls as $existingPayroll) {
+                $selisihLembur = $nominalLembur - (int) ($existingPayroll->lembur ?? 0);
+                \Illuminate\Support\Facades\DB::table('payroll')
+                    ->where('id', $existingPayroll->id)
+                    ->update([
+                        'lembur' => $nominalLembur,
+                        'total_pendapatan' => \Illuminate\Support\Facades\DB::raw('total_pendapatan + ' . $selisihLembur),
+                        'gaji_bersih' => \Illuminate\Support\Facades\DB::raw('gaji_bersih + ' . $selisihLembur),
+                        'updated_at' => now(),
+                    ]);
+            }
+
+            // 3. Sinkronkan juga ke tabel insentif jika ada
+            \Illuminate\Support\Facades\DB::table('insentif')
+                ->where('pegawai_id', $dbPegId)
+                ->where(function ($q) use ($periodeLembur, $bulanNama, $tahun) {
+                    $q->where('periode', $periodeLembur)
+                      ->orWhere('periode', 'ilike', "%$bulanNama $tahun%")
+                      ->orWhere('periode', 'ilike', "%$tahun%");
+                })
+                ->update([
+                    'lembur' => $nominalLembur,
+                ]);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Sync prestasi lembur failed: ' . $e->getMessage());
+        }
+    }
+
     protected function validateData(Request $request): array
     {
         return $request->validate([
-            'pegawai_id' => 'required|integer',
+            'pegawai_id' => 'required',
             'tanggal' => 'required|date',
             'karya' => 'required|string|max:100',
             'absensi' => 'required|string|max:100',

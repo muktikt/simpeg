@@ -164,6 +164,38 @@ class InsentifController extends Controller
             $insentifBpjstk = (int) ($r->tunjangan_bpjs_tenaga_kerja ?? ($r->tunjangan_bpjstk ?? ($r->insentif_bpjs_tenaga_kerja ?? 0)));
             $insentifPerusahaan = (int) ($r->tunjangan_perusahaan ?? ($r->insentif_perusahaan ?? 0));
             $lembur = (int) ($r->lembur ?? 0);
+            if (!empty($pegawaiId)) {
+                $prefix = sprintf('%04d-%02d', $tahun, $bulan);
+                $monthPadded = str_pad($bulan, 2, '0', STR_PAD_LEFT);
+                try {
+                    $pRow = DB::table('prestasi')
+                        ->where('pegawai_id', $pegawaiId)
+                        ->where(function ($q) use ($prefix, $tahun, $bulan, $monthPadded) {
+                            $q->where('tanggal', 'like', "$prefix%")
+                              ->orWhere('tanggal', 'like', "%$tahun-$monthPadded-%")
+                              ->orWhere('tanggal', 'like', "%$tahun-$bulan-%");
+                        })
+                        ->orderByDesc('id')
+                        ->first();
+
+                    if ($pRow) {
+                        $meta = json_decode($pRow->keterangan ?? '{}', true) ?: [];
+                        $jam = (float) ($meta['jam_lembur'] ?? ($pRow->jam_lembur ?? 0));
+                        $lembur = (int) ($meta['nominal_lembur'] ?? round($jam * PrestasiController::RATE_LEMBUR_PER_JAM));
+                    } else {
+                        $bulanNama = AbsensiController::BULAN[$bulan] ?? '';
+                        $lRow = DB::table('lembur')
+                            ->where('pegawai_id', $pegawaiId)
+                            ->where(function ($q) use ($bulanNama, $tahun) {
+                                $q->where('bulan', 'ilike', "%$bulanNama $tahun%");
+                            })
+                            ->first();
+                        if ($lRow) {
+                            $lembur = (int) ($lRow->uang_lembur ?? 0);
+                        }
+                    }
+                } catch (\Throwable $e) {}
+            }
             $insentifPajak = (int) ($r->tunjangan_pajak ?? ($r->insentif_pajak ?? 0));
             $insentifAirMinum = (int) ($r->tunjangan_air_minum ?? ($r->tunjangan_airminum ?? ($r->insentif_air_minum ?? 0)));
             $insentifKomunikasi = (int) ($r->tunjangan_komunikasi ?? ($r->insentif_komunikasi ?? 0));

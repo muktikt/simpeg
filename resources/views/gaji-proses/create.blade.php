@@ -58,8 +58,13 @@
         <div class="form-grid">
             @foreach ($komponenPendapatan as $key => $label)
                 <div class="form-group">
-                    <label for="{{ $key }}">{{ $label }}</label>
-                    <input type="number" id="{{ $key }}" name="{{ $key }}" min="0" step="1" value="{{ old($key, 0) }}" class="komponen-pendapatan" oninput="hitungTotal()">
+                    <label for="{{ $key }}">
+                        {{ $label }}
+                        @if($key === 'lembur')
+                            <span style="font-size:11px; font-weight:normal; color:var(--teal, #0f766e);">(Otomatis dari Prestasi SDM)</span>
+                        @endif
+                    </label>
+                    <input type="number" id="{{ $key }}" name="{{ $key }}" min="0" step="1" value="{{ old($key, 0) }}" class="komponen-pendapatan" oninput="hitungTotal()" @if($key === 'lembur') readonly style="background-color: var(--card-bg, #f1f5f9); cursor: not-allowed;" title="Diambil otomatis dari Modul Set Prestasi Pegawai (Rate: Rp 9.375/jam)" @endif>
                 </div>
             @endforeach
         </div>
