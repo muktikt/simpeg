@@ -311,7 +311,12 @@ class ApiPegawaiController extends Controller
             return response()->json(['success' => false, 'message' => 'Pegawai tidak ditemukan.'], 404);
         }
 
-        $gaji13 = DB::table('gaji_13')->where('pegawai_id', $pegawai->id)->orderByDesc('created_at')->first();
+        $gaji13 = DB::table('gaji_13')->where('pegawai_id', $pegawai->id)->orderByDesc('tahun')->first();
+
+        $pemecahan = null;
+        if ($gaji13) {
+            $pemecahan = \App\Http\Controllers\GajiTigabelasController::hitungPemecahanGaji13((array) $gaji13);
+        }
 
         return response()->json([
             'success' => true,
@@ -319,7 +324,11 @@ class ApiPegawaiController extends Controller
             'data' => [
                 'nik' => $pegawai->nik,
                 'nama' => $pegawai->name,
+                'jabatan' => $pegawai->jabatan ?? '-',
+                'unit_kerja' => $pegawai->unit_kerja ?? '-',
+                'golongan' => $pegawai->golongan_detail ?? ($pegawai->golongan ?? '-'),
                 'gaji_13' => $gaji13,
+                'pemecahan' => $pemecahan,
             ],
         ]);
     }

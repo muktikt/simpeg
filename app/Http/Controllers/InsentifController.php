@@ -108,54 +108,102 @@ class InsentifController extends Controller
         $golongan = $r->p_golongan_detail ?? ($r->p_golongan ?? ($r->golongan ?? '-'));
 
         // Komponen Penerimaan Insentif
-        $insentifJabatan = (int) ($r->tunjangan_jabatan ?? ($r->insentif_jabatan ?? 0));
-        $insentifPrestasi = (int) ($r->tunjangan_prestasi ?? ($r->insentif_prestasi ?? 0));
-        $insentifTransportasi = (int) ($r->tunjangan_transportasi ?? ($r->tunjangan_transport ?? ($r->insentif_transportasi ?? 0)));
-        $insentifPangan = (int) ($r->tunjangan_pangan ?? ($r->insentif_pangan ?? 0));
-        $insentifBpjsKes = (int) ($r->tunjangan_bpjs_kesehatan ?? ($r->tunjangan_bpjskes ?? ($r->insentif_bpjs_kesehatan ?? 0)));
-        $insentifPerumahan = (int) ($r->tunjangan_perumahan ?? ($r->insentif_perumahan ?? 0));
-        $insentifBpjstk = (int) ($r->tunjangan_bpjs_tenaga_kerja ?? ($r->tunjangan_bpjstk ?? ($r->insentif_bpjs_tenaga_kerja ?? 0)));
-        $insentifPerusahaan = (int) ($r->tunjangan_perusahaan ?? ($r->insentif_perusahaan ?? 0));
-        $lembur = (int) ($r->lembur ?? 0);
-        $insentifPajak = (int) ($r->tunjangan_pajak ?? ($r->insentif_pajak ?? 0));
-        $insentifAirMinum = (int) ($r->tunjangan_air_minum ?? ($r->tunjangan_airminum ?? ($r->insentif_air_minum ?? 0)));
-        $insentifKomunikasi = (int) ($r->tunjangan_komunikasi ?? ($r->insentif_komunikasi ?? 0));
+        if ($sumber === 'gaji13') {
+            $pemecahan = GajiTigabelasController::hitungPemecahanGaji13((array) $r);
+            $ins = $pemecahan['insentif'];
 
-        $totalInsentif = $insentifJabatan + $insentifPrestasi + $insentifTransportasi + $insentifPangan +
-            $insentifBpjsKes + $insentifPerumahan + $insentifBpjstk + $insentifPerusahaan +
-            $lembur + $insentifPajak + $insentifAirMinum + $insentifKomunikasi;
+            $insentifJabatan = $ins['insentif_jabatan'];
+            $insentifPrestasi = $ins['insentif_prestasi'];
+            $insentifTransportasi = $ins['insentif_transportasi'];
+            $insentifPangan = $ins['insentif_pangan'];
+            $insentifBpjsKes = $ins['insentif_bpjs_kesehatan'];
+            $insentifPerumahan = $ins['insentif_perumahan'];
+            $insentifBpjstk = $ins['insentif_bpjs_tenaga_kerja'];
+            $insentifPerusahaan = $ins['insentif_perusahaan'];
+            $lembur = $ins['lembur'];
+            $insentifPajak = $ins['insentif_pajak'];
+            $insentifAirMinum = $ins['insentif_air_minum'];
+            $insentifKomunikasi = $ins['insentif_komunikasi'];
+            $totalInsentif = $ins['total_insentif'];
 
-        // Potongan Insentif
-        $potSanksi = (int) ($r->potongan_sanksi_perusahaan ?? ($r->potongan_sanksi ?? 0));
-        $potPmi = (int) ($r->potongan_trandist_pmi_lain ?? ($r->potongan_pmi_lain ?? ($r->potongan_lain ?? 0)));
-        $potDapenma = (int) ($r->potongan_dapenma ?? 0);
-        $potBpjstk = (int) ($r->potongan_bpjs_tenaga_kerja ?? ($r->potongan_bpjstk ?? 0));
-        $potPerumahan = (int) ($r->potongan_perumahan ?? 0);
-        $potTperusahaan = (int) ($r->potongan_tunjangan_perusahaan ?? ($r->potongan_insentif_perusahaan ?? ($r->potongan_tperusahaan ?? 0)));
-        $potKorpri = (int) ($r->potongan_korpri ?? 0);
-        $potPajak = (int) ($r->potongan_pajak ?? 0);
-        $potBpjskes = (int) ($r->potongan_bpjs_kesehatan ?? ($r->potongan_bpjskes ?? 0));
+            // Potongan Insentif
+            $potSanksi = $ins['potongan_sanksi_perusahaan'];
+            $potPmi = $ins['potongan_trandist_pmi_lain'];
+            $potDapenma = $ins['potongan_dapenma'];
+            $potBpjstk = $ins['potongan_bpjs_tenaga_kerja'];
+            $potPerumahan = $ins['potongan_perumahan'];
+            $potTperusahaan = $ins['potongan_tunjangan_perusahaan'];
+            $potKorpri = $ins['potongan_korpri'];
+            $potPajak = $ins['potongan_pajak'];
+            $potBpjskes = $ins['potongan_bpjs_kesehatan'];
+            $totalPotonganInsentif = $ins['total_potongan_insentif'];
 
-        $totalPotonganInsentif = $potSanksi + $potPmi + $potDapenma + $potBpjstk + $potPerumahan +
-            $potTperusahaan + $potKorpri + $potPajak + $potBpjskes;
+            // Potongan Non-Insentif (Koperasi & Kas memakai porsi pembagi proporsional)
+            $potKoperasi = $ins['potongan_koperasi'];
+            $potDarmawanita = $ins['potongan_darma_wanita'];
+            $potAirMinum = $ins['potongan_rekening_air_minum'];
+            $potKas = $ins['potongan_kas'];
+            $potBjb = $ins['potongan_bank_bjb'];
+            $potBjbs = $ins['potongan_bank_bjbs'];
+            $potBtn = $ins['potongan_bank_btn'];
+            $potBpr = $ins['potongan_bank_bpr'];
+            $potAsuransi = $ins['potongan_asuransi'];
+            $potZakat = $ins['potongan_zakat_profesi'];
+            $totalPotonganNonInsentif = $ins['total_potongan_non_insentif'];
 
-        // Potongan Non-Insentif (Keuangan / Trandist)
-        $potKoperasi = (int) ($r->potongan_koperasi ?? 0);
-        $potDarmawanita = (int) ($r->potongan_darma_wanita ?? ($r->potongan_darmawanita ?? 0));
-        $potAirMinum = (int) ($r->potongan_rekening_air_minum ?? ($r->potongan_ledeng ?? 0));
-        $potKas = (int) ($r->potongan_kas ?? 0);
-        $potBjb = (int) ($r->potongan_bank_bjb ?? ($r->potongan_bjb ?? 0));
-        $potBjbs = (int) ($r->potongan_bank_bjbs ?? ($r->potongan_bjbs ?? 0));
-        $potBtn = (int) ($r->potongan_bank_btn ?? ($r->potongan_btn ?? 0));
-        $potBpr = (int) ($r->potongan_bank_bpr ?? ($r->potongan_bpr ?? 0));
-        $potAsuransi = (int) ($r->potongan_asuransi ?? 0);
-        $potZakat = (int) ($r->potongan_zakat_profesi ?? ($r->potongan_zakat ?? 0));
+            $totalPotongan = $ins['total_potongan'];
+            $insentifDiterima = $ins['insentif_diterima'];
+            $periodeLabel = "Insentif Pendidikan 13 Tahun $tahun";
+        } else {
+            $insentifJabatan = (int) ($r->tunjangan_jabatan ?? ($r->insentif_jabatan ?? 0));
+            $insentifPrestasi = (int) ($r->tunjangan_prestasi ?? ($r->insentif_prestasi ?? 0));
+            $insentifTransportasi = (int) ($r->tunjangan_transportasi ?? ($r->tunjangan_transport ?? ($r->insentif_transportasi ?? 0)));
+            $insentifPangan = (int) ($r->tunjangan_pangan ?? ($r->insentif_pangan ?? 0));
+            $insentifBpjsKes = (int) ($r->tunjangan_bpjs_kesehatan ?? ($r->tunjangan_bpjskes ?? ($r->insentif_bpjs_kesehatan ?? 0)));
+            $insentifPerumahan = (int) ($r->tunjangan_perumahan ?? ($r->insentif_perumahan ?? 0));
+            $insentifBpjstk = (int) ($r->tunjangan_bpjs_tenaga_kerja ?? ($r->tunjangan_bpjstk ?? ($r->insentif_bpjs_tenaga_kerja ?? 0)));
+            $insentifPerusahaan = (int) ($r->tunjangan_perusahaan ?? ($r->insentif_perusahaan ?? 0));
+            $lembur = (int) ($r->lembur ?? 0);
+            $insentifPajak = (int) ($r->tunjangan_pajak ?? ($r->insentif_pajak ?? 0));
+            $insentifAirMinum = (int) ($r->tunjangan_air_minum ?? ($r->tunjangan_airminum ?? ($r->insentif_air_minum ?? 0)));
+            $insentifKomunikasi = (int) ($r->tunjangan_komunikasi ?? ($r->insentif_komunikasi ?? 0));
 
-        $totalPotonganNonInsentif = $potKoperasi + $potDarmawanita + $potAirMinum + $potKas +
-            $potBjb + $potBjbs + $potBtn + $potBpr + $potAsuransi + $potZakat;
+            $totalInsentif = $insentifJabatan + $insentifPrestasi + $insentifTransportasi + $insentifPangan +
+                $insentifBpjsKes + $insentifPerumahan + $insentifBpjstk + $insentifPerusahaan +
+                $lembur + $insentifPajak + $insentifAirMinum + $insentifKomunikasi;
 
-        $totalPotongan = $totalPotonganInsentif + $totalPotonganNonInsentif;
-        $insentifDiterima = max(0, $totalInsentif - $totalPotongan);
+            // Potongan Insentif
+            $potSanksi = (int) ($r->potongan_sanksi_perusahaan ?? ($r->potongan_sanksi ?? 0));
+            $potPmi = (int) ($r->potongan_trandist_pmi_lain ?? ($r->potongan_pmi_lain ?? ($r->potongan_lain ?? 0)));
+            $potDapenma = (int) ($r->potongan_dapenma ?? 0);
+            $potBpjstk = (int) ($r->potongan_bpjs_tenaga_kerja ?? ($r->potongan_bpjstk ?? 0));
+            $potPerumahan = (int) ($r->potongan_perumahan ?? 0);
+            $potTperusahaan = (int) ($r->potongan_tunjangan_perusahaan ?? ($r->potongan_insentif_perusahaan ?? ($r->potongan_tperusahaan ?? 0)));
+            $potKorpri = (int) ($r->potongan_korpri ?? 0);
+            $potPajak = (int) ($r->potongan_pajak ?? 0);
+            $potBpjskes = (int) ($r->potongan_bpjs_kesehatan ?? ($r->potongan_bpjskes ?? 0));
+
+            $totalPotonganInsentif = $potSanksi + $potPmi + $potDapenma + $potBpjstk + $potPerumahan +
+                $potTperusahaan + $potKorpri + $potPajak + $potBpjskes;
+
+            // Potongan Non-Insentif (Keuangan / Trandist)
+            $potKoperasi = (int) ($r->potongan_koperasi ?? 0);
+            $potDarmawanita = (int) ($r->potongan_darma_wanita ?? ($r->potongan_darmawanita ?? 0));
+            $potAirMinum = (int) ($r->potongan_rekening_air_minum ?? ($r->potongan_ledeng ?? 0));
+            $potKas = (int) ($r->potongan_kas ?? 0);
+            $potBjb = (int) ($r->potongan_bank_bjb ?? ($r->potongan_bjb ?? 0));
+            $potBjbs = (int) ($r->potongan_bank_bjbs ?? ($r->potongan_bjbs ?? 0));
+            $potBtn = (int) ($r->potongan_bank_btn ?? ($r->potongan_btn ?? 0));
+            $potBpr = (int) ($r->potongan_bank_bpr ?? ($r->potongan_bpr ?? 0));
+            $potAsuransi = (int) ($r->potongan_asuransi ?? 0);
+            $potZakat = (int) ($r->potongan_zakat_profesi ?? ($r->potongan_zakat ?? 0));
+
+            $totalPotonganNonInsentif = $potKoperasi + $potDarmawanita + $potAirMinum + $potKas +
+                $potBjb + $potBjbs + $potBtn + $potBpr + $potAsuransi + $potZakat;
+
+            $totalPotongan = $totalPotonganInsentif + $totalPotonganNonInsentif;
+            $insentifDiterima = max(0, $totalInsentif - $totalPotongan);
+        }
 
         return [
             'id' => $id,

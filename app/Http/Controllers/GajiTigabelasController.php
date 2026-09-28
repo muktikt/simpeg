@@ -168,11 +168,223 @@ class GajiTigabelasController extends Controller
             'tahun' => (int) ($r->tahun ?? now()->year),
             'status' => $status,
             'disetujui_oleh' => $r->disetujui_oleh ?? null,
-            'gapok' => $jumlah > 0 ? $jumlah : 0,
+
+            // Komponen Pendapatan
+            'gapok' => (float) ($r->gapok ?? ($jumlah > 0 ? $jumlah : 0)),
+            'tunjangan_istri' => (float) ($r->tunjangan_istri ?? 0),
+            'tunjangan_anak' => (float) ($r->tunjangan_anak ?? 0),
+            'tunjangan_prestasi' => (float) ($r->tunjangan_prestasi ?? 0),
+            'tunjangan_jabatan' => (float) ($r->tunjangan_jabatan ?? 0),
+            'tunjangan_transport' => (float) ($r->tunjangan_transportasi ?? ($r->tunjangan_transport ?? 0)),
+            'tunjangan_pangan' => (float) ($r->tunjangan_pangan ?? 0),
+            'tunjangan_bpjstk' => (float) ($r->tunjangan_bpjs_tenaga_kerja ?? ($r->tunjangan_bpjstk ?? 0)),
+            'tunjangan_perumahan' => (float) ($r->tunjangan_perumahan ?? 0),
+            'tunjangan_perusahaan' => (float) ($r->tunjangan_perusahaan ?? 0),
+            'tunjangan_airminum' => (float) ($r->tunjangan_air_minum ?? ($r->tunjangan_airminum ?? 0)),
+            'tunjangan_bpjskes' => (float) ($r->tunjangan_bpjs_kesehatan ?? ($r->tunjangan_bpjskes ?? 0)),
+            'tunjangan_komunikasi' => (float) ($r->tunjangan_komunikasi ?? 0),
+            'tunjangan_pajak' => (float) ($r->tunjangan_pajak ?? 0),
+            'lembur' => (float) ($r->lembur ?? 0),
+
+            // Potongan Pendapatan
+            'potongan_sanksi' => (float) ($r->potongan_sanksi_perusahaan ?? 0),
+            'potongan_lain' => (float) ($r->potongan_trandist_pmi_lain ?? ($r->potongan_lain ?? 0)),
+            'potongan_dapenma' => (float) ($r->potongan_dapenma ?? 0),
+            'potongan_bpjstk' => (float) ($r->potongan_bpjs_tenaga_kerja ?? ($r->potongan_bpjstk ?? 0)),
+            'potongan_perumahan' => (float) ($r->potongan_perumahan ?? 0),
+            'potongan_tperusahaan' => (float) ($r->potongan_tunjangan_perusahaan ?? ($r->potongan_tperusahaan ?? 0)),
+            'potongan_korpri' => (float) ($r->potongan_korpri ?? 0),
+            'potongan_pajak' => (float) ($r->potongan_pajak ?? 0),
+            'potongan_bpjskes' => (float) ($r->potongan_bpjs_kesehatan ?? ($r->potongan_bpjskes ?? 0)),
+
+            // Potongan Non-Pendapatan
+            'potongan_koperasi' => (float) ($r->potongan_koperasi ?? 0),
+            'potongan_darmawanita' => (float) ($r->potongan_darma_wanita ?? ($r->potongan_darmawanita ?? 0)),
+            'potongan_ledeng' => (float) ($r->potongan_rekening_air_minum ?? ($r->potongan_ledeng ?? 0)),
+            'potongan_kas' => (float) ($r->potongan_kas ?? 0),
+            'potongan_bjb' => (float) ($r->potongan_bank_bjb ?? ($r->potongan_bjb ?? 0)),
+            'potongan_bjbs' => (float) ($r->potongan_bank_bjbs ?? ($r->potongan_bjbs ?? 0)),
+            'potongan_btn' => (float) ($r->potongan_bank_btn ?? ($r->potongan_btn ?? 0)),
+            'potongan_bpr' => (float) ($r->potongan_bank_bpr ?? ($r->potongan_bpr ?? 0)),
+            'potongan_asuransi' => (float) ($r->potongan_asuransi ?? 0),
+            'potongan_zakat' => (float) ($r->potongan_zakat ?? ($r->potongan_zakat_ramadhan ?? 0)),
+
             'total_pendapatan' => $totalPendapatan > 0 ? $totalPendapatan : $jumlah,
-            'total_potongan_pendapatan' => $totalPotongan,
-            'total_potongan_non_pendapatan' => 0,
-            'gaji13_diterima' => $jumlah > 0 ? $jumlah : ($totalPendapatan - $totalPotongan),
+            'total_potongan_pendapatan' => (float) ($r->total_potongan_pendapatan ?? $totalPotongan),
+            'total_potongan_non_pendapatan' => (float) ($r->total_potongan_non_pendapatan ?? 0),
+            'total_potongan' => $totalPotongan,
+            'gaji13_diterima' => (float) ($r->gaji13_diterima ?? ($jumlah > 0 ? $jumlah : ($totalPendapatan - $totalPotongan))),
+        ];
+    }
+
+    /**
+     * Hitung pemecahan Gaji 13 menjadi 2 format slip resmi:
+     * 1. Slip Tunjangan Pendidikan (HANYA Gapok + Tunj. Istri + Tunj. Anak, Potongan Koperasi/Kas proporsional)
+     * 2. Slip Insentif Pendidikan (Tunjangan lain di luar Gapok/Keluarga, Potongan Koperasi/Kas proporsional)
+     * 3. Slip Gaji 13 Utuh (Gabungan lengkap 100%)
+     */
+    public static function hitungPemecahanGaji13(array $gaji13): array
+    {
+        $statusPeg = (string) ($gaji13['kategori'] ?? 'satuan');
+        $nik = (string) ($gaji13['nik'] ?? '');
+        $gapok = (int) ($gaji13['gapok'] ?? 0);
+        $tIstri = (int) ($gaji13['tunjangan_istri'] ?? 0);
+        $tAnak = (int) ($gaji13['tunjangan_anak'] ?? 0);
+
+        $totalPendapatan = (int) ($gaji13['total_pendapatan'] ?? 0);
+        $tPajak = (int) ($gaji13['tunjangan_pajak'] ?? 0);
+        $potZakat = (int) ($gaji13['potongan_zakat'] ?? 0);
+        $potKoperasi = (int) ($gaji13['potongan_koperasi'] ?? 0);
+        $potKas = (int) ($gaji13['potongan_kas'] ?? 0);
+
+        if ($gapok <= 0 && $totalPendapatan > 0) {
+            $gapok = (int) round($totalPendapatan * 0.4);
+        }
+        if ($totalPendapatan <= 0) {
+            $totalPendapatan = (int) ($gaji13['gaji13_diterima'] ?? ($gaji13['jumlah'] ?? 0));
+        }
+
+        // 1. Pendapatan Tunjangan Pendidikan = Gapok + Tunjangan Istri + Tunjangan Anak
+        $pendapatanTpendidikan = $gapok + $tIstri + $tAnak;
+        // 2. Pendapatan Insentif = Total Pendapatan - Pendapatan Tunjangan Pendidikan
+        $pendapatanInsentif = max(0, $totalPendapatan - $pendapatanTpendidikan);
+
+        // Rasio pembagian proporsional (sesuai sistem lama PERUMDAM Tirta Darma Ayu)
+        $isDireksi = in_array(strtolower($statusPeg), ['dirut', 'dirum', 'dirtek', 'di']);
+        $isNik1811 = str_starts_with($nik, '1811');
+
+        if ($isDireksi) {
+            $pembagiTpendidikan = 0.0;
+            $pembagiInsentif = 1.0;
+        } elseif ($isNik1811) {
+            $pembagiTpendidikan = 1.0;
+            $pembagiInsentif = 0.0;
+        } else {
+            $dasarBagi = $totalPendapatan - $tPajak - $potZakat;
+            if ($dasarBagi > 0 && $pendapatanTpendidikan > 0) {
+                $pembagiTpendidikan = min(1.0, max(0.0, $pendapatanTpendidikan / $dasarBagi));
+                $pembagiInsentif = 1.0 - $pembagiTpendidikan;
+            } else {
+                $pembagiTpendidikan = 0.5;
+                $pembagiInsentif = 0.5;
+            }
+        }
+
+        // Pembagian potongan Koperasi & Kas
+        $koperasiTpendidikan = (int) round($potKoperasi * $pembagiTpendidikan);
+        $koperasiInsentif = $potKoperasi - $koperasiTpendidikan;
+
+        $kasTpendidikan = (int) round($potKas * $pembagiTpendidikan);
+        $kasInsentif = $potKas - $kasTpendidikan;
+
+        // Potongan Tunjangan Pendidikan
+        $zakatTpendidikan = $isNik1811 ? $potZakat : 0;
+        $totalPotonganTpendidikan = $koperasiTpendidikan + $kasTpendidikan + $zakatTpendidikan;
+        $tpendidikanDiterima = max(0, $pendapatanTpendidikan - $totalPotonganTpendidikan);
+
+        // Potongan Insentif:
+        $potSanksi = (int) ($gaji13['potongan_sanksi'] ?? ($gaji13['potongan_sanksi_perusahaan'] ?? 0));
+        $potLain = (int) ($gaji13['potongan_lain'] ?? ($gaji13['potongan_trandist_pmi_lain'] ?? 0));
+        $potDapenma = (int) ($gaji13['potongan_dapenma'] ?? 0);
+        $potBpjstk = (int) ($gaji13['potongan_bpjstk'] ?? ($gaji13['potongan_bpjs_tenaga_kerja'] ?? 0));
+        $potPerumahan = (int) ($gaji13['potongan_perumahan'] ?? 0);
+        $potTperusahaan = (int) ($gaji13['potongan_tperusahaan'] ?? ($gaji13['potongan_tunjangan_perusahaan'] ?? 0));
+        $potKorpri = (int) ($gaji13['potongan_korpri'] ?? 0);
+        $potPajak = (int) ($gaji13['potongan_pajak'] ?? 0);
+        $potBpjskes = (int) ($gaji13['potongan_bpjskes'] ?? ($gaji13['potongan_bpjs_kesehatan'] ?? 0));
+
+        $totalPotonganPendapatanInsentif = $potSanksi + $potLain + $potDapenma + $potBpjstk +
+            $potPerumahan + $potTperusahaan + $potKorpri + $potPajak + $potBpjskes;
+
+        // Potongan Non-Pendapatan Insentif
+        $potDarmawanita = (int) ($gaji13['potongan_darmawanita'] ?? ($gaji13['potongan_darma_wanita'] ?? 0));
+        $potLedeng = (int) ($gaji13['potongan_ledeng'] ?? ($gaji13['potongan_rekening_air_minum'] ?? 0));
+        $potBjb = (int) ($gaji13['potongan_bjb'] ?? ($gaji13['potongan_bank_bjb'] ?? 0));
+        $potBjbs = (int) ($gaji13['potongan_bjbs'] ?? ($gaji13['potongan_bank_bjbs'] ?? 0));
+        $potBtn = (int) ($gaji13['potongan_btn'] ?? ($gaji13['potongan_bank_btn'] ?? 0));
+        $potBpr = (int) ($gaji13['potongan_bpr'] ?? ($gaji13['potongan_bank_bpr'] ?? 0));
+        $potAsuransi = (int) ($gaji13['potongan_asuransi'] ?? 0);
+        $zakatInsentif = $isNik1811 ? 0 : $potZakat;
+
+        $totalPotonganNonPendapatanInsentif = $koperasiInsentif + $kasInsentif + $potDarmawanita +
+            $potLedeng + $potBjb + $potBjbs + $potBtn + $potBpr + $potAsuransi + $zakatInsentif;
+
+        $totalPotonganInsentif = $totalPotonganPendapatanInsentif + $totalPotonganNonPendapatanInsentif;
+        $insentifDiterima = max(0, $pendapatanInsentif - $totalPotonganInsentif);
+
+        // Gaji 13 Utuh
+        $totalPotonganUtuh = (int) ($gaji13['total_potongan'] ?? ($totalPotonganTpendidikan + $totalPotonganInsentif));
+        if ($totalPotonganUtuh <= 0) {
+            $totalPotonganUtuh = $totalPotonganTpendidikan + $totalPotonganInsentif;
+        }
+        $gaji13UtuhDiterima = max(0, $totalPendapatan - $totalPotonganUtuh);
+
+        return [
+            'rasio' => [
+                'pembagi_tpendidikan' => $pembagiTpendidikan,
+                'pembagi_insentif' => $pembagiInsentif,
+                'persen_tpendidikan' => round($pembagiTpendidikan * 100, 1),
+                'persen_insentif' => round($pembagiInsentif * 100, 1),
+            ],
+            'tunjangan_pendidikan' => [
+                'gapok' => $gapok,
+                'tunjangan_istri' => $tIstri,
+                'tunjangan_anak' => $tAnak,
+                'total_pendapatan' => $pendapatanTpendidikan,
+                'potongan_koperasi' => $koperasiTpendidikan,
+                'potongan_kas' => $kasTpendidikan,
+                'potongan_zakat' => $zakatTpendidikan,
+                'total_potongan' => $totalPotonganTpendidikan,
+                'diterima' => $tpendidikanDiterima,
+            ],
+            'insentif' => [
+                'insentif_jabatan' => (int) ($gaji13['tunjangan_jabatan'] ?? 0),
+                'insentif_prestasi' => (int) ($gaji13['tunjangan_prestasi'] ?? 0),
+                'insentif_transportasi' => (int) ($gaji13['tunjangan_transport'] ?? ($gaji13['tunjangan_transportasi'] ?? 0)),
+                'insentif_pangan' => (int) ($gaji13['tunjangan_pangan'] ?? 0),
+                'insentif_bpjs_kesehatan' => (int) ($gaji13['tunjangan_bpjskes'] ?? ($gaji13['tunjangan_bpjs_kesehatan'] ?? 0)),
+                'insentif_perumahan' => (int) ($gaji13['tunjangan_perumahan'] ?? 0),
+                'insentif_bpjs_tenaga_kerja' => (int) ($gaji13['tunjangan_bpjstk'] ?? ($gaji13['tunjangan_bpjs_tenaga_kerja'] ?? 0)),
+                'insentif_perusahaan' => (int) ($gaji13['tunjangan_perusahaan'] ?? 0),
+                'lembur' => (int) ($gaji13['lembur'] ?? 0),
+                'insentif_pajak' => (int) ($gaji13['tunjangan_pajak'] ?? 0),
+                'insentif_air_minum' => (int) ($gaji13['tunjangan_airminum'] ?? ($gaji13['tunjangan_air_minum'] ?? 0)),
+                'insentif_komunikasi' => (int) ($gaji13['tunjangan_komunikasi'] ?? 0),
+                'total_insentif' => $pendapatanInsentif,
+
+                'potongan_sanksi_perusahaan' => $potSanksi,
+                'potongan_trandist_pmi_lain' => $potLain,
+                'potongan_dapenma' => $potDapenma,
+                'potongan_bpjs_tenaga_kerja' => $potBpjstk,
+                'potongan_perumahan' => $potPerumahan,
+                'potongan_tunjangan_perusahaan' => $potTperusahaan,
+                'potongan_korpri' => $potKorpri,
+                'potongan_pajak' => $potPajak,
+                'potongan_bpjs_kesehatan' => $potBpjskes,
+                'total_potongan_insentif' => $totalPotonganPendapatanInsentif,
+
+                'potongan_koperasi' => $koperasiInsentif,
+                'potongan_darma_wanita' => $potDarmawanita,
+                'potongan_rekening_air_minum' => $potLedeng,
+                'potongan_kas' => $kasInsentif,
+                'potongan_bank_bjb' => $potBjb,
+                'potongan_bank_bjbs' => $potBjbs,
+                'potongan_bank_btn' => $potBtn,
+                'potongan_bank_bpr' => $potBpr,
+                'potongan_asuransi' => $potAsuransi,
+                'potongan_zakat_profesi' => $zakatInsentif,
+                'total_potongan_non_insentif' => $totalPotonganNonPendapatanInsentif,
+
+                'total_potongan' => $totalPotonganInsentif,
+                'insentif_diterima' => $insentifDiterima,
+                'diterima' => $insentifDiterima,
+            ],
+            'gaji_13_utuh' => [
+                'total_pendapatan' => $totalPendapatan,
+                'total_potongan' => $totalPotonganUtuh,
+                'diterima' => $gaji13UtuhDiterima,
+                'gaji13_diterima' => $gaji13UtuhDiterima,
+            ],
         ];
     }
 
@@ -260,54 +472,20 @@ class GajiTigabelasController extends Controller
     {
         $tahun = (int) $request->get('tahun', now()->year);
         $userLogin = session('simpeg_user');
+        $format = $request->get('format', 'tpendidikan');
 
         $data = $this->gaji13Terbit($tahun);
-        $rincianAnak = [];
 
         if ($userLogin['userlevel'] === '5' || $request->has('my')) {
             $data = $data->where('nik', $userLogin['nik']);
-
-            // Ambil data rincian anak dinamis dari database Supabase (tabel keluarga)
-            try {
-                $pegawai = \Illuminate\Support\Facades\DB::table('pegawai')->where('nik', $userLogin['nik'])->first();
-                if ($pegawai) {
-                    $anakList = \Illuminate\Support\Facades\DB::table('keluarga')
-                        ->where('pegawai_id', $pegawai->id)
-                        ->where(function ($q) {
-                            $q->where('hubungan', 'ilike', '%anak%')
-                              ->orWhere('status_keluarga', 'ilike', '%anak%')
-                              ->orWhere('hubungan', 'Anak');
-                        })
-                        ->get();
-
-                    foreach ($anakList as $anak) {
-                        $namaAnak = $anak->nama ?? 'Anak';
-                        $words = explode(' ', trim($namaAnak));
-                        $inisial = '';
-                        foreach (array_slice($words, 0, 2) as $w) {
-                            $inisial .= strtoupper(substr($w, 0, 1));
-                        }
-
-                        $rincianAnak[] = [
-                            'nama' => $namaAnak,
-                            'inisial' => $inisial ?: 'AN',
-                            'jenjang_singkat' => $anak->pekerjaan ?? $anak->jenjang ?? 'Pelajar',
-                            'jenjang_detail' => $anak->keterangan ?? 'Anak Kandung',
-                            'status' => 'Sudah Cair',
-                            'status_bg' => '#dcfce7',
-                            'status_color' => '#15803d',
-                            'nominal' => 1218400,
-                        ];
-                    }
-                }
-            } catch (\Throwable $e) {
-                // Fallback jika database connection offline
-            }
         }
 
-        $data = $data->sortBy('nama')->values();
+        $data = $data->map(function ($row) {
+            $row['pemecahan'] = self::hitungPemecahanGaji13($row);
+            return $row;
+        })->sortBy('nama')->values();
 
-        return view('gaji-tigabelas.laporan-slip', compact('data', 'tahun', 'rincianAnak'));
+        return view('gaji-tigabelas.laporan-slip', compact('data', 'tahun', 'format'));
     }
 
     public function laporanBukuBesar(Request $request)
@@ -397,8 +575,50 @@ class GajiTigabelasController extends Controller
                     'kategori' => $validated['kategori'],
                     'kode_ptkp' => $validated['kode_ptkp'],
                     'total_pendapatan' => (int) $totalPendapatan,
+                    'total_potongan_pendapatan' => (int) $totalPotonganPendapatan,
+                    'total_potongan_non_pendapatan' => (int) $totalPotonganNonPendapatan,
                     'total_potongan' => (int) $totalPotongan,
+                    'gaji13_diterima' => (int) $gaji13Diterima,
                     'tanggal_cair' => date('Y-m-d'),
+
+                    // Komponen Pendapatan
+                    'gapok' => (int) ($validated['gapok'] ?? 0),
+                    'tunjangan_istri' => (int) ($validated['tunjangan_istri'] ?? 0),
+                    'tunjangan_anak' => (int) ($validated['tunjangan_anak'] ?? 0),
+                    'tunjangan_prestasi' => (int) ($validated['tunjangan_prestasi'] ?? 0),
+                    'tunjangan_jabatan' => (int) ($validated['tunjangan_jabatan'] ?? 0),
+                    'tunjangan_transportasi' => (int) ($validated['tunjangan_transport'] ?? 0),
+                    'tunjangan_pangan' => (int) ($validated['tunjangan_pangan'] ?? 0),
+                    'tunjangan_bpjs_tenaga_kerja' => (int) ($validated['tunjangan_bpjstk'] ?? 0),
+                    'tunjangan_perumahan' => (int) ($validated['tunjangan_perumahan'] ?? 0),
+                    'tunjangan_perusahaan' => (int) ($validated['tunjangan_perusahaan'] ?? 0),
+                    'tunjangan_air_minum' => (int) ($validated['tunjangan_airminum'] ?? 0),
+                    'tunjangan_bpjs_kesehatan' => (int) ($validated['tunjangan_bpjskes'] ?? 0),
+                    'tunjangan_komunikasi' => (int) ($validated['tunjangan_komunikasi'] ?? 0),
+                    'tunjangan_pajak' => (int) ($validated['tunjangan_pajak'] ?? 0),
+                    'lembur' => (int) ($validated['lembur'] ?? 0),
+
+                    // Potongan Pendapatan
+                    'potongan_dapenma' => (int) ($validated['potongan_dapenma'] ?? 0),
+                    'potongan_bpjs_tenaga_kerja' => (int) ($validated['potongan_bpjstk'] ?? 0),
+                    'potongan_bpjs_kesehatan' => (int) ($validated['potongan_bpjskes'] ?? 0),
+                    'potongan_perumahan' => (int) ($validated['potongan_perumahan'] ?? 0),
+                    'potongan_pajak' => (int) ($validated['potongan_pajak'] ?? 0),
+                    'potongan_korpri' => (int) ($validated['potongan_korpri'] ?? 0),
+                    'potongan_tunjangan_perusahaan' => (int) ($validated['potongan_tperusahaan'] ?? 0),
+                    'potongan_trandist_pmi_lain' => (int) ($validated['potongan_lain'] ?? 0),
+
+                    // Potongan Non-Pendapatan
+                    'potongan_koperasi' => (int) ($validated['potongan_koperasi'] ?? 0),
+                    'potongan_darma_wanita' => (int) ($validated['potongan_darmawanita'] ?? 0),
+                    'potongan_rekening_air_minum' => (int) ($validated['potongan_ledeng'] ?? 0),
+                    'potongan_kas' => (int) ($validated['potongan_kas'] ?? 0),
+                    'potongan_bank_bjb' => (int) ($validated['potongan_bjb'] ?? 0),
+                    'potongan_bank_bjbs' => (int) ($validated['potongan_bjbs'] ?? 0),
+                    'potongan_asuransi' => (int) ($validated['potongan_asuransi'] ?? 0),
+                    'potongan_bank_btn' => (int) ($validated['potongan_btn'] ?? 0),
+                    'potongan_bank_bpr' => (int) ($validated['potongan_bpr'] ?? 0),
+                    'potongan_zakat' => (int) ($validated['potongan_zakat'] ?? 0),
                 ]);
 
                 $insertedToDb = true;
@@ -420,16 +640,20 @@ class GajiTigabelasController extends Controller
             ->with('success', 'Proses Gaji 13 untuk '.$validated['nama'].' berhasil disimpan dan masuk ke database.');
     }
 
-    public function show(mixed $id)
+    public function show(mixed $id, Request $request)
     {
         $gaji13 = collect($this->all())->first(fn ($r) => (string)($r['id'] ?? '') === (string)$id);
 
         abort_if(! $gaji13, 404);
 
         $gaji13['bisa_approve'] = $this->canUserApprove($gaji13['status'] ?? 'draft');
+        $pemecahan = self::hitungPemecahanGaji13($gaji13);
+        $format = $request->get('format', 'tpendidikan');
 
         return view('gaji-tigabelas.show', [
             'gaji13' => $gaji13,
+            'pemecahan' => $pemecahan,
+            'format' => $format,
             'komponenPendapatan' => self::KOMPONEN_PENDAPATAN,
             'potonganPendapatan' => self::POTONGAN_PENDAPATAN,
             'potonganNonPendapatan' => self::POTONGAN_NON_PENDAPATAN,
