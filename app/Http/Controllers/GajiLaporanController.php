@@ -58,12 +58,99 @@ class GajiLaporanController extends Controller
     public function lembur(Request $request)
     {
         [$bulan, $tahun] = array_values($this->periodeInput($request));
-        $userLogin = session('simpeg_user');
+        $userLogin = session('simpeg_user') ?? [];
 
-        // 1. Ambil data lembur dari tabel payroll database Supabase
+        $namaBulan = \App\Http\Controllers\AbsensiController::BULAN[$bulan] ?? ('Bulan ' . $bulan);
+        $periodeStr = "$namaBulan $tahun";
+        $prefix = sprintf('%04d-%02d', $tahun, $bulan);
+        $monthPadded = str_pad($bulan, 2, '0', STR_PAD_LEFT);
+
+        // 1. Data dari Prestasi (Prioritas Utama - Input Manual SDM)
+        $prestasiLembur = collect();
+        try {
+            $rows = \Illuminate\Support\Facades\DB::table('prestasi')
+                ->leftJoin('pegawai', 'prestasi.pegawai_id', '=', 'pegawai.id')
+                ->where(function ($q) use ($prefix, $tahun, $bulan, $monthPadded) {
+                    $q->where('prestasi.tanggal', 'like', "$prefix%")
+                      ->orWhere('prestasi.tanggal', 'like', "%$tahun-$monthPadded-%")
+                      ->orWhere('prestasi.tanggal', 'like', "%$tahun-$bulan-%");
+                })
+                ->select(
+                    'prestasi.id',
+                    'prestasi.pegawai_id',
+                    'prestasi.tanggal',
+                    'prestasi.keterangan',
+                    'pegawai.nik',
+                    'pegawai.name as nama',
+                    'pegawai.jabatan',
+                    'pegawai.unit_kerja'
+                )
+                ->get();
+
+            foreach ($rows as $r) {
+                $meta = json_decode($r->keterangan ?? '{}', true) ?: [];
+                $jam = (float) ($meta['jam_lembur'] ?? ($r->jam_lembur ?? 0));
+                $nominal = (float) ($meta['nominal_lembur'] ?? ($jam * PrestasiController::RATE_LEMBUR_PER_JAM));
+                if ($jam > 0 || $nominal > 0) {
+                    $prestasiLembur->push([
+                        'id' => $r->id,
+                        'pegawai_id' => $r->pegawai_id,
+                        'nik' => $r->nik,
+                        'nama' => $r->nama,
+                        'tanggal' => $r->tanggal,
+                        'jam_lembur' => $jam,
+                        'nominal_lembur' => $nominal,
+                        'periode' => $periodeStr,
+                        'source' => 'prestasi',
+                    ]);
+                }
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Laporan lembur prestasi query failed: ' . $e->getMessage());
+        }
+
+        // 2. Data dari tabel lembur (misal sinkronisasi Set Prestasi)
+        $dbLemburRows = collect();
+        try {
+            $lemburList = \Illuminate\Support\Facades\DB::table('lembur')
+                ->leftJoin('pegawai', 'lembur.pegawai_id', '=', 'pegawai.id')
+                ->where('lembur.bulan', 'ilike', "%$periodeStr%")
+                ->select(
+                    'lembur.id',
+                    'lembur.pegawai_id',
+                    'pegawai.nik',
+                    'pegawai.name as nama',
+                    'lembur.uang_lembur as nominal_lembur',
+                    'lembur.jam_lembur',
+                    'lembur.bulan as periode',
+                    'lembur.created_at'
+                )
+                ->get();
+
+            foreach ($lemburList as $r) {
+                $jam = (float) ($r->jam_lembur ?? 0);
+                $nominal = (float) ($r->nominal_lembur ?? 0);
+                if ($jam > 0 || $nominal > 0) {
+                    $tgl = $r->created_at ? date('Y-m-d', strtotime($r->created_at)) : null;
+                    $dbLemburRows->push([
+                        'id' => $r->id,
+                        'pegawai_id' => $r->pegawai_id,
+                        'nik' => $r->nik,
+                        'nama' => $r->nama,
+                        'tanggal' => $tgl,
+                        'jam_lembur' => $jam,
+                        'nominal_lembur' => $nominal,
+                        'periode' => $r->periode ?? $periodeStr,
+                        'source' => 'lembur_table',
+                    ]);
+                }
+            }
+        } catch (\Throwable $e) {}
+
+        // 3. Ambil data lembur dari payroll (hanya sebagai fallback jika belum diinput di Prestasi)
         $payrollLembur = collect();
         try {
-            $payrollLembur = \Illuminate\Support\Facades\DB::table('payroll')
+            $payrollRows = \Illuminate\Support\Facades\DB::table('payroll')
                 ->leftJoin('pegawai', 'payroll.pegawai_id', '=', 'pegawai.id')
                 ->where('payroll.bulan', $bulan)
                 ->where('payroll.tahun', $tahun)
@@ -78,92 +165,102 @@ class GajiLaporanController extends Controller
                     'payroll.tahun',
                     'payroll.periode'
                 )
-                ->get()
-                ->map(function ($r) {
-                    $arr = (array) $r;
-                    $arr['jam_lembur'] = round($arr['nominal_lembur'] / PrestasiController::RATE_LEMBUR_PER_JAM, 1);
-                    return $arr;
-                });
+                ->get();
+
+            foreach ($payrollRows as $r) {
+                $nominal = (float) $r->nominal_lembur;
+                $jam = round($nominal / PrestasiController::RATE_LEMBUR_PER_JAM, 1);
+                $payrollLembur->push([
+                    'id' => $r->id,
+                    'pegawai_id' => $r->pegawai_id,
+                    'nik' => $r->nik,
+                    'nama' => $r->nama,
+                    'tanggal' => null,
+                    'jam_lembur' => $jam,
+                    'nominal_lembur' => $nominal,
+                    'periode' => $r->periode ?? $periodeStr,
+                    'source' => 'payroll',
+                ]);
+            }
         } catch (\Throwable $e) {}
 
-        // 2. Ambil juga data lembur dari tabel lembur (misal dari input Set Prestasi)
-        $namaBulan = \App\Http\Controllers\AbsensiController::BULAN[$bulan] ?? '';
-        $periodeStr = "$namaBulan $tahun";
-        $dbLemburRows = collect();
-        try {
-            $dbLemburRows = \Illuminate\Support\Facades\DB::table('lembur')
-                ->leftJoin('pegawai', 'lembur.pegawai_id', '=', 'pegawai.id')
-                ->where('lembur.bulan', 'ilike', "%$periodeStr%")
-                ->select(
-                    'lembur.id',
-                    'lembur.pegawai_id',
-                    'pegawai.nik',
-                    'pegawai.name as nama',
-                    'lembur.uang_lembur as nominal_lembur',
-                    'lembur.jam_lembur',
-                    'lembur.bulan as periode'
-                )
-                ->get()
-                ->map(function ($r) {
-                    $arr = (array) $r;
-                    $arr['nominal_lembur'] = (float) ($arr['nominal_lembur'] ?? 0);
-                    $arr['jam_lembur'] = (float) ($arr['jam_lembur'] ?? 0);
-                    return $arr;
-                });
-        } catch (\Throwable $e) {}
-
-        $data = $payrollLembur->concat($dbLemburRows)->unique('nik');
+        // Prioritas data: Prestasi (Input Manual SDM) -> Tabel Lembur -> Payroll
+        $data = $prestasiLembur->concat($dbLemburRows)->concat($payrollLembur)->unique('nik')->values();
 
         $riwayatLembur = [];
 
-        if ($userLogin['userlevel'] === '5' || $request->has('my')) {
+        $isPegawai = (($userLogin['userlevel'] ?? '') === '5') || $request->has('my');
+        if ($isPegawai) {
             $myNik = $userLogin['nik'] ?? '';
-            $data = $data->where('nik', $myNik);
+            $data = $data->where('nik', $myNik)->values();
 
-            // Ambil semua riwayat lembur milik pegawai ini dari tabel payroll & lembur
-            $dbRiwayatPayroll = collect();
+            // Ambil semua riwayat lembur milik pegawai ini dari tabel prestasi, lembur, & payroll
+            $riwayatItems = collect();
+
+            // Dari Prestasi
             try {
-                $dbRiwayatPayroll = \Illuminate\Support\Facades\DB::table('payroll')
+                $pRows = \Illuminate\Support\Facades\DB::table('prestasi')
+                    ->leftJoin('pegawai', 'prestasi.pegawai_id', '=', 'pegawai.id')
+                    ->where('pegawai.nik', $myNik)
+                    ->select('prestasi.*')
+                    ->orderByDesc('prestasi.tanggal')
+                    ->get();
+
+                foreach ($pRows as $r) {
+                    $meta = json_decode($r->keterangan ?? '{}', true) ?: [];
+                    $jam = (float) ($meta['jam_lembur'] ?? ($r->jam_lembur ?? 0));
+                    $nominal = (float) ($meta['nominal_lembur'] ?? ($jam * PrestasiController::RATE_LEMBUR_PER_JAM));
+                    if ($jam > 0 || $nominal > 0) {
+                        $tgl = $r->tanggal ? date('F Y', strtotime($r->tanggal)) : '-';
+                        $riwayatItems->push([
+                            'bulan_nama' => $tgl,
+                            'jam_lembur' => $jam,
+                            'nominal_lembur' => $nominal,
+                        ]);
+                    }
+                }
+            } catch (\Throwable $e) {}
+
+            // Dari Lembur table
+            try {
+                $lRows = \Illuminate\Support\Facades\DB::table('lembur')
+                    ->leftJoin('pegawai', 'lembur.pegawai_id', '=', 'pegawai.id')
+                    ->where('pegawai.nik', $myNik)
+                    ->select('lembur.*')
+                    ->orderByDesc('lembur.created_at')
+                    ->get();
+
+                foreach ($lRows as $r) {
+                    $riwayatItems->push([
+                        'bulan_nama' => $r->bulan ?? '-',
+                        'jam_lembur' => (float) ($r->jam_lembur ?? 0),
+                        'nominal_lembur' => (float) ($r->uang_lembur ?? 0),
+                    ]);
+                }
+            } catch (\Throwable $e) {}
+
+            // Dari Payroll
+            try {
+                $payRows = \Illuminate\Support\Facades\DB::table('payroll')
                     ->leftJoin('pegawai', 'payroll.pegawai_id', '=', 'pegawai.id')
                     ->where('pegawai.nik', $myNik)
                     ->where('payroll.lembur', '>', 0)
-                    ->select(
-                        'payroll.id',
-                        'pegawai.nik',
-                        'pegawai.name as nama',
-                        'payroll.lembur as nominal_lembur',
-                        'payroll.periode as bulan_nama',
-                        'payroll.tahun',
-                        'payroll.bulan'
-                    )
+                    ->select('payroll.*')
                     ->orderByDesc('payroll.tahun')
                     ->orderByDesc('payroll.bulan')
-                    ->get()
-                    ->map(function ($r) {
-                        $arr = (array) $r;
-                        $arr['jam_lembur'] = round($arr['nominal_lembur'] / PrestasiController::RATE_LEMBUR_PER_JAM, 1);
-                        return $arr;
-                    });
+                    ->get();
+
+                foreach ($payRows as $r) {
+                    $nominal = (float) ($r->lembur ?? 0);
+                    $riwayatItems->push([
+                        'bulan_nama' => $r->periode ?? "Bulan {$r->bulan} {$r->tahun}",
+                        'jam_lembur' => round($nominal / PrestasiController::RATE_LEMBUR_PER_JAM, 1),
+                        'nominal_lembur' => $nominal,
+                    ]);
+                }
             } catch (\Throwable $e) {}
 
-            $dbRiwayatLembur = collect();
-            try {
-                $dbRiwayatLembur = \Illuminate\Support\Facades\DB::table('lembur')
-                    ->leftJoin('pegawai', 'lembur.pegawai_id', '=', 'pegawai.id')
-                    ->where('pegawai.nik', $myNik)
-                    ->select(
-                        'lembur.id',
-                        'pegawai.nik',
-                        'pegawai.name as nama',
-                        'lembur.uang_lembur as nominal_lembur',
-                        'lembur.bulan as bulan_nama',
-                        'lembur.jam_lembur'
-                    )
-                    ->get()
-                    ->map(fn ($r) => (array) $r);
-            } catch (\Throwable $e) {}
-
-            $riwayatLembur = $dbRiwayatPayroll->concat($dbRiwayatLembur)->unique('bulan_nama')->values();
+            $riwayatLembur = $riwayatItems->unique('bulan_nama')->values();
         }
 
         $data = $data->sortBy('nama')->values();

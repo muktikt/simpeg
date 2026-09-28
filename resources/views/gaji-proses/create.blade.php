@@ -40,7 +40,7 @@
             </div>
             <div class="form-group">
                 <label for="bulan">Bulan</label>
-                <select id="bulan" name="bulan" required>
+                <select id="bulan" name="bulan" required onchange="onPegawaiChange()">
                     @foreach ($bulanList ?? \App\Http\Controllers\AbsensiController::BULAN as $val => $label)
                         <option value="{{ $val }}" @selected((int) old('bulan', now()->month) === $val)>{{ $label }}</option>
                     @endforeach
@@ -48,7 +48,7 @@
             </div>
             <div class="form-group">
                 <label for="tahun">Tahun</label>
-                <input type="number" id="tahun" name="tahun" value="{{ old('tahun', now()->year) }}" required>
+                <input type="number" id="tahun" name="tahun" value="{{ old('tahun', now()->year) }}" required onchange="onPegawaiChange()">
             </div>
         </div>
     </div>
@@ -110,8 +110,12 @@ async function onPegawaiChange() {
 
     info.value = 'Menghitung...';
 
+    const bulan = document.getElementById('bulan')?.value || '';
+    const tahun = document.getElementById('tahun')?.value || '';
+    const url = pegawaiKeluargaUrl.replace('__ID__', pegawaiId) + '?bulan=' + encodeURIComponent(bulan) + '&tahun=' + encodeURIComponent(tahun);
+
     try {
-        const res = await fetch(pegawaiKeluargaUrl.replace('__ID__', pegawaiId));
+        const res = await fetch(url);
         const data = await res.json();
 
         info.value = (data.kawin ? 'Kawin' : 'Belum Kawin') + ', Anak: ' + data.jml_anak + ', PTKP: ' + data.kode_ptkp;
@@ -122,6 +126,12 @@ async function onPegawaiChange() {
         if (gapokField && tunjIstriField && data.kawin) {
             const gapok = parseFloat(gapokField.value) || 0;
             tunjIstriField.value = Math.round(gapok * 0.1);
+        }
+
+        // Auto-isi Lembur dari modul Prestasi (Input Manual SDM)
+        const lemburField = document.getElementById('lembur');
+        if (lemburField && data.lembur !== undefined) {
+            lemburField.value = data.lembur;
         }
 
         // Auto-isi Potongan dari Keuangan (Koperasi, Darmawanita, Ledeng, Kas, Bank, Zakat, dll)

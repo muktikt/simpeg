@@ -304,7 +304,7 @@ class GajiProsesController extends Controller
      * Hitung tunjangan keluarga & kategori PTKP berdasarkan data keluarga pegawai,
      * mengikuti formula yang ditemukan di sistem lama.
      */
-    public function hitungKeluarga(int $pegawaiId): array
+    public function hitungKeluarga(int $pegawaiId, ?Request $request = null): array
     {
         $pegawai = $this->pegawaiById($pegawaiId);
         $keluarga = $pegawai['keluarga'] ?? [];
@@ -334,6 +334,55 @@ class GajiProsesController extends Controller
             } catch (\Throwable $e) {}
         }
 
+        $bulan = (int) ($request?->input('bulan', now()->month));
+        $tahun = (int) ($request?->input('tahun', now()->year));
+        $prefix = sprintf('%04d-%02d', $tahun, $bulan);
+        $monthPadded = str_pad($bulan, 2, '0', STR_PAD_LEFT);
+
+        $lemburNominal = 0;
+        $jamLembur = 0;
+
+        $dbPegId = $pegawai['db_id'] ?? null;
+        if (! $dbPegId && ! empty($pegawai['nik'])) {
+            $dbPegId = \Illuminate\Support\Facades\DB::table('pegawai')->where('nik', $pegawai['nik'])->value('id');
+        }
+
+        if ($dbPegId) {
+            // 1. Cek tabel prestasi (input manual SDM)
+            try {
+                $pRow = \Illuminate\Support\Facades\DB::table('prestasi')
+                    ->where('pegawai_id', $dbPegId)
+                    ->where(function ($q) use ($prefix, $tahun, $bulan, $monthPadded) {
+                        $q->where('tanggal', 'like', "$prefix%")
+                          ->orWhere('tanggal', 'like', "%$tahun-$monthPadded-%")
+                          ->orWhere('tanggal', 'like', "%$tahun-$bulan-%");
+                    })
+                    ->orderByDesc('id')
+                    ->first();
+
+                if ($pRow) {
+                    $meta = json_decode($pRow->keterangan ?? '{}', true) ?: [];
+                    $jamLembur = (float) ($meta['jam_lembur'] ?? ($pRow->jam_lembur ?? 0));
+                    $lemburNominal = (int) ($meta['nominal_lembur'] ?? round($jamLembur * PrestasiController::RATE_LEMBUR_PER_JAM));
+                }
+            } catch (\Throwable $e) {}
+
+            // 2. Jika belum ada di prestasi, cek tabel lembur
+            if ($lemburNominal === 0) {
+                try {
+                    $bulanNama = AbsensiController::BULAN[$bulan] ?? '';
+                    $lRow = \Illuminate\Support\Facades\DB::table('lembur')
+                        ->where('pegawai_id', $dbPegId)
+                        ->where('bulan', 'ilike', "%$bulanNama $tahun%")
+                        ->first();
+                    if ($lRow) {
+                        $lemburNominal = (int) ($lRow->uang_lembur ?? 0);
+                        $jamLembur = (float) ($lRow->jam_lembur ?? 0);
+                    }
+                } catch (\Throwable $e) {}
+            }
+        }
+
         return [
             'kawin' => $kawin,
             'jml_istri' => $jmlIstri,
@@ -341,6 +390,8 @@ class GajiProsesController extends Controller
             'jml_anak_pajak' => $jmlAnakPajak,
             'kode_ptkp' => $kodePtkp,
             'potongan_keu' => $potonganKeu,
+            'lembur' => $lemburNominal,
+            'jam_lembur' => $jamLembur,
         ];
     }
 
@@ -410,9 +461,9 @@ class GajiProsesController extends Controller
      * Endpoint kecil dipanggil via fetch() dari form create - mengembalikan
      * hitungan tunjangan keluarga & kategori PTKP untuk pegawai yang dipilih.
      */
-    public function hitungKeluargaJson(int $pegawaiId)
+    public function hitungKeluargaJson(Request $request, int $pegawaiId)
     {
-        return response()->json($this->hitungKeluarga($pegawaiId));
+        return response()->json($this->hitungKeluarga($pegawaiId, $request));
     }
 
     public function store(Request $request)
@@ -420,7 +471,7 @@ class GajiProsesController extends Controller
         $validated = $this->validateData($request);
 
         $pegawai = $this->pegawaiById($validated['pegawai_id']);
-        $keluargaCalc = $this->hitungKeluarga($validated['pegawai_id']);
+        $keluargaCalc = $this->hitungKeluarga($validated['pegawai_id'], $request);
 
         $totalPendapatan = collect(array_keys(self::KOMPONEN_PENDAPATAN))
             ->sum(fn ($key) => (float) ($validated[$key] ?? 0));
@@ -565,10 +616,41 @@ class GajiProsesController extends Controller
                     // 1. Sinkron ke tabel lembur jika ada lembur
                     if (($dbPayroll->lembur ?? 0) > 0) {
                         try {
+                            $rateLembur = PrestasiController::RATE_LEMBUR_PER_JAM;
+                            $jamLembur = max(1, (int) round(($dbPayroll->lembur ?? 0) / $rateLembur));
+
+                            // Cek apakah ada record manual dari Set Prestasi SDM untuk pegawai dan periode ini
+                            $existingPrestasi = \Illuminate\Support\Facades\DB::table('prestasi')
+                                ->where('pegawai_id', $dbPayroll->pegawai_id)
+                                ->where(function ($q) use ($dbPayroll) {
+                                    $prefix = sprintf('%04d-%02d', $dbPayroll->tahun, $dbPayroll->bulan);
+                                    $q->where('tanggal', 'like', "$prefix%")
+                                      ->orWhere('tanggal', 'like', "%{$dbPayroll->tahun}-" . str_pad($dbPayroll->bulan, 2, '0', STR_PAD_LEFT) . "-%");
+                                })
+                                ->orderByDesc('id')
+                                ->first();
+
+                            if ($existingPrestasi) {
+                                $pMeta = json_decode($existingPrestasi->keterangan ?? '{}', true) ?: [];
+                                if (!empty($pMeta['jam_lembur'])) {
+                                    $jamLembur = $pMeta['jam_lembur'];
+                                }
+                            } else {
+                                // Jika di tabel lembur sudah ada record dengan jam_lembur yang diinput manual, jangan timpa jika nominalnya cocok
+                                $existingLembur = \Illuminate\Support\Facades\DB::table('lembur')
+                                    ->where('pegawai_id', $dbPayroll->pegawai_id)
+                                    ->where('bulan', $dbPayroll->periode)
+                                    ->first();
+
+                                if ($existingLembur && (int)$existingLembur->uang_lembur === (int)$dbPayroll->lembur && (float)$existingLembur->jam_lembur > 0) {
+                                    $jamLembur = $existingLembur->jam_lembur;
+                                }
+                            }
+
                             \Illuminate\Support\Facades\DB::table('lembur')->updateOrInsert(
                                 ['pegawai_id' => $dbPayroll->pegawai_id, 'bulan' => $dbPayroll->periode],
                                 [
-                                    'jam_lembur' => max(1, (int) round(($dbPayroll->lembur ?? 0) / 50000)),
+                                    'jam_lembur' => $jamLembur,
                                     'uang_lembur' => $dbPayroll->lembur,
                                     'created_at' => now(),
                                 ]

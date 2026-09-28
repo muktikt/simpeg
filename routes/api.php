@@ -35,6 +35,8 @@ Route::prefix('v1')->group(function () {
     // Pengajuan Cuti & Lembur
     Route::get('/cuti', [ApiPegawaiController::class, 'getCuti']);
     Route::post('/cuti', [ApiPegawaiController::class, 'storeCuti']);
+    Route::get('/lembur', [ApiPegawaiController::class, 'getLembur']);
+    Route::get('/payroll/lembur', [ApiPegawaiController::class, 'getLembur']);
     Route::post('/lembur', [ApiPegawaiController::class, 'storeLembur']);
 
     // Pengaduan Pegawai
