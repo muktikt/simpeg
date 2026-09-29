@@ -184,7 +184,31 @@ class PrestasiController extends Controller
         // 2. Sinkron ke tabel lembur, payroll, dan insentif
         static::syncPrestasiLemburToTables($dbPegId, $jamLembur, $nominalLembur, $validated['tanggal']);
 
-        // 3. Clear cache pegawai
+        // 3. Notifikasi OneSignal & Lonceng Flutter saat Lembur Dicatat
+        if ($jamLembur > 0) {
+            $tglCarbon = \Illuminate\Support\Carbon::parse($validated['tanggal']);
+            $periodeLembur = ($tglCarbon->translatedFormat('F') ?: $tglCarbon->format('F')) . ' ' . $tglCarbon->year;
+            $pesanLembur = "Data lembur Anda sebesar {$jamLembur} jam (Rp " . number_format($nominalLembur, 0, ',', '.') . ") periode {$periodeLembur} telah dicatat oleh SDM.";
+            $targetNik = $pegawai['nik'] ?? null;
+            if (!$targetNik && $dbPegId) {
+                $targetNik = \Illuminate\Support\Facades\DB::table('pegawai')->where('id', $dbPegId)->value('nik');
+            }
+
+            if ($targetNik) {
+                try {
+                    \App\Services\OneSignalService::kirimNotifikasiPegawai(
+                        $targetNik,
+                        '⏰ Data Lembur Dicatat',
+                        $pesanLembur,
+                        ['type' => 'lembur', 'periode' => $periodeLembur]
+                    );
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::warning('OneSignal lembur notif failed: ' . $e->getMessage());
+                }
+            }
+        }
+
+        // 4. Clear cache pegawai
         \Illuminate\Support\Facades\Cache::forget('simpeg_all_pegawai_list');
         \Illuminate\Support\Facades\Cache::forget('pegawai_master_cache');
         \Illuminate\Support\Facades\Cache::forget('simpeg_dashboard_stats');
@@ -251,6 +275,29 @@ class PrestasiController extends Controller
 
         if ($dbPegId) {
             static::syncPrestasiLemburToTables($dbPegId, $jamLembur, $nominalLembur, $validated['tanggal']);
+
+            if ($jamLembur > 0) {
+                $tglCarbon = \Illuminate\Support\Carbon::parse($validated['tanggal']);
+                $periodeLembur = ($tglCarbon->translatedFormat('F') ?: $tglCarbon->format('F')) . ' ' . $tglCarbon->year;
+                $pesanLembur = "Data lembur Anda sebesar {$jamLembur} jam (Rp " . number_format($nominalLembur, 0, ',', '.') . ") periode {$periodeLembur} telah diperbarui oleh SDM.";
+                $targetNik = $pegawai['nik'] ?? null;
+                if (!$targetNik && $dbPegId) {
+                    $targetNik = \Illuminate\Support\Facades\DB::table('pegawai')->where('id', $dbPegId)->value('nik');
+                }
+
+                if ($targetNik) {
+                    try {
+                        \App\Services\OneSignalService::kirimNotifikasiPegawai(
+                            $targetNik,
+                            '⏰ Data Lembur Diperbarui',
+                            $pesanLembur,
+                            ['type' => 'lembur', 'periode' => $periodeLembur]
+                        );
+                    } catch (\Throwable $e) {
+                        \Illuminate\Support\Facades\Log::warning('OneSignal lembur update notif failed: ' . $e->getMessage());
+                    }
+                }
+            }
         }
 
         \Illuminate\Support\Facades\Cache::forget('simpeg_all_pegawai_list');
