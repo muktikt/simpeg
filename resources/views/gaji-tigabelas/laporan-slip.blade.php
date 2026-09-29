@@ -98,344 +98,84 @@
 
         {{-- FORMAT 1: TUNJANGAN PENDIDIKAN --}}
         @if ($format === 'tpendidikan')
-        <div class="slip-doc-container">
-            <div class="slip-header-kop">
-                <div class="slip-kop-brand">
-                    <div class="slip-kop-company">PERUMDAM Tirta Darma Ayu</div>
-                    <div class="slip-kop-sub">KABUPATEN INDRAMAYU &middot; JAWA BARAT</div>
-                    <div class="slip-kop-address">Jl. Letjen Suprapto No25/E, Indramayu 45214 Telp (0234) 271322</div>
-                </div>
-                <div class="slip-kop-title-box">
-                    <div class="slip-title-text">DAFTAR TUNJANGAN PENDIDIKAN & POTONGAN</div>
-                    <div class="slip-badge-periode">BULAN : JULI {{ $tahun }}</div>
-                </div>
-            </div>
-
-            <div class="slip-emp-box">
-                <div style="display:flex; flex-direction:column; gap:6px;">
-                    <div class="slip-emp-item"><span class="k">NIK</span><span class="sep">:</span><span class="v">{{ $item['nik'] }}</span></div>
-                    <div class="slip-emp-item"><span class="k">NAMA</span><span class="sep">:</span><span class="v" style="font-size:13.5px; color:#0F2A3D; font-weight:700;">{{ strtoupper($item['nama']) }}</span></div>
-                    <div class="slip-emp-item"><span class="k">GOLONGAN</span><span class="sep">:</span><span class="v">{{ $item['golongan'] ?: '-' }} (PTKP: {{ $item['kode_ptkp'] }})</span></div>
-                </div>
-                <div style="display:flex; flex-direction:column; gap:6px;">
-                    <div class="slip-emp-item"><span class="k">UNIT KERJA</span><span class="sep">:</span><span class="v">{{ strtoupper($item['unit_kerja'] ?? '-') }}</span></div>
-                    <div class="slip-emp-item"><span class="k">JABATAN</span><span class="sep">:</span><span class="v">{{ strtoupper($item['jabatan'] ?? 'Pegawai') }}</span></div>
-                    <div class="slip-emp-item"><span class="k">STATUS SLIP</span><span class="sep">:</span><span class="v" style="color:#16A34A; font-weight:700;">TERBIT & FINAL</span></div>
-                </div>
-            </div>
-
-            <div class="slip-columns-wrap">
-                <div class="slip-col-card">
-                    <div class="slip-col-head" style="color:#0369A1; background:#F0F9FF; border-color:#BAE6FD;">
-                        I. PENERIMAAN TUNJ. PENDIDIKAN
-                    </div>
-                    <div class="slip-items-body">
-                        <div class="slip-row-item"><span class="item-label">Gaji Pokok</span><span class="item-val">Rp {{ number_format($tpendidikan['gapok'], 0, ',', '.') }}</span></div>
-                        <div class="slip-row-item"><span class="item-label">Tunjangan Istri / Suami</span><span class="item-val">Rp {{ number_format($tpendidikan['tunjangan_istri'], 0, ',', '.') }}</span></div>
-                        <div class="slip-row-item"><span class="item-label">Tunjangan Anak</span><span class="item-val">Rp {{ number_format($tpendidikan['tunjangan_anak'], 0, ',', '.') }}</span></div>
-                    </div>
-                    <div class="slip-col-total" style="background:#F0F9FF; border-color:#BAE6FD;">
-                        <span>JUMLAH PENDAPATAN (A)</span>
-                        <span class="tot-val" style="color:#0369A1;">Rp {{ number_format($tpendidikan['total_pendapatan'], 0, ',', '.') }}</span>
-                    </div>
-                </div>
-
-                <div class="slip-col-card">
-                    <div class="slip-col-head" style="color:#B91C1C; background:#FEF2F2; border-color:#FECACA;">
-                        II. POTONGAN (PROPORSIONAL)
-                    </div>
-                    <div class="slip-items-body">
-                        <div class="slip-row-item"><span class="item-label">Potongan Koperasi ({{ $rasio['persen_tpendidikan'] }}%)</span><span class="item-val" style="color:#DC2626;">Rp {{ number_format($tpendidikan['potongan_koperasi'], 0, ',', '.') }}</span></div>
-                        <div class="slip-row-item"><span class="item-label">Potongan Kas ({{ $rasio['persen_tpendidikan'] }}%)</span><span class="item-val" style="color:#DC2626;">Rp {{ number_format($tpendidikan['potongan_kas'], 0, ',', '.') }}</span></div>
-                        @if ($tpendidikan['potongan_zakat'] > 0)
-                        <div class="slip-row-item"><span class="item-label">Potongan Zakat</span><span class="item-val" style="color:#DC2626;">Rp {{ number_format($tpendidikan['potongan_zakat'], 0, ',', '.') }}</span></div>
-                        @endif
-                    </div>
-                    <div class="slip-col-total" style="background:#FEF2F2; border-color:#FECACA;">
-                        <span>JUMLAH POTONGAN (B)</span>
-                        <span class="tot-val" style="color:#DC2626;">Rp {{ number_format($tpendidikan['total_potongan'], 0, ',', '.') }}</span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="slip-thp-wrapper">
-                <div>
-                    <div class="slip-thp-title">JUMLAH PENDAPATAN DITERIMA (BERSIH = A - B)</div>
-                    <div class="slip-thp-terbilang">Terbilang: # {{ terbilang($tpendidikan['diterima']) }} Rupiah #</div>
-                </div>
-                <div class="slip-thp-nominal">
-                    Rp {{ number_format($tpendidikan['diterima'], 0, ',', '.') }}
-                </div>
-            </div>
-
-            <div class="slip-signatures-grid">
-                <div class="slip-sig-box">
-                    <div class="slip-sig-role">Penerima / Pegawai,</div>
-                    <div class="slip-sig-spacer"></div>
-                    <div class="slip-sig-name">{{ strtoupper($item['nama']) }}</div>
-                    <div class="slip-sig-nip">NIK. {{ $item['nik'] }}</div>
-                </div>
-                <div class="slip-sig-box">
-                    <div class="slip-sig-role">Indramayu, Juli {{ $tahun }}<br>Bagian Keuangan & Penggajian,</div>
-                    <div class="slip-sig-spacer"></div>
-                    <div class="slip-sig-name">PERUMDAM Tirta Darma Ayu</div>
-                    <div class="slip-sig-nip">Kasubag / Staf Keuangan</div>
-                </div>
-            </div>
-        </div>
+            @php
+                $tpenPendapatan = [
+                    ['label' => 'GAPOK', 'value' => $tpendidikan['gapok'] ?? 0],
+                    ['label' => 'TUNJANGAN ISTRI', 'value' => $tpendidikan['tunjangan_istri'] ?? 0],
+                    ['label' => 'TUNJANGAN ANAK', 'value' => $tpendidikan['tunjangan_anak'] ?? 0],
+                ];
+                $tpenPotonganNon = [
+                    ['label' => 'POTONGAN KOPERASI (' . $rasio['persen_tpendidikan'] . '%)', 'value' => $tpendidikan['potongan_koperasi'] ?? 0],
+                    ['label' => 'POTONGAN KAS (' . $rasio['persen_tpendidikan'] . '%)', 'value' => $tpendidikan['potongan_kas'] ?? 0],
+                    ['label' => 'POTONGAN ZAKAT', 'value' => $tpendidikan['potongan_zakat'] ?? 0],
+                ];
+            @endphp
+            @include('partials.official-slip', [
+                'judul' => 'DAFTAR TUNJANGAN PENDIDIKAN & POTONGAN BULAN : JULI ' . $tahun,
+                'data' => $item,
+                'pendapatanRows' => $tpenPendapatan,
+                'potonganPendapatanRows' => [],
+                'potonganNonPendapatanRows' => $tpenPotonganNon,
+                'totalPendapatan' => $tpendidikan['total_pendapatan'],
+                'totalPotonganPendapatan' => 0,
+                'totalPotonganNonPendapatan' => $tpendidikan['total_potongan'],
+                'pendapatanDiterima' => $tpendidikan['diterima'],
+                'labelDiterima' => 'JUMLAH PENDAPATAN DITERIMA',
+            ])
 
         {{-- FORMAT 2: INSENTIF PENDIDIKAN --}}
         @elseif ($format === 'insentif')
-        <div class="slip-doc-container">
-            <div class="slip-header-kop">
-                <div class="slip-kop-brand">
-                    <div class="slip-kop-company">PERUMDAM Tirta Darma Ayu</div>
-                    <div class="slip-kop-sub">KABUPATEN INDRAMAYU &middot; JAWA BARAT</div>
-                    <div class="slip-kop-address">Jl. Letjen Suprapto No25/E, Indramayu 45214 Telp (0234) 271322</div>
-                </div>
-                <div class="slip-kop-title-box">
-                    <div class="slip-title-text">DAFTAR INSENTIF PENDIDIKAN & POTONGAN</div>
-                    <div class="slip-badge-periode">BULAN : JULI {{ $tahun }}</div>
-                </div>
-            </div>
+            @php
+                $insPendapatan = [
+                    ['label' => 'TUNJANGAN JABATAN', 'value' => $insentif['insentif_jabatan'] ?? 0],
+                    ['label' => 'TUNJANGAN PRESTASI', 'value' => $insentif['insentif_prestasi'] ?? 0],
+                    ['label' => 'TUNJANGAN TRANSPORTASI', 'value' => $insentif['insentif_transportasi'] ?? 0],
+                    ['label' => 'TUNJANGAN PANGAN', 'value' => $insentif['insentif_pangan'] ?? 0],
+                    ['label' => 'TUNJANGAN BPJS KESEHATAN', 'value' => $insentif['insentif_bpjs_kesehatan'] ?? 0],
+                    ['label' => 'TUNJANGAN PERUMAHAN', 'value' => $insentif['insentif_perumahan'] ?? 0],
+                    ['label' => 'TUNJANGAN BPJS TENAGA KERJA', 'value' => $insentif['insentif_bpjs_tenaga_kerja'] ?? 0],
+                    ['label' => 'TUNJANGAN PERUSAHAAN', 'value' => $insentif['insentif_perusahaan'] ?? 0],
+                    ['label' => 'LEMBUR', 'value' => $insentif['lembur'] ?? 0],
+                    ['label' => 'TUNJANGAN PAJAK', 'value' => $insentif['insentif_pajak'] ?? 0],
+                    ['label' => 'TUNJANGAN AIR MINUM', 'value' => $insentif['insentif_air_minum'] ?? 0],
+                    ['label' => 'TUNJANGAN KOMUNIKASI', 'value' => $insentif['insentif_komunikasi'] ?? 0],
+                ];
+                $insPotonganPend = [
+                    ['label' => 'POTONGAN PAJAK', 'value' => $insentif['potongan_pajak'] ?? 0],
+                ];
+                $insPotonganNon = [
+                    ['label' => 'POTONGAN KOPERASI (' . $rasio['persen_insentif'] . '%)', 'value' => $insentif['potongan_koperasi'] ?? 0],
+                    ['label' => 'POTONGAN KAS (' . $rasio['persen_insentif'] . '%)', 'value' => $insentif['potongan_kas'] ?? 0],
+                    ['label' => 'POTONGAN DARMA WANITA', 'value' => $insentif['potongan_darma_wanita'] ?? 0],
+                    ['label' => 'POTONGAN REKENING AIR MINUM', 'value' => $insentif['potongan_rekening_air_minum'] ?? 0],
+                    ['label' => 'POTONGAN BANK BJB', 'value' => $insentif['potongan_bank_bjb'] ?? 0],
+                    ['label' => 'POTONGAN BANK BJBS', 'value' => $insentif['potongan_bank_bjbs'] ?? 0],
+                    ['label' => 'POTONGAN BANK BTN', 'value' => $insentif['potongan_bank_btn'] ?? 0],
+                    ['label' => 'POTONGAN BANK BPR', 'value' => $insentif['potongan_bank_bpr'] ?? 0],
+                    ['label' => 'POTONGAN ASURANSI/LAINNYA', 'value' => $insentif['potongan_asuransi'] ?? 0],
+                    ['label' => 'POTONGAN ZAKAT', 'value' => $insentif['potongan_zakat_profesi'] ?? 0],
+                ];
+            @endphp
+            @include('partials.official-slip', [
+                'judul' => 'DAFTAR INSENTIF PENDIDIKAN & POTONGAN BULAN : JULI ' . $tahun,
+                'data' => $item,
+                'pendapatanRows' => $insPendapatan,
+                'potonganPendapatanRows' => $insPotonganPend,
+                'potonganNonPendapatanRows' => $insPotonganNon,
+                'totalPendapatan' => $insentif['total_insentif'],
+                'totalPotonganPendapatan' => $insentif['potongan_pajak'] ?? 0,
+                'totalPotonganNonPendapatan' => ($insentif['total_potongan'] ?? 0) - ($insentif['potongan_pajak'] ?? 0),
+                'pendapatanDiterima' => $insentif['diterima'],
+                'labelDiterima' => 'JUMLAH INSENTIF DITERIMA',
+            ])
 
-            <div class="slip-emp-box">
-                <div style="display:flex; flex-direction:column; gap:6px;">
-                    <div class="slip-emp-item"><span class="k">NIK</span><span class="sep">:</span><span class="v">{{ $item['nik'] }}</span></div>
-                    <div class="slip-emp-item"><span class="k">NAMA</span><span class="sep">:</span><span class="v" style="font-size:13.5px; color:#0F2A3D; font-weight:700;">{{ strtoupper($item['nama']) }}</span></div>
-                    <div class="slip-emp-item"><span class="k">GOLONGAN</span><span class="sep">:</span><span class="v">{{ $item['golongan'] ?: '-' }} (PTKP: {{ $item['kode_ptkp'] }})</span></div>
-                </div>
-                <div style="display:flex; flex-direction:column; gap:6px;">
-                    <div class="slip-emp-item"><span class="k">UNIT KERJA</span><span class="sep">:</span><span class="v">{{ strtoupper($item['unit_kerja'] ?? '-') }}</span></div>
-                    <div class="slip-emp-item"><span class="k">JABATAN</span><span class="sep">:</span><span class="v">{{ strtoupper($item['jabatan'] ?? 'Pegawai') }}</span></div>
-                    <div class="slip-emp-item"><span class="k">STATUS SLIP</span><span class="sep">:</span><span class="v" style="color:#16A34A; font-weight:700;">TERBIT & FINAL</span></div>
-                </div>
-            </div>
-
-            <div class="slip-columns-wrap">
-                <div class="slip-col-card">
-                    <div class="slip-col-head" style="color:#7C3AED; background:#F5F3FF; border-color:#DDD6FE;">
-                        I. PENERIMAAN INSENTIF
-                    </div>
-                    <div class="slip-items-body">
-                        @if ($insentif['insentif_jabatan'] > 0)
-                            <div class="slip-row-item"><span class="item-label">Insentif Jabatan</span><span class="item-val">Rp {{ number_format($insentif['insentif_jabatan'], 0, ',', '.') }}</span></div>
-                        @endif
-                        @if ($insentif['insentif_prestasi'] > 0)
-                            <div class="slip-row-item"><span class="item-label">Insentif Prestasi</span><span class="item-val">Rp {{ number_format($insentif['insentif_prestasi'], 0, ',', '.') }}</span></div>
-                        @endif
-                        @if ($insentif['insentif_transportasi'] > 0)
-                            <div class="slip-row-item"><span class="item-label">Insentif Transportasi</span><span class="item-val">Rp {{ number_format($insentif['insentif_transportasi'], 0, ',', '.') }}</span></div>
-                        @endif
-                        @if ($insentif['insentif_pangan'] > 0)
-                            <div class="slip-row-item"><span class="item-label">Insentif Pangan</span><span class="item-val">Rp {{ number_format($insentif['insentif_pangan'], 0, ',', '.') }}</span></div>
-                        @endif
-                        @if ($insentif['insentif_bpjs_kesehatan'] > 0)
-                            <div class="slip-row-item"><span class="item-label">Insentif BPJS Kesehatan</span><span class="item-val">Rp {{ number_format($insentif['insentif_bpjs_kesehatan'], 0, ',', '.') }}</span></div>
-                        @endif
-                        @if ($insentif['insentif_perumahan'] > 0)
-                            <div class="slip-row-item"><span class="item-label">Insentif Perumahan</span><span class="item-val">Rp {{ number_format($insentif['insentif_perumahan'], 0, ',', '.') }}</span></div>
-                        @endif
-                        @if ($insentif['insentif_bpjs_tenaga_kerja'] > 0)
-                            <div class="slip-row-item"><span class="item-label">Insentif BPJS Ketenagakerjaan</span><span class="item-val">Rp {{ number_format($insentif['insentif_bpjs_tenaga_kerja'], 0, ',', '.') }}</span></div>
-                        @endif
-                        @if ($insentif['insentif_perusahaan'] > 0)
-                            <div class="slip-row-item"><span class="item-label">Insentif Perusahaan</span><span class="item-val">Rp {{ number_format($insentif['insentif_perusahaan'], 0, ',', '.') }}</span></div>
-                        @endif
-                        @if ($insentif['lembur'] > 0)
-                            <div class="slip-row-item"><span class="item-label">Uang Lembur</span><span class="item-val">Rp {{ number_format($insentif['lembur'], 0, ',', '.') }}</span></div>
-                        @endif
-                        @if ($insentif['insentif_pajak'] > 0)
-                            <div class="slip-row-item"><span class="item-label">Insentif Pajak (PPh21)</span><span class="item-val">Rp {{ number_format($insentif['insentif_pajak'], 0, ',', '.') }}</span></div>
-                        @endif
-                        @if ($insentif['insentif_air_minum'] > 0)
-                            <div class="slip-row-item"><span class="item-label">Insentif Air Minum</span><span class="item-val">Rp {{ number_format($insentif['insentif_air_minum'], 0, ',', '.') }}</span></div>
-                        @endif
-                        @if ($insentif['insentif_komunikasi'] > 0)
-                            <div class="slip-row-item"><span class="item-label">Insentif Komunikasi</span><span class="item-val">Rp {{ number_format($insentif['insentif_komunikasi'], 0, ',', '.') }}</span></div>
-                        @endif
-                    </div>
-                    <div class="slip-col-total" style="background:#F5F3FF; border-color:#DDD6FE;">
-                        <span>JUMLAH INSENTIF (A)</span>
-                        <span class="tot-val" style="color:#7C3AED;">Rp {{ number_format($insentif['total_insentif'], 0, ',', '.') }}</span>
-                    </div>
-                </div>
-
-                <div class="slip-col-card">
-                    <div class="slip-col-head" style="color:#B91C1C; background:#FEF2F2; border-color:#FECACA;">
-                        II. POTONGAN (PROPORSIONAL)
-                    </div>
-                    <div class="slip-items-body">
-                        @if ($insentif['potongan_pajak'] > 0)
-                            <div class="slip-row-item"><span class="item-label">Potongan Pajak (PPh21)</span><span class="item-val" style="color:#DC2626;">Rp {{ number_format($insentif['potongan_pajak'], 0, ',', '.') }}</span></div>
-                        @endif
-                        @if ($insentif['potongan_koperasi'] > 0)
-                            <div class="slip-row-item"><span class="item-label">Potongan Koperasi ({{ $rasio['persen_insentif'] }}%)</span><span class="item-val" style="color:#DC2626;">Rp {{ number_format($insentif['potongan_koperasi'], 0, ',', '.') }}</span></div>
-                        @endif
-                        @if ($insentif['potongan_kas'] > 0)
-                            <div class="slip-row-item"><span class="item-label">Potongan Kas ({{ $rasio['persen_insentif'] }}%)</span><span class="item-val" style="color:#DC2626;">Rp {{ number_format($insentif['potongan_kas'], 0, ',', '.') }}</span></div>
-                        @endif
-                        @if ($insentif['potongan_darma_wanita'] > 0)
-                            <div class="slip-row-item"><span class="item-label">Potongan Darma Wanita</span><span class="item-val" style="color:#DC2626;">Rp {{ number_format($insentif['potongan_darma_wanita'], 0, ',', '.') }}</span></div>
-                        @endif
-                        @if ($insentif['potongan_rekening_air_minum'] > 0)
-                            <div class="slip-row-item"><span class="item-label">Potongan Rekening Air Minum</span><span class="item-val" style="color:#DC2626;">Rp {{ number_format($insentif['potongan_rekening_air_minum'], 0, ',', '.') }}</span></div>
-                        @endif
-                        @if ($insentif['potongan_bank_bjb'] > 0)
-                            <div class="slip-row-item"><span class="item-label">Potongan Bank BJB</span><span class="item-val" style="color:#DC2626;">Rp {{ number_format($insentif['potongan_bank_bjb'], 0, ',', '.') }}</span></div>
-                        @endif
-                        @if ($insentif['potongan_bank_bjbs'] > 0)
-                            <div class="slip-row-item"><span class="item-label">Potongan Bank BJBS</span><span class="item-val" style="color:#DC2626;">Rp {{ number_format($insentif['potongan_bank_bjbs'], 0, ',', '.') }}</span></div>
-                        @endif
-                        @if ($insentif['potongan_bank_btn'] > 0)
-                            <div class="slip-row-item"><span class="item-label">Potongan Bank BTN</span><span class="item-val" style="color:#DC2626;">Rp {{ number_format($insentif['potongan_bank_btn'], 0, ',', '.') }}</span></div>
-                        @endif
-                        @if ($insentif['potongan_bank_bpr'] > 0)
-                            <div class="slip-row-item"><span class="item-label">Potongan Bank BPR</span><span class="item-val" style="color:#DC2626;">Rp {{ number_format($insentif['potongan_bank_bpr'], 0, ',', '.') }}</span></div>
-                        @endif
-                        @if ($insentif['potongan_asuransi'] > 0)
-                            <div class="slip-row-item"><span class="item-label">Potongan Asuransi</span><span class="item-val" style="color:#DC2626;">Rp {{ number_format($insentif['potongan_asuransi'], 0, ',', '.') }}</span></div>
-                        @endif
-                        @if ($insentif['potongan_zakat_profesi'] > 0)
-                            <div class="slip-row-item"><span class="item-label">Potongan Zakat</span><span class="item-val" style="color:#DC2626;">Rp {{ number_format($insentif['potongan_zakat_profesi'], 0, ',', '.') }}</span></div>
-                        @endif
-                    </div>
-                    <div class="slip-col-total" style="background:#FEF2F2; border-color:#FECACA;">
-                        <span>JUMLAH POTONGAN (B)</span>
-                        <span class="tot-val" style="color:#DC2626;">Rp {{ number_format($insentif['total_potongan'], 0, ',', '.') }}</span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="slip-thp-wrapper">
-                <div>
-                    <div class="slip-thp-title">JUMLAH INSENTIF DITERIMA (BERSIH = A - B)</div>
-                    <div class="slip-thp-terbilang">Terbilang: # {{ terbilang($insentif['diterima']) }} Rupiah #</div>
-                </div>
-                <div class="slip-thp-nominal" style="color:#7C3AED;">
-                    Rp {{ number_format($insentif['diterima'], 0, ',', '.') }}
-                </div>
-            </div>
-
-            <div class="slip-signatures-grid">
-                <div class="slip-sig-box">
-                    <div class="slip-sig-role">Penerima / Pegawai,</div>
-                    <div class="slip-sig-spacer"></div>
-                    <div class="slip-sig-name">{{ strtoupper($item['nama']) }}</div>
-                    <div class="slip-sig-nip">NIK. {{ $item['nik'] }}</div>
-                </div>
-                <div class="slip-sig-box">
-                    <div class="slip-sig-role">Indramayu, Juli {{ $tahun }}<br>Bagian Keuangan & Penggajian,</div>
-                    <div class="slip-sig-spacer"></div>
-                    <div class="slip-sig-name">PERUMDAM Tirta Darma Ayu</div>
-                    <div class="slip-sig-nip">Kasubag / Staf Keuangan</div>
-                </div>
-            </div>
-        </div>
-
-        {{-- FORMAT 3: GAJI 13 UTUH --}}
+        {{-- FORMAT 3: GAJI 13 UTUH (GAMBAR 2 ASLI) --}}
         @else
-        <div class="slip-doc-container">
-            <div class="slip-header-kop">
-                <div class="slip-kop-brand">
-                    <div class="slip-kop-company">PERUMDAM Tirta Darma Ayu</div>
-                    <div class="slip-kop-sub">KABUPATEN INDRAMAYU &middot; JAWA BARAT</div>
-                    <div class="slip-kop-address">Jl. Letjen Suprapto No25/E, Indramayu 45214 Telp (0234) 271322</div>
-                </div>
-                <div class="slip-kop-title-box">
-                    <div class="slip-title-text">SLIP GAJI TIGA BELAS</div>
-                    <div class="slip-badge-periode">TAHUN AJARAN: {{ $tahunAjaran }}</div>
-                </div>
-            </div>
-
-            <div class="slip-emp-box">
-                <div style="display:flex; flex-direction:column; gap:6px;">
-                    <div class="slip-emp-item"><span class="k">NIK</span><span class="sep">:</span><span class="v">{{ $item['nik'] }}</span></div>
-                    <div class="slip-emp-item"><span class="k">NAMA</span><span class="sep">:</span><span class="v" style="font-size:13.5px; color:#0F2A3D; font-weight:700;">{{ strtoupper($item['nama']) }}</span></div>
-                    <div class="slip-emp-item"><span class="k">GOLONGAN</span><span class="sep">:</span><span class="v">{{ $item['golongan'] ?: '-' }} (PTKP: {{ $item['kode_ptkp'] }})</span></div>
-                </div>
-                <div style="display:flex; flex-direction:column; gap:6px;">
-                    <div class="slip-emp-item"><span class="k">UNIT KERJA</span><span class="sep">:</span><span class="v">{{ strtoupper($item['unit_kerja'] ?? '-') }}</span></div>
-                    <div class="slip-emp-item"><span class="k">JABATAN</span><span class="sep">:</span><span class="v">{{ strtoupper($item['jabatan'] ?? 'Pegawai') }}</span></div>
-                    <div class="slip-emp-item"><span class="k">STATUS SLIP</span><span class="sep">:</span><span class="v" style="color:#16A34A; font-weight:700;">TERBIT & FINAL</span></div>
-                </div>
-            </div>
-
-            <div class="slip-columns-wrap">
-                <div class="slip-col-card">
-                    <div class="slip-col-head" style="color:#0369A1; background:#F0F9FF; border-color:#BAE6FD;">
-                        I. PENERIMAAN
-                    </div>
-                    <div class="slip-items-body">
-                        @foreach (\App\Http\Controllers\GajiTigabelasController::KOMPONEN_PENDAPATAN as $key => $label)
-                            @if (($item[$key] ?? 0) > 0)
-                                <div class="slip-row-item">
-                                    <span class="item-label">{{ $label }}</span>
-                                    <span class="item-val">Rp {{ number_format($item[$key] ?? 0, 0, ',', '.') }}</span>
-                                </div>
-                            @endif
-                        @endforeach
-                    </div>
-                    <div class="slip-col-total" style="background:#F0F9FF; border-color:#BAE6FD;">
-                        <span>TOTAL PENDAPATAN (A)</span>
-                        <span class="tot-val" style="color:#0369A1;">Rp {{ number_format($utuh['total_pendapatan'], 0, ',', '.') }}</span>
-                    </div>
-                </div>
-
-                <div class="slip-col-card">
-                    <div class="slip-col-head" style="color:#B91C1C; background:#FEF2F2; border-color:#FECACA;">
-                        II. POTONGAN
-                    </div>
-                    <div class="slip-items-body">
-                        @foreach (\App\Http\Controllers\GajiTigabelasController::POTONGAN_PENDAPATAN as $key => $label)
-                            @if (($item[$key] ?? 0) > 0)
-                                <div class="slip-row-item">
-                                    <span class="item-label">{{ $label }}</span>
-                                    <span class="item-val" style="color:#DC2626;">Rp {{ number_format($item[$key] ?? 0, 0, ',', '.') }}</span>
-                                </div>
-                            @endif
-                        @endforeach
-                        @foreach (\App\Http\Controllers\GajiTigabelasController::POTONGAN_NON_PENDAPATAN as $key => $label)
-                            @if (($item[$key] ?? 0) > 0)
-                                <div class="slip-row-item">
-                                    <span class="item-label">{{ $label }}</span>
-                                    <span class="item-val" style="color:#DC2626;">Rp {{ number_format($item[$key] ?? 0, 0, ',', '.') }}</span>
-                                </div>
-                            @endif
-                        @endforeach
-                    </div>
-                    <div class="slip-col-total" style="background:#FEF2F2; border-color:#FECACA;">
-                        <span>TOTAL POTONGAN (B)</span>
-                        <span class="tot-val" style="color:#DC2626;">Rp {{ number_format($utuh['total_potongan'], 0, ',', '.') }}</span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="slip-thp-wrapper">
-                <div>
-                    <div class="slip-thp-title">TOTAL DITERIMA (BERSIH = A - B)</div>
-                    <div class="slip-thp-terbilang">Terbilang: # {{ terbilang($utuh['diterima']) }} Rupiah #</div>
-                </div>
-                <div class="slip-thp-nominal">
-                    Rp {{ number_format($utuh['diterima'], 0, ',', '.') }}
-                </div>
-            </div>
-
-            <div class="slip-signatures-grid">
-                <div class="slip-sig-box">
-                    <div class="slip-sig-role">Penerima / Pegawai,</div>
-                    <div class="slip-sig-spacer"></div>
-                    <div class="slip-sig-name">{{ strtoupper($item['nama']) }}</div>
-                    <div class="slip-sig-nip">NIK. {{ $item['nik'] }}</div>
-                </div>
-                <div class="slip-sig-box">
-                    <div class="slip-sig-role">Indramayu, Juli {{ $tahun }}<br>Bagian Keuangan & Penggajian,</div>
-                    <div class="slip-sig-spacer"></div>
-                    <div class="slip-sig-name">PERUMDAM Tirta Darma Ayu</div>
-                    <div class="slip-sig-nip">Kasubag / Staf Keuangan</div>
-                </div>
-            </div>
-        </div>
+            @include('partials.official-slip', [
+                'judul' => 'DAFTAR GAJI TIGA BELAS BULAN : JULI ' . $tahun,
+                'data' => $item,
+                'labelDiterima' => 'JUMLAH PENDAPATAN DITERIMA',
+            ])
         @endif
 
     @else

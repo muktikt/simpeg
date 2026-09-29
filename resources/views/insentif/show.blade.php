@@ -8,7 +8,7 @@
     $backRoute = ($myRole === '5') ? route('insentif.laporan-slip', ['my' => 1]) : route('insentif.laporan-slip', ['tahun' => $item['tahun'], 'bulan' => $item['bulan']]);
 @endphp
 
-<div class="page-head">
+<div class="page-head no-print">
     <div class="breadcrumb">Home / Laporan Insentif / {{ $item['nama'] }}</div>
     <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
         <h1 style="margin:0;">Slip Insentif - {{ $item['nama'] }}</h1>
@@ -22,185 +22,54 @@
     </div>
 </div>
 
-<!-- OFFICIAL SLIP DOCUMENT CONTAINER (PRINT & SCREEN) -->
-<div class="slip-doc-container">
-    <!-- Header KOP Resmi -->
-    <div class="slip-header-kop">
-        <div class="slip-kop-brand">
-            <div class="slip-kop-company">PERUMDAM Tirta Darma Ayu</div>
-            <div class="slip-kop-sub">KABUPATEN INDRAMAYU &middot; JAWA BARAT</div>
-            <div class="slip-kop-address">Jl. Letjen Suprapto No25/E, Indramayu 45214 Telp (0234) 271322</div>
-        </div>
-        <div class="slip-kop-title-box">
-            <div class="slip-title-text">DAFTAR INSENTIF & POTONGAN</div>
-            <div class="slip-badge-periode">PERIODE: {{ strtoupper($item['periode']) }}</div>
-        </div>
-    </div>
+@php
+    $insPendapatan = [
+        ['label' => 'TUNJANGAN JABATAN', 'value' => $item['insentif_jabatan'] ?? 0],
+        ['label' => 'TUNJANGAN PRESTASI', 'value' => $item['insentif_prestasi'] ?? 0],
+        ['label' => 'TUNJANGAN TRANSPORTASI', 'value' => $item['insentif_transportasi'] ?? 0],
+        ['label' => 'TUNJANGAN PANGAN', 'value' => $item['insentif_pangan'] ?? 0],
+        ['label' => 'TUNJANGAN BPJS KESEHATAN', 'value' => $item['insentif_bpjs_kesehatan'] ?? 0],
+        ['label' => 'TUNJANGAN PERUMAHAN', 'value' => $item['insentif_perumahan'] ?? 0],
+        ['label' => 'TUNJANGAN BPJS TENAGA KERJA', 'value' => $item['insentif_bpjs_tenaga_kerja'] ?? 0],
+        ['label' => 'TUNJANGAN PERUSAHAAN', 'value' => $item['insentif_perusahaan'] ?? 0],
+        ['label' => 'LEMBUR', 'value' => $item['lembur'] ?? 0],
+        ['label' => 'TUNJANGAN PAJAK', 'value' => $item['insentif_pajak'] ?? 0],
+        ['label' => 'TUNJANGAN AIR MINUM', 'value' => $item['insentif_air_minum'] ?? 0],
+        ['label' => 'TUNJANGAN KOMUNIKASI', 'value' => $item['insentif_komunikasi'] ?? 0],
+    ];
+    $insPotonganPend = [
+        ['label' => 'POTONGAN SANKSI', 'value' => $item['potongan_sanksi_perusahaan'] ?? 0],
+        ['label' => 'POTONGAN PMI / LAIN-LAIN', 'value' => $item['potongan_pmi_lain'] ?? 0],
+        ['label' => 'POTONGAN DAPENMA', 'value' => $item['potongan_dapenma'] ?? 0],
+        ['label' => 'POTONGAN BPJS TENAGA KERJA', 'value' => $item['potongan_bpjs_tenaga_kerja'] ?? 0],
+        ['label' => 'POTONGAN PERUMAHAN', 'value' => $item['potongan_perumahan'] ?? 0],
+        ['label' => 'POTONGAN TUNJANGAN PERUSAHAAN', 'value' => $item['potongan_insentif_perusahaan'] ?? 0],
+        ['label' => 'POTONGAN KORPRI', 'value' => $item['potongan_korpri'] ?? 0],
+        ['label' => 'POTONGAN PAJAK', 'value' => $item['potongan_pajak'] ?? 0],
+        ['label' => 'POTONGAN BPJS KESEHATAN', 'value' => $item['potongan_bpjs_kesehatan'] ?? 0],
+    ];
+    $insPotonganNon = [
+        ['label' => 'POTONGAN KOPERASI', 'value' => $item['potongan_koperasi'] ?? 0],
+        ['label' => 'POTONGAN DARMA WANITA', 'value' => $item['potongan_darma_wanita'] ?? 0],
+        ['label' => 'POTONGAN REKENING AIR MINUM', 'value' => $item['potongan_rekening_air_minum'] ?? 0],
+        ['label' => 'POTONGAN KAS', 'value' => $item['potongan_kas'] ?? 0],
+        ['label' => 'POTONGAN BANK BJB', 'value' => $item['potongan_bank_bjb'] ?? 0],
+        ['label' => 'POTONGAN BANK BJBS', 'value' => $item['potongan_bank_bjbs'] ?? 0],
+        ['label' => 'POTONGAN BANK BTN', 'value' => $item['potongan_bank_btn'] ?? 0],
+        ['label' => 'POTONGAN BANK BPR', 'value' => $item['potongan_bank_bpr'] ?? 0],
+        ['label' => 'POTONGAN ASURANSI/LAINNYA', 'value' => $item['potongan_asuransi'] ?? 0],
+        ['label' => 'POTONGAN ZAKAT', 'value' => $item['potongan_zakat_profesi'] ?? 0],
+    ];
+@endphp
 
-    <!-- Info Pegawai -->
-    <div class="slip-emp-box">
-        <div style="display:flex; flex-direction:column; gap:6px;">
-            <div class="slip-emp-item"><span class="k">NIK</span><span class="sep">:</span><span class="v">{{ $item['nik'] }}</span></div>
-            <div class="slip-emp-item"><span class="k">Nama Pegawai</span><span class="sep">:</span><span class="v" style="font-size:14px; color:#0F2A3D;">{{ $item['nama'] }}</span></div>
-            <div class="slip-emp-item"><span class="k">Jabatan</span><span class="sep">:</span><span class="v">{{ $item['jabatan'] ?? 'Pegawai' }}</span></div>
-        </div>
-        <div style="display:flex; flex-direction:column; gap:6px;">
-            <div class="slip-emp-item"><span class="k">Unit Kerja</span><span class="sep">:</span><span class="v">{{ $item['unit_kerja'] ?? '-' }}</span></div>
-            <div class="slip-emp-item"><span class="k">Golongan</span><span class="sep">:</span><span class="v">{{ $item['golongan'] ?? '-' }}</span></div>
-            <div class="slip-emp-item"><span class="k">Status Slip</span><span class="sep">:</span><span class="v" style="color:#16A34A; font-weight:700;">Terbit & Final</span></div>
-        </div>
-    </div>
-
-    <!-- Rincian 2 Kolom Vertikal (Pendapatan & Potongan) -->
-    <div class="slip-columns-wrap">
-        <!-- Kolom Penerimaan Insentif -->
-        <div class="slip-col-card">
-            <div class="slip-col-head" style="color:#0369A1; background:#F0F9FF; border-color:#BAE6FD;">
-                I. PENERIMAAN INSENTIF
-            </div>
-            <div class="slip-items-body">
-                @if (($item['insentif_jabatan'] ?? 0) > 0)
-                    <div class="slip-row-item"><span class="item-label">Insentif Jabatan</span><span class="item-val">Rp {{ number_format($item['insentif_jabatan'], 0, ',', '.') }}</span></div>
-                @endif
-                @if (($item['insentif_prestasi'] ?? 0) > 0)
-                    <div class="slip-row-item"><span class="item-label">Insentif Prestasi</span><span class="item-val">Rp {{ number_format($item['insentif_prestasi'], 0, ',', '.') }}</span></div>
-                @endif
-                @if (($item['insentif_transportasi'] ?? 0) > 0)
-                    <div class="slip-row-item"><span class="item-label">Insentif Transportasi</span><span class="item-val">Rp {{ number_format($item['insentif_transportasi'], 0, ',', '.') }}</span></div>
-                @endif
-                @if (($item['insentif_pangan'] ?? 0) > 0)
-                    <div class="slip-row-item"><span class="item-label">Insentif Pangan</span><span class="item-val">Rp {{ number_format($item['insentif_pangan'], 0, ',', '.') }}</span></div>
-                @endif
-                @if (($item['insentif_bpjs_kesehatan'] ?? 0) > 0)
-                    <div class="slip-row-item"><span class="item-label">Insentif BPJS Kesehatan</span><span class="item-val">Rp {{ number_format($item['insentif_bpjs_kesehatan'], 0, ',', '.') }}</span></div>
-                @endif
-                @if (($item['insentif_perumahan'] ?? 0) > 0)
-                    <div class="slip-row-item"><span class="item-label">Insentif Perumahan</span><span class="item-val">Rp {{ number_format($item['insentif_perumahan'], 0, ',', '.') }}</span></div>
-                @endif
-                @if (($item['insentif_bpjs_tenaga_kerja'] ?? 0) > 0)
-                    <div class="slip-row-item"><span class="item-label">Insentif BPJS Ketenagakerjaan</span><span class="item-val">Rp {{ number_format($item['insentif_bpjs_tenaga_kerja'], 0, ',', '.') }}</span></div>
-                @endif
-                @if (($item['insentif_perusahaan'] ?? 0) > 0)
-                    <div class="slip-row-item"><span class="item-label">Insentif Perusahaan</span><span class="item-val">Rp {{ number_format($item['insentif_perusahaan'], 0, ',', '.') }}</span></div>
-                @endif
-                @if (($item['lembur'] ?? 0) > 0)
-                    <div class="slip-row-item"><span class="item-label">Uang Lembur</span><span class="item-val">Rp {{ number_format($item['lembur'], 0, ',', '.') }}</span></div>
-                @endif
-                @if (($item['insentif_pajak'] ?? 0) > 0)
-                    <div class="slip-row-item"><span class="item-label">Insentif Pajak (PPh21)</span><span class="item-val">Rp {{ number_format($item['insentif_pajak'], 0, ',', '.') }}</span></div>
-                @endif
-                @if (($item['insentif_air_minum'] ?? 0) > 0)
-                    <div class="slip-row-item"><span class="item-label">Insentif Air Minum</span><span class="item-val">Rp {{ number_format($item['insentif_air_minum'], 0, ',', '.') }}</span></div>
-                @endif
-                @if (($item['insentif_komunikasi'] ?? 0) > 0)
-                    <div class="slip-row-item"><span class="item-label">Insentif Komunikasi</span><span class="item-val">Rp {{ number_format($item['insentif_komunikasi'], 0, ',', '.') }}</span></div>
-                @endif
-            </div>
-            <div class="slip-col-total" style="background:#F0F9FF; border-color:#BAE6FD;">
-                <span>TOTAL INSENTIF (A)</span>
-                <span class="tot-val" style="color:#0369A1;">Rp {{ number_format($item['total_insentif'], 0, ',', '.') }}</span>
-            </div>
-        </div>
-
-        <!-- Kolom Potongan -->
-        <div class="slip-col-card">
-            <div class="slip-col-head" style="color:#B91C1C; background:#FEF2F2; border-color:#FECACA;">
-                II. POTONGAN
-            </div>
-            <div class="slip-items-body">
-                <!-- Potongan Bagian Insentif -->
-                @if (($item['potongan_sanksi_perusahaan'] ?? 0) > 0)
-                    <div class="slip-row-item"><span class="item-label">Potongan Sanksi Perusahaan</span><span class="item-val" style="color:#DC2626;">Rp {{ number_format($item['potongan_sanksi_perusahaan'], 0, ',', '.') }}</span></div>
-                @endif
-                @if (($item['potongan_pmi_lain'] ?? 0) > 0)
-                    <div class="slip-row-item"><span class="item-label">Potongan PMI / Lain-lain</span><span class="item-val" style="color:#DC2626;">Rp {{ number_format($item['potongan_pmi_lain'], 0, ',', '.') }}</span></div>
-                @endif
-                @if (($item['potongan_dapenma'] ?? 0) > 0)
-                    <div class="slip-row-item"><span class="item-label">Potongan DAPENMA</span><span class="item-val" style="color:#DC2626;">Rp {{ number_format($item['potongan_dapenma'], 0, ',', '.') }}</span></div>
-                @endif
-                @if (($item['potongan_bpjs_tenaga_kerja'] ?? 0) > 0)
-                    <div class="slip-row-item"><span class="item-label">Potongan BPJS Ketenagakerjaan</span><span class="item-val" style="color:#DC2626;">Rp {{ number_format($item['potongan_bpjs_tenaga_kerja'], 0, ',', '.') }}</span></div>
-                @endif
-                @if (($item['potongan_perumahan'] ?? 0) > 0)
-                    <div class="slip-row-item"><span class="item-label">Potongan Perumahan</span><span class="item-val" style="color:#DC2626;">Rp {{ number_format($item['potongan_perumahan'], 0, ',', '.') }}</span></div>
-                @endif
-                @if (($item['potongan_insentif_perusahaan'] ?? 0) > 0)
-                    <div class="slip-row-item"><span class="item-label">Potongan Insentif Perusahaan</span><span class="item-val" style="color:#DC2626;">Rp {{ number_format($item['potongan_insentif_perusahaan'], 0, ',', '.') }}</span></div>
-                @endif
-                @if (($item['potongan_korpri'] ?? 0) > 0)
-                    <div class="slip-row-item"><span class="item-label">Potongan Korpri</span><span class="item-val" style="color:#DC2626;">Rp {{ number_format($item['potongan_korpri'], 0, ',', '.') }}</span></div>
-                @endif
-                @if (($item['potongan_pajak'] ?? 0) > 0)
-                    <div class="slip-row-item"><span class="item-label">Potongan Pajak (PPh21)</span><span class="item-val" style="color:#DC2626;">Rp {{ number_format($item['potongan_pajak'], 0, ',', '.') }}</span></div>
-                @endif
-                @if (($item['potongan_bpjs_kesehatan'] ?? 0) > 0)
-                    <div class="slip-row-item"><span class="item-label">Potongan BPJS Kesehatan</span><span class="item-val" style="color:#DC2626;">Rp {{ number_format($item['potongan_bpjs_kesehatan'], 0, ',', '.') }}</span></div>
-                @endif
-
-                <!-- Potongan Non-Insentif / Keuangan -->
-                @if (($item['potongan_koperasi'] ?? 0) > 0)
-                    <div class="slip-row-item"><span class="item-label">Potongan Koperasi</span><span class="item-val" style="color:#DC2626;">Rp {{ number_format($item['potongan_koperasi'], 0, ',', '.') }}</span></div>
-                @endif
-                @if (($item['potongan_darma_wanita'] ?? 0) > 0)
-                    <div class="slip-row-item"><span class="item-label">Potongan Dharma Wanita</span><span class="item-val" style="color:#DC2626;">Rp {{ number_format($item['potongan_darma_wanita'], 0, ',', '.') }}</span></div>
-                @endif
-                @if (($item['potongan_rekening_air_minum'] ?? 0) > 0)
-                    <div class="slip-row-item"><span class="item-label">Potongan Rekening Air Minum</span><span class="item-val" style="color:#DC2626;">Rp {{ number_format($item['potongan_rekening_air_minum'], 0, ',', '.') }}</span></div>
-                @endif
-                @if (($item['potongan_kas'] ?? 0) > 0)
-                    <div class="slip-row-item"><span class="item-label">Potongan Kas / Pinjaman</span><span class="item-val" style="color:#DC2626;">Rp {{ number_format($item['potongan_kas'], 0, ',', '.') }}</span></div>
-                @endif
-                @if (($item['potongan_bank_bjb'] ?? 0) > 0)
-                    <div class="slip-row-item"><span class="item-label">Potongan Bank BJB</span><span class="item-val" style="color:#DC2626;">Rp {{ number_format($item['potongan_bank_bjb'], 0, ',', '.') }}</span></div>
-                @endif
-                @if (($item['potongan_bank_bjbs'] ?? 0) > 0)
-                    <div class="slip-row-item"><span class="item-label">Potongan Bank BJBS</span><span class="item-val" style="color:#DC2626;">Rp {{ number_format($item['potongan_bank_bjbs'], 0, ',', '.') }}</span></div>
-                @endif
-                @if (($item['potongan_bank_btn'] ?? 0) > 0)
-                    <div class="slip-row-item"><span class="item-label">Potongan Bank BTN</span><span class="item-val" style="color:#DC2626;">Rp {{ number_format($item['potongan_bank_btn'], 0, ',', '.') }}</span></div>
-                @endif
-                @if (($item['potongan_bank_bpr'] ?? 0) > 0)
-                    <div class="slip-row-item"><span class="item-label">Potongan Bank BPR</span><span class="item-val" style="color:#DC2626;">Rp {{ number_format($item['potongan_bank_bpr'], 0, ',', '.') }}</span></div>
-                @endif
-                @if (($item['potongan_asuransi'] ?? 0) > 0)
-                    <div class="slip-row-item"><span class="item-label">Potongan Asuransi</span><span class="item-val" style="color:#DC2626;">Rp {{ number_format($item['potongan_asuransi'], 0, ',', '.') }}</span></div>
-                @endif
-                @if (($item['potongan_zakat_profesi'] ?? 0) > 0)
-                    <div class="slip-row-item"><span class="item-label">Potongan Zakat Profesi</span><span class="item-val" style="color:#DC2626;">Rp {{ number_format($item['potongan_zakat_profesi'], 0, ',', '.') }}</span></div>
-                @endif
-            </div>
-            <div class="slip-col-total" style="background:#FEF2F2; border-color:#FECACA;">
-                <span>TOTAL POTONGAN (B)</span>
-                <span class="tot-val" style="color:#DC2626;">Rp {{ number_format($item['total_potongan'], 0, ',', '.') }}</span>
-            </div>
-        </div>
-    </div>
-
-    <!-- Box Take Home Pay (Insentif Bersih) -->
-    <div class="slip-thp-wrapper">
-        <div>
-            <div class="slip-thp-title">TOTAL INSENTIF DITERIMA (BERSIH = A - B)</div>
-            <div class="slip-thp-terbilang">Terbilang: # {{ terbilang($item['insentif_diterima']) }} Rupiah #</div>
-        </div>
-        <div class="slip-thp-nominal">
-            Rp {{ number_format($item['insentif_diterima'], 0, ',', '.') }}
-        </div>
-    </div>
-
-    <!-- Tanda Tangan Pengesahan Resmi -->
-    <div class="slip-signatures-grid">
-        <div class="slip-sig-box">
-            <div class="slip-sig-role">Penerima / Pegawai,</div>
-            <div class="slip-sig-spacer"></div>
-            <div class="slip-sig-name">{{ $item['nama'] }}</div>
-            <div class="slip-sig-nip">NIK. {{ $item['nik'] }}</div>
-        </div>
-        <div class="slip-sig-box">
-            <div class="slip-sig-role">Indramayu, {{ \Carbon\Carbon::now()->translatedFormat('d F Y') }}<br>Bagian Keuangan & Penggajian,</div>
-            <div class="slip-sig-spacer"></div>
-            <div class="slip-sig-name">{{ $item['disetujui_oleh'] ?? 'PERUMDAM Tirta Darma Ayu' }}</div>
-            <div class="slip-sig-nip">Kasubag / Staf Keuangan</div>
-        </div>
-    </div>
-</div>
+@include('partials.official-slip', [
+    'judul' => 'DAFTAR INSENTIF & POTONGAN PERIODE : ' . strtoupper($item['periode'] ?? ''),
+    'data' => $item,
+    'pendapatanRows' => $insPendapatan,
+    'potonganPendapatanRows' => $insPotonganPend,
+    'potonganNonPendapatanRows' => $insPotonganNon,
+    'totalPendapatan' => $item['total_insentif'] ?? null,
+    'pendapatanDiterima' => $item['insentif_diterima'] ?? null,
+    'labelDiterima' => 'JUMLAH INSENTIF DITERIMA',
+])
 @endsection

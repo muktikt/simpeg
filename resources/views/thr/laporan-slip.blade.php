@@ -40,109 +40,11 @@
             $totalPotongan = ($item['total_potongan_pendapatan'] ?? 0) + ($item['total_potongan_non_pendapatan'] ?? 0);
         @endphp
 
-        <!-- OFFICIAL SLIP DOCUMENT CONTAINER (PRINT & SCREEN) -->
-        <div class="slip-doc-container">
-            <!-- Header KOP Resmi -->
-            <div class="slip-header-kop">
-                <div class="slip-kop-brand">
-                    <div class="slip-kop-company">PERUMDAM Tirta Darma Ayu</div>
-                    <div class="slip-kop-sub">KABUPATEN INDRAMAYU &middot; JAWA BARAT</div>
-                    <div class="slip-kop-address">Jl. Letjen Suprapto No25/E, Indramayu 45214 Telp (0234) 271322</div>
-                </div>
-                <div class="slip-kop-title-box">
-                    <div class="slip-title-text">SLIP TUNJANGAN HARI RAYA (THR)</div>
-                    <div class="slip-badge-periode">TAHUN ANGGARAN: {{ $tahun }}</div>
-                </div>
-            </div>
-
-            <!-- Info Pegawai -->
-            <div class="slip-emp-box">
-                <div style="display:flex; flex-direction:column; gap:6px;">
-                    <div class="slip-emp-item"><span class="k">NIK</span><span class="sep">:</span><span class="v">{{ $item['nik'] }}</span></div>
-                    <div class="slip-emp-item"><span class="k">Nama Pegawai</span><span class="sep">:</span><span class="v" style="font-size:14px; color:#0F2A3D;">{{ $item['nama'] }}</span></div>
-                    <div class="slip-emp-item"><span class="k">Jabatan</span><span class="sep">:</span><span class="v">{{ $item['jabatan'] ?? 'Pegawai' }}</span></div>
-                </div>
-                <div style="display:flex; flex-direction:column; gap:6px;">
-                    <div class="slip-emp-item"><span class="k">Unit Kerja</span><span class="sep">:</span><span class="v">{{ $item['unit_kerja'] ?? '-' }}</span></div>
-                    <div class="slip-emp-item"><span class="k">Kategori</span><span class="sep">:</span><span class="v">{{ \App\Http\Controllers\ThrController::KATEGORI[$item['kategori'] ?? 'pegawai'] ?? ($item['kategori'] ?? 'Pegawai Tetap') }}</span></div>
-                    <div class="slip-emp-item"><span class="k">Status Slip</span><span class="sep">:</span><span class="v" style="color:#16A34A;">Terbit & Final</span></div>
-                </div>
-            </div>
-
-            <!-- Rincian 2 Kolom Vertikal (Pendapatan & Potongan) -->
-            <div class="slip-columns-wrap">
-                <!-- Kolom Penerimaan -->
-                <div class="slip-col-card">
-                    <div class="slip-col-head" style="color:#0369A1; background:#F0F9FF; border-color:#BAE6FD;">
-                        I. PENERIMAAN THR
-                    </div>
-                    <div class="slip-items-body">
-                        @if(($item['gapok'] ?? 0) > 0)
-                            <div class="slip-row-item"><span class="item-label">Gaji Pokok</span><span class="item-val">Rp {{ number_format($item['gapok'], 0, ',', '.') }}</span></div>
-                        @endif
-                        @if(($item['tunjangan_jabatan'] ?? 0) > 0)
-                            <div class="slip-row-item"><span class="item-label">Tunjangan Jabatan</span><span class="item-val">Rp {{ number_format($item['tunjangan_jabatan'], 0, ',', '.') }}</span></div>
-                        @endif
-                        @if(($item['tunjangan_transport'] ?? 0) > 0)
-                            <div class="slip-row-item"><span class="item-label">Tunjangan Transport</span><span class="item-val">Rp {{ number_format($item['tunjangan_transport'], 0, ',', '.') }}</span></div>
-                        @endif
-                    </div>
-                    <div class="slip-col-total" style="background:#F0F9FF; border-color:#BAE6FD;">
-                        <span>TOTAL PENDAPATAN (A)</span>
-                        <span class="tot-val" style="color:#0369A1;">Rp {{ number_format($item['total_pendapatan'] ?? $item['gapok'], 0, ',', '.') }}</span>
-                    </div>
-                </div>
-
-                <!-- Kolom Potongan -->
-                <div class="slip-col-card">
-                    <div class="slip-col-head" style="color:#B91C1C; background:#FEF2F2; border-color:#FECACA;">
-                        II. POTONGAN THR
-                    </div>
-                    <div class="slip-items-body">
-                        @if(($item['potongan_pajak'] ?? 0) > 0)
-                            <div class="slip-row-item"><span class="item-label">Potongan Pajak (PPh21)</span><span class="item-val" style="color:#DC2626;">Rp {{ number_format($item['potongan_pajak'], 0, ',', '.') }}</span></div>
-                        @endif
-                        @if(($item['potongan_kas'] ?? 0) > 0)
-                            <div class="slip-row-item"><span class="item-label">Potongan Kas / Pinjaman</span><span class="item-val" style="color:#DC2626;">Rp {{ number_format($item['potongan_kas'], 0, ',', '.') }}</span></div>
-                        @endif
-                        @if(($item['potongan_keu_minus'] ?? 0) > 0)
-                            <div class="slip-row-item"><span class="item-label">Potongan Keuangan</span><span class="item-val" style="color:#DC2626;">Rp {{ number_format($item['potongan_keu_minus'], 0, ',', '.') }}</span></div>
-                        @endif
-                    </div>
-                    <div class="slip-col-total" style="background:#FEF2F2; border-color:#FECACA;">
-                        <span>TOTAL POTONGAN (B)</span>
-                        <span class="tot-val" style="color:#DC2626;">Rp {{ number_format($totalPotongan, 0, ',', '.') }}</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Box Take Home Pay (THR Bersih) -->
-            <div class="slip-thp-wrapper">
-                <div>
-                    <div class="slip-thp-title">TOTAL THR DITERIMA (BERSIH = A - B)</div>
-                    <div class="slip-thp-terbilang">Terbilang: # {{ terbilang($thrNominal) }} Rupiah #</div>
-                </div>
-                <div class="slip-thp-nominal">
-                    Rp {{ number_format($thrNominal, 0, ',', '.') }}
-                </div>
-            </div>
-
-            <!-- Tanda Tangan Pengesahan Resmi -->
-            <div class="slip-signatures-grid">
-                <div class="slip-sig-box">
-                    <div class="slip-sig-role">Penerima / Pegawai,</div>
-                    <div class="slip-sig-spacer"></div>
-                    <div class="slip-sig-name">{{ $item['nama'] }}</div>
-                    <div class="slip-sig-nip">NIK. {{ $item['nik'] }}</div>
-                </div>
-                <div class="slip-sig-box">
-                    <div class="slip-sig-role">Indramayu, {{ \Carbon\Carbon::now()->translatedFormat('d F Y') }}<br>Bagian Keuangan & Penggajian,</div>
-                    <div class="slip-sig-spacer"></div>
-                    <div class="slip-sig-name">PERUMDAM Tirta Darma Ayu</div>
-                    <div class="slip-sig-nip">Kasubag / Staf Keuangan</div>
-                </div>
-            </div>
-        </div>
+        @include('partials.official-slip', [
+            'judul' => 'DAFTAR TUNJANGAN HARI RAYA TAHUN : ' . $tahun,
+            'data' => $item,
+            'labelDiterima' => 'JUMLAH PENDAPATAN DITERIMA',
+        ])
 
         @if (!empty($riwayatThr) && count($riwayatThr) > 0)
             <div class="panel" style="max-width:840px; margin:0 auto 32px;">
