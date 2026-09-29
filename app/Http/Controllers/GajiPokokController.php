@@ -39,7 +39,7 @@ class GajiPokokController extends Controller
         ];
     }
 
-    protected function all(): array
+    public function all(): array
     {
         $file = $this->storageFile();
         if (file_exists($file)) {
