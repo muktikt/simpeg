@@ -338,11 +338,33 @@ class GajiProsesController extends Controller
             return null;
         }
 
-        return collect($this->pegawaiList())->first(function ($p) use ($id) {
+        $pegawai = collect($this->pegawaiList())->first(function ($p) use ($id) {
             return (string) ($p['id'] ?? '') === (string) $id
                 || (string) ($p['db_id'] ?? '') === (string) $id
                 || (string) ($p['nik'] ?? '') === (string) $id;
         });
+
+        if ($pegawai) {
+            $dbId = $pegawai['db_id'] ?? null;
+            if (! $dbId && ! empty($pegawai['nik'])) {
+                try {
+                    $dbId = \Illuminate\Support\Facades\DB::table('pegawai')->where('nik', $pegawai['nik'])->value('id');
+                    $pegawai['db_id'] = $dbId;
+                } catch (\Throwable $e) {}
+            }
+
+            if ($dbId && empty($pegawai['keluarga'])) {
+                try {
+                    $pegawai['keluarga'] = \Illuminate\Support\Facades\DB::table('keluarga')
+                        ->where('pegawai_id', $dbId)
+                        ->get()
+                        ->map(fn ($r) => (array) $r)
+                        ->toArray();
+                } catch (\Throwable $e) {}
+            }
+        }
+
+        return $pegawai;
     }
 
     /**
@@ -354,19 +376,60 @@ class GajiProsesController extends Controller
         $pegawai = $this->pegawaiById($pegawaiId);
         $keluarga = $pegawai['keluarga'] ?? [];
 
-        $kawin = collect($keluarga)->contains(fn ($k) => $k['hubungan'] === 'Istri/Suami');
-        $jmlAnak = min(collect($keluarga)->where('hubungan', 'Anak')->count(), 2);
-        $jmlAnakPajak = min(collect($keluarga)->where('hubungan', 'Anak')->count(), 3);
+        $kawin = collect($keluarga)->contains(function ($k) {
+            $hub = strtolower(trim((string) ($k['hubungan'] ?? '')));
+            return in_array($hub, ['istri/suami', 'istri', 'suami']);
+        });
+        // Filter anggota keluarga dengan hubungan "Anak"
+        $anakList = collect($keluarga)->filter(function ($k) {
+            $hub = strtolower(trim((string) ($k['hubungan'] ?? '')));
+            return $hub === 'anak';
+        });
+
+        $totalAnak = $anakList->count();
+
+        // Hitung anak yang memenuhi syarat tunjangan (Usia < 21 th, atau < 25 th jika status kuliah)
+        $refBulan = (int) ($request?->input('bulan') ?: now()->month);
+        $refTahun = (int) ($request?->input('tahun') ?: now()->year);
+        $refDate = new \DateTime(sprintf('%04d-%02d-01', $refTahun, $refBulan));
+
+        $anakEligibleCount = $anakList->filter(function ($k) use ($refDate) {
+            $tglLahirStr = $k['tanggal_lahir'] ?? $k['tgl_lahir'] ?? null;
+            if (! $tglLahirStr) {
+                return true;
+            }
+            try {
+                $bDate = new \DateTime($tglLahirStr);
+                $age = $bDate->diff($refDate)->y;
+                $isKuliah = in_array(strtolower(trim((string) ($k['pekerjaan'] ?? $k['status_kuliah'] ?? ''))), ['kuliah']);
+                return ($age < 21) || ($age < 25 && $isKuliah);
+            } catch (\Throwable $e) {
+                return true;
+            }
+        })->count();
+
+        // Tunjangan anak di payroll dibatasi maksimal 2 anak
+        $jmlAnakTunjangan = min($anakEligibleCount, 2);
+
+        // Tanggungan anak untuk PTKP pajak maksimal 3 anak
+        $jmlAnakPajak = min($totalAnak, 3);
 
         $jmlIstri = $kawin ? 1 : 0;
-        $kodePtkp = match ($jmlIstri + $jmlAnakPajak + 1) {
-            1 => 'TK',
-            2 => 'K',
-            3 => 'K1',
-            4 => 'K2',
-            5 => 'K3',
-            default => 'K3',
-        };
+        if ($kawin) {
+            $kodePtkp = match ($jmlAnakPajak) {
+                0 => 'K',
+                1 => 'K1',
+                2 => 'K2',
+                default => 'K3',
+            };
+        } else {
+            $kodePtkp = match ($jmlAnakPajak) {
+                0 => 'TK',
+                1 => 'TK1',
+                2 => 'TK2',
+                default => 'TK3',
+            };
+        }
 
         $potonganKeu = null;
         if (! empty($pegawai['nik'])) {
@@ -379,8 +442,8 @@ class GajiProsesController extends Controller
             } catch (\Throwable $e) {}
         }
 
-        $bulan = (int) ($request?->input('bulan', now()->month));
-        $tahun = (int) ($request?->input('tahun', now()->year));
+        $bulan = (int) ($request?->input('bulan') ?: now()->month);
+        $tahun = (int) ($request?->input('tahun') ?: now()->year);
         $prefix = sprintf('%04d-%02d', $tahun, $bulan);
         $monthPadded = str_pad($bulan, 2, '0', STR_PAD_LEFT);
 
@@ -431,7 +494,9 @@ class GajiProsesController extends Controller
         return [
             'kawin' => $kawin,
             'jml_istri' => $jmlIstri,
-            'jml_anak' => $jmlAnak,
+            'total_anak' => $totalAnak,
+            'jml_anak' => $jmlAnakTunjangan,
+            'jml_anak_tunjangan' => $jmlAnakTunjangan,
             'jml_anak_pajak' => $jmlAnakPajak,
             'kode_ptkp' => $kodePtkp,
             'potongan_keu' => $potonganKeu,

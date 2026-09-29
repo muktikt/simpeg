@@ -101,7 +101,25 @@
 </form>
 
 <script>
-const pegawaiKeluargaUrl = @json(route('thr.hitung-keluarga', ['pegawaiId' => '__ID__']));
+const pegawaiKeluargaUrl = @json(route('thr.hitung-keluarga', ['pegawaiId' => '__ID__'], false));
+let currentKeluargaData = null;
+
+function updateTunjanganKeluarga() {
+    if (!currentKeluargaData) return;
+    const gapokField = document.getElementById('gapok');
+    const gapok = parseFloat(gapokField ? gapokField.value : 0) || 0;
+
+    const tunjIstriField = document.getElementById('tunjangan_istri');
+    if (tunjIstriField) {
+        tunjIstriField.value = currentKeluargaData.kawin ? Math.round(gapok * 0.1) : 0;
+    }
+
+    const tunjAnakField = document.getElementById('tunjangan_anak');
+    if (tunjAnakField) {
+        const jmlAnak = currentKeluargaData.jml_anak || 0;
+        tunjAnakField.value = jmlAnak > 0 ? Math.round(gapok * 0.02 * jmlAnak) : 0;
+    }
+}
 
 async function onPegawaiChange() {
     const pegawaiId = document.getElementById('pegawai_id').value;
@@ -109,6 +127,7 @@ async function onPegawaiChange() {
 
     if (!pegawaiId) {
         info.value = 'Pilih pegawai dulu';
+        currentKeluargaData = null;
         return;
     }
 
@@ -116,18 +135,22 @@ async function onPegawaiChange() {
 
     try {
         const res = await fetch(pegawaiKeluargaUrl.replace('__ID__', pegawaiId));
-        const data = await res.json();
-
-        info.value = (data.kawin ? 'Kawin' : 'Belum Kawin') + ', Anak: ' + data.jml_anak + ', PTKP: ' + data.kode_ptkp;
-
-        const gapokField = document.getElementById('gapok');
-        const tunjIstriField = document.getElementById('tunjangan_istri');
-        if (gapokField && tunjIstriField && data.kawin) {
-            const gapok = parseFloat(gapokField.value) || 0;
-            tunjIstriField.value = Math.round(gapok * 0.1);
-            hitungTotal();
+        if (!res.ok) {
+            throw new Error('HTTP ' + res.status);
         }
+        const data = await res.json();
+        currentKeluargaData = data;
+
+        let infoAnak = 'Anak: ' + (data.total_anak !== undefined ? data.total_anak : (data.jml_anak || 0));
+        if (data.total_anak !== undefined && data.jml_anak !== undefined && data.total_anak > data.jml_anak) {
+            infoAnak = 'Total Anak: ' + data.total_anak + ' (' + data.jml_anak + ' dapat tunjangan)';
+        }
+        info.value = (data.kawin ? 'Kawin' : 'Belum Kawin') + ', ' + infoAnak + ', PTKP: ' + (data.kode_ptkp || '-');
+
+        updateTunjanganKeluarga();
+        hitungTotal();
     } catch (e) {
+        console.error('Error hitung data keluarga:', e);
         info.value = 'Gagal menghitung data keluarga';
     }
 }
@@ -151,6 +174,11 @@ function hitungTotal() {
     document.getElementById('total-potongan-display').textContent = formatRupiah(totalPotongan);
     document.getElementById('thr-diterima-display').textContent = formatRupiah(totalPendapatan - totalPotongan);
 }
+
+document.getElementById('gapok')?.addEventListener('input', function() {
+    updateTunjanganKeluarga();
+    hitungTotal();
+});
 
 hitungTotal();
 </script>
