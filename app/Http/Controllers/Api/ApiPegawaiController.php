@@ -32,14 +32,18 @@ class ApiPegawaiController extends Controller
         $pegawaiId = $request->header('X-Pegawai-Id') ?? $request->query('pegawai_id') ?? $request->query('id');
 
         if ($nik) {
-            $pegawai = DB::table('pegawai')->where('nik', $nik)->first();
+            $pegawai = Cache::remember("pegawai_nik_{$nik}", 180, function () use ($nik) {
+                return DB::table('pegawai')->where('nik', $nik)->first();
+            });
             if ($pegawai) {
                 return $pegawai;
             }
         }
 
         if ($pegawaiId) {
-            $pegawai = DB::table('pegawai')->where('id', $pegawaiId)->first();
+            $pegawai = Cache::remember("pegawai_id_{$pegawaiId}", 180, function () use ($pegawaiId) {
+                return DB::table('pegawai')->where('id', $pegawaiId)->first();
+            });
             if ($pegawai) {
                 return $pegawai;
             }
@@ -823,115 +827,121 @@ class ApiPegawaiController extends Controller
      */
     public function getLembur(Request $request)
     {
+        $start = microtime(true);
         $pegawai = $this->getPegawaiByRequest($request);
         if (! $pegawai) {
             return response()->json(['success' => false, 'message' => 'Pegawai tidak ditemukan.'], 404);
         }
 
-        $bulanNames = [
-            1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
-            5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
-            9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember',
-        ];
+        $tPeg = round((microtime(true) - $start) * 1000, 2);
+        $cacheKey = "api_lembur_{$pegawai->id}";
+        $isHit = Cache::has($cacheKey);
+        $finalData = Cache::remember($cacheKey, 60, function () use ($pegawai) {
+            $bulanNames = [
+                1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
+                5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
+                9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember',
+            ];
 
-        $allItems = collect();
+            $allItems = collect();
 
-        // 1. Ambil dari Prestasi (Prioritas tertinggi: input manual SDM)
-        try {
-            $prestasiRows = DB::table('prestasi')
-                ->where('pegawai_id', $pegawai->id)
-                ->orderByDesc('tanggal')
-                ->orderByDesc('id')
-                ->get();
+            // 1. Ambil dari Prestasi (Prioritas tertinggi: input manual SDM)
+            try {
+                $prestasiRows = DB::table('prestasi')
+                    ->where('pegawai_id', $pegawai->id)
+                    ->orderByDesc('tanggal')
+                    ->orderByDesc('id')
+                    ->get();
 
-            foreach ($prestasiRows as $r) {
-                $meta = json_decode($r->keterangan ?? '{}', true) ?: [];
-                $jam = (float) ($meta['jam_lembur'] ?? 0);
-                $nominal = (int) ($meta['nominal_lembur'] ?? round($jam * \App\Http\Controllers\PrestasiController::RATE_LEMBUR_PER_JAM));
+                foreach ($prestasiRows as $r) {
+                    $meta = json_decode($r->keterangan ?? '{}', true) ?: [];
+                    $jam = (float) ($meta['jam_lembur'] ?? 0);
+                    $nominal = (int) ($meta['nominal_lembur'] ?? round($jam * \App\Http\Controllers\PrestasiController::RATE_LEMBUR_PER_JAM));
 
-                if ($jam > 0 || $nominal > 0) {
-                    $bName = '-';
-                    if (!empty($r->tanggal)) {
-                        $t = strtotime($r->tanggal);
-                        if ($t) {
-                            $m = (int) date('n', $t);
-                            $y = date('Y', $t);
-                            $bName = ($bulanNames[$m] ?? date('F', $t)) . " $y";
+                    if ($jam > 0 || $nominal > 0) {
+                        $bName = '-';
+                        if (!empty($r->tanggal)) {
+                            $t = strtotime($r->tanggal);
+                            if ($t) {
+                                $m = (int) date('n', $t);
+                                $y = date('Y', $t);
+                                $bName = ($bulanNames[$m] ?? date('F', $t)) . " $y";
+                            }
                         }
-                    }
 
+                        $allItems->push([
+                            'id' => $r->id,
+                            'bulan' => $bName,
+                            'jam_lembur' => $jam,
+                            'uang_lembur' => $nominal,
+                            'tanggal' => $r->tanggal,
+                            'keterangan' => $meta['desc'] ?? ($r->judul ?? 'Lembur Prestasi Kerja'),
+                            'source' => 'prestasi',
+                            'created_at' => $r->created_at,
+                        ]);
+                    }
+                }
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Api getLembur prestasi failed: ' . $e->getMessage());
+            }
+
+            // 2. Ambil dari tabel lembur
+            try {
+                $lemburRows = DB::table('lembur')
+                    ->where('pegawai_id', $pegawai->id)
+                    ->orderByDesc('created_at')
+                    ->orderByDesc('id')
+                    ->get();
+
+                foreach ($lemburRows as $r) {
                     $allItems->push([
                         'id' => $r->id,
-                        'bulan' => $bName,
-                        'jam_lembur' => $jam,
-                        'uang_lembur' => $nominal,
-                        'tanggal' => $r->tanggal,
-                        'keterangan' => $meta['desc'] ?? ($r->judul ?? 'Lembur Prestasi Kerja'),
-                        'source' => 'prestasi',
+                        'bulan' => $r->bulan ?? '-',
+                        'jam_lembur' => (float) ($r->jam_lembur ?? 0),
+                        'uang_lembur' => (int) ($r->uang_lembur ?? 0),
+                        'tanggal' => $r->created_at ? date('Y-m-d', strtotime($r->created_at)) : null,
+                        'keterangan' => 'Uang Lembur Pegawai',
+                        'source' => 'lembur',
                         'created_at' => $r->created_at,
                     ]);
                 }
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Api getLembur lembur table failed: ' . $e->getMessage());
             }
-        } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::warning('Api getLembur prestasi failed: ' . $e->getMessage());
-        }
 
-        // 2. Ambil dari tabel lembur
-        try {
-            $lemburRows = DB::table('lembur')
-                ->where('pegawai_id', $pegawai->id)
-                ->orderByDesc('created_at')
-                ->orderByDesc('id')
-                ->get();
+            // 3. Fallback dari tabel payroll
+            try {
+                $payrollRows = DB::table('payroll')
+                    ->where('pegawai_id', $pegawai->id)
+                    ->where('lembur', '>', 0)
+                    ->orderByDesc('tahun')
+                    ->orderByDesc('bulan')
+                    ->get();
 
-            foreach ($lemburRows as $r) {
-                $allItems->push([
-                    'id' => $r->id,
-                    'bulan' => $r->bulan ?? '-',
-                    'jam_lembur' => (float) ($r->jam_lembur ?? 0),
-                    'uang_lembur' => (int) ($r->uang_lembur ?? 0),
-                    'tanggal' => $r->created_at ? date('Y-m-d', strtotime($r->created_at)) : null,
-                    'keterangan' => 'Uang Lembur Pegawai',
-                    'source' => 'lembur',
-                    'created_at' => $r->created_at,
-                ]);
+                foreach ($payrollRows as $r) {
+                    $bName = $bulanNames[(int) $r->bulan] ?? ('Bulan ' . $r->bulan);
+                    $periode = $r->periode ?? "$bName {$r->tahun}";
+                    $uang = (int) $r->lembur;
+                    $jam = round($uang / \App\Http\Controllers\PrestasiController::RATE_LEMBUR_PER_JAM, 1);
+
+                    $allItems->push([
+                        'id' => $r->id,
+                        'bulan' => $periode,
+                        'jam_lembur' => $jam,
+                        'uang_lembur' => $uang,
+                        'tanggal' => null,
+                        'keterangan' => "Payroll $periode",
+                        'source' => 'payroll',
+                        'created_at' => $r->created_at ?? null,
+                    ]);
+                }
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Api getLembur payroll failed: ' . $e->getMessage());
             }
-        } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::warning('Api getLembur lembur table failed: ' . $e->getMessage());
-        }
 
-        // 3. Fallback dari tabel payroll
-        try {
-            $payrollRows = DB::table('payroll')
-                ->where('pegawai_id', $pegawai->id)
-                ->where('lembur', '>', 0)
-                ->orderByDesc('tahun')
-                ->orderByDesc('bulan')
-                ->get();
-
-            foreach ($payrollRows as $r) {
-                $bName = $bulanNames[(int) $r->bulan] ?? ('Bulan ' . $r->bulan);
-                $periode = $r->periode ?? "$bName {$r->tahun}";
-                $uang = (int) $r->lembur;
-                $jam = round($uang / \App\Http\Controllers\PrestasiController::RATE_LEMBUR_PER_JAM, 1);
-
-                $allItems->push([
-                    'id' => $r->id,
-                    'bulan' => $periode,
-                    'jam_lembur' => $jam,
-                    'uang_lembur' => $uang,
-                    'tanggal' => null,
-                    'keterangan' => "Payroll $periode",
-                    'source' => 'payroll',
-                    'created_at' => $r->created_at ?? null,
-                ]);
-            }
-        } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::warning('Api getLembur payroll failed: ' . $e->getMessage());
-        }
-
-        // Urutkan & prioritaskan prestasi -> lembur -> payroll per bulan
-        $finalData = $allItems->unique('bulan')->values();
+            // Urutkan & prioritaskan prestasi -> lembur -> payroll per bulan
+            return $allItems->unique('bulan')->values()->all();
+        });
 
         return response()->json([
             'success' => true,
@@ -980,6 +990,8 @@ class ApiPegawaiController extends Controller
             'uang_lembur' => $uangLembur,
             'created_at' => now(),
         ]);
+
+        Cache::forget("api_lembur_{$pegawai->id}");
 
         return response()->json([
             'success' => true,
