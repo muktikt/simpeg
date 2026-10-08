@@ -13,24 +13,35 @@ class PengaduanController extends Controller
     protected function getUserContext(): array
     {
         $sessionUser = session('simpeg_user', []);
-        $nik = $sessionUser['nik'] ?? '';
+        $nik = (string) ($sessionUser['nik'] ?? '');
         $userLevel = $sessionUser['userlevel'] ?? '5';
         $rolePengaduan = $sessionUser['role_pengaduan'] ?? 'pegawai';
         $divisiKadiv = $sessionUser['divisi_kadiv'] ?? null;
         $nama = $sessionUser['nama_peg'] ?? 'Pegawai';
 
-        // Jika belum ada di session, deteksi langsung dari tabel pegawai
-        if (empty($sessionUser['role_pengaduan']) && !empty($nik)) {
+        // Pastikan mapping NIK struktural Pengaduan selalu akurat
+        if ($nik === '1711161') {
+            $rolePengaduan = 'kspi';
+            $divisiKadiv = null;
+        } elseif ($nik === '1711571') {
+            $rolePengaduan = 'kadiv';
+            $divisiKadiv = 'administrasi';
+        } elseif ($nik === '1711251') {
+            $rolePengaduan = 'kadiv';
+            $divisiKadiv = 'teknik';
+        } elseif ($rolePengaduan === 'kspi' && $nik !== '1711161') {
+            // KSPI HANYA NIK 1711161
+            $rolePengaduan = 'pegawai';
+        } elseif (empty($sessionUser['role_pengaduan']) && !empty($nik)) {
             try {
                 $peg = DB::table('pegawai')->where('nik', $nik)->first();
                 if ($peg) {
                     $dbRole = strtolower($peg->role ?? '');
-                    $jabatanLower = strtolower($peg->jabatan ?? '');
                     $divisiKadiv = $peg->divisi_kadiv ?? null;
 
                     if ($dbRole === 'direktur') {
                         $rolePengaduan = 'dirut';
-                    } elseif ($dbRole === 'kspi') {
+                    } elseif ($dbRole === 'kspi' && $nik === '1711161') {
                         $rolePengaduan = 'kspi';
                     } elseif ($dbRole === 'tpdpk') {
                         $rolePengaduan = 'tpdpk';

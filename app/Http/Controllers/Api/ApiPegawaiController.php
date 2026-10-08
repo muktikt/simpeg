@@ -19,8 +19,8 @@ class ApiPegawaiController extends Controller
         '1711296' => 'keuangan123',
         '1711145' => 'keuangan123',
         '1711161' => 'kspi123',
-        '1711446' => 'kadivteknik123',
-        '1711479' => 'kadivadmin123',
+        '1711571' => 'kadivadmin123',
+        '1711251' => 'kadivteknik123',
     ];
 
     /**
@@ -112,6 +112,7 @@ class ApiPegawaiController extends Controller
         $userLevel = '5';
         $dbRole = strtolower($pegawai->role ?? '');
         $jabatanLower = strtolower($pegawai->jabatan ?? '');
+        $divisiKadiv = $pegawai->divisi_kadiv ?? null;
 
         if ($dbRole === 'direktur' || str_contains($jabatanLower, 'direktur utama')) {
             $roleKode = 'DIRUT';
@@ -122,6 +123,20 @@ class ApiPegawaiController extends Controller
         } elseif ($dbRole === 'keuangan' || $dbRole === 'keu' || str_contains($jabatanLower, 'keuangan')) {
             $roleKode = 'KEUANGAN';
             $userLevel = '2';
+        } elseif ($nik === '1711161' || ($dbRole === 'kspi' && $nik === '1711161')) {
+            $roleKode = 'KSPI';
+            $userLevel = '5';
+        } elseif ($nik === '1711571' || $nik === '1711251' || $dbRole === 'kadiv' || $dbRole === 'kadivkategori') {
+            $roleKode = 'KADIV';
+            $userLevel = '5';
+            if ($nik === '1711571') {
+                $divisiKadiv = 'administrasi';
+            } elseif ($nik === '1711251') {
+                $divisiKadiv = 'teknik';
+            }
+        } elseif ($dbRole === 'tpdpk') {
+            $roleKode = 'TPDPK';
+            $userLevel = '5';
         } else {
             $roleKode = 'PEGAWAI';
             $userLevel = '5';
@@ -142,6 +157,7 @@ class ApiPegawaiController extends Controller
                     'golongan' => $pegawai->golongan ?? '',
                     'userlevel' => $userLevel,
                     'role' => $roleKode,
+                    'divisi_kadiv' => $divisiKadiv,
                 ],
                 'token' => $token,
             ]

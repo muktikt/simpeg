@@ -216,10 +216,22 @@ class OneSignalService
 
         $cleanIsi = mb_substr(strip_tags($isi), 0, 160);
 
+        $expandedRoles = [];
+        foreach ($roles as $r) {
+            $rLow = strtolower(trim($r));
+            $expandedRoles[] = $rLow;
+            if ($rLow === 'kadiv') {
+                $expandedRoles[] = 'kadivkategori';
+            } elseif ($rLow === 'kadivkategori') {
+                $expandedRoles[] = 'kadiv';
+            }
+        }
+        $expandedRoles = array_unique($expandedRoles);
+
         // 1. Simpan ke tabel `notifikasi` Supabase (agar lonceng notifikasi user bertambah)
         try {
             $pIds = DB::table('pegawai')
-                ->whereIn(DB::raw('LOWER(role)'), array_map('strtolower', $roles))
+                ->whereIn(DB::raw('LOWER(role)'), $expandedRoles)
                 ->pluck('id')
                 ->toArray();
             self::simpanKeTabelNotifikasi($pIds, $judul, $cleanIsi);

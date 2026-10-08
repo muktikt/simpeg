@@ -48,14 +48,24 @@
         </div>
     </div>
 
-    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:14px;">
-        <div class="field">
-            <label for="foto_bukti" style="font-weight:600; font-size:12.5px; display:block; margin-bottom:4px;">Foto Bukti (Maks 5MB)</label>
-            <input type="file" id="foto_bukti" name="foto_bukti[]" multiple accept="image/*" style="width:100%; font-size:12px;">
+    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-bottom:14px; align-items:start;">
+        <div class="field" style="display:flex; flex-direction:column;">
+            <label for="foto_bukti" style="font-weight:600; font-size:12.5px; display:flex; flex-direction:column; justify-content:flex-end; min-height:36px; margin-bottom:6px; line-height:1.25;">
+                <span>Foto Bukti</span>
+                <span style="font-size:11px; font-weight:400; color:var(--text-muted);">(Maks 5MB)</span>
+            </label>
+            <div class="input-wrap" style="width:100%;">
+                <input type="file" id="foto_bukti" name="foto_bukti[]" multiple accept="image/*" style="width:100%; font-size:11.5px; padding:6px 8px; border:1px solid var(--border); border-radius:6px; background:#f8fafc; box-sizing:border-box; height:38px; cursor:pointer;">
+            </div>
         </div>
-        <div class="field">
-            <label for="dokumen_pendukung" style="font-weight:600; font-size:12.5px; display:block; margin-bottom:4px;">Dokumen PDF/Word (Maks 10MB)</label>
-            <input type="file" id="dokumen_pendukung" name="dokumen_pendukung[]" multiple accept=".pdf,.doc,.docx" style="width:100%; font-size:12px;">
+        <div class="field" style="display:flex; flex-direction:column;">
+            <label for="dokumen_pendukung" style="font-weight:600; font-size:12.5px; display:flex; flex-direction:column; justify-content:flex-end; min-height:36px; margin-bottom:6px; line-height:1.25;">
+                <span>Dokumen PDF/Word</span>
+                <span style="font-size:11px; font-weight:400; color:var(--text-muted);">(Maks 10MB)</span>
+            </label>
+            <div class="input-wrap" style="width:100%;">
+                <input type="file" id="dokumen_pendukung" name="dokumen_pendukung[]" multiple accept=".pdf,.doc,.docx" style="width:100%; font-size:11.5px; padding:6px 8px; border:1px solid var(--border); border-radius:6px; background:#f8fafc; box-sizing:border-box; height:38px; cursor:pointer;">
+            </div>
         </div>
     </div>
 

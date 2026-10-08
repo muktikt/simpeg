@@ -20,8 +20,8 @@ class LoginController extends Controller
         '1711296' => 'keuangan123',
         '1711145' => 'keuangan123',
         '1711161' => 'kspi123',
-        '1711446' => 'kadivteknik123',
-        '1711479' => 'kadivadmin123',
+        '1711571' => 'kadivadmin123',
+        '1711251' => 'kadivteknik123',
     ];
 
     /**
@@ -100,7 +100,7 @@ class LoginController extends Controller
         }
 
         // 3. Tentukan userlevel & role pengaduan murni dari kolom database (pegawai.role & pegawai.divisi_kadiv)
-        // dengan fallback otomatis untuk NIK inti (SDM, Keuangan, Direksi) jika role di DB lokal belum sinkron:
+        // dengan fallback otomatis untuk NIK inti (SDM, Keuangan, Direksi, KSPI, Kadiv SPI):
         $masterRoles = [
             '1711001' => ['role' => 'direktur', 'userlevel' => '7', 'role_pengaduan' => 'dirut'],
             '1711002' => ['role' => 'direktur', 'userlevel' => '7', 'role_pengaduan' => 'dirut'],
@@ -112,32 +112,51 @@ class LoginController extends Controller
             '1711567' => ['role' => 'sdm', 'userlevel' => '1', 'role_pengaduan' => 'sdm'],
             '1711296' => ['role' => 'keuangan', 'userlevel' => '2', 'role_pengaduan' => 'keuangan'],
             '1711145' => ['role' => 'keuangan', 'userlevel' => '2', 'role_pengaduan' => 'keuangan'],
+            '1711161' => ['role' => 'kspi', 'userlevel' => '5', 'role_pengaduan' => 'kspi'],
+            '1711571' => ['role' => 'kadivKategori', 'userlevel' => '5', 'role_pengaduan' => 'kadiv', 'divisi_kadiv' => 'administrasi'],
+            '1711251' => ['role' => 'kadivKategori', 'userlevel' => '5', 'role_pengaduan' => 'kadiv', 'divisi_kadiv' => 'teknik'],
         ];
 
         $dbRole = strtolower(trim($pegawai->role ?? ''));
         $divisiKadiv = $pegawai->divisi_kadiv ?? null;
 
-        // Jika NIK terdaftar di masterRoles tapi kolom role di DB lokal belum terisi / masih pegawai biasa,
-        // gunakan masterRoles dan sinkronkan otomatis ke DB pegawai:
-        if (isset($masterRoles[$nik]) && ($dbRole === '' || $dbRole === 'pegawai')) {
-            $dbRole = $masterRoles[$nik]['role'];
-            try {
-                DB::table('pegawai')->where('nik', $nik)->update(['role' => $dbRole]);
-            } catch (\Throwable $e) {}
+        // Sinkronkan otomatis jika NIK terdaftar di masterRoles
+        if (isset($masterRoles[$nik])) {
+            $expectedRole = $masterRoles[$nik]['role'];
+            $expectedDivisi = $masterRoles[$nik]['divisi_kadiv'] ?? null;
+            if ($dbRole !== strtolower($expectedRole) || ($expectedDivisi !== null && $divisiKadiv !== $expectedDivisi)) {
+                $dbRole = strtolower($expectedRole);
+                if ($expectedDivisi !== null) {
+                    $divisiKadiv = $expectedDivisi;
+                }
+                try {
+                    $updateData = ['role' => $expectedRole];
+                    if ($expectedDivisi !== null) {
+                        $updateData['divisi_kadiv'] = $expectedDivisi;
+                    }
+                    DB::table('pegawai')->where('nik', $nik)->update($updateData);
+                } catch (\Throwable $e) {}
+            }
         }
 
         if ($dbRole === 'direktur') {
             $userLevel = '7'; // DIRUT
             $rolePengaduan = 'dirut';
-        } elseif ($dbRole === 'kspi') {
+        } elseif ($dbRole === 'kspi' || (string) $nik === '1711161') {
             $userLevel = '5';
-            $rolePengaduan = 'kspi';
+            // Hanya NIK 1711161 yang berwenang sebagai role KSPI
+            $rolePengaduan = ((string) $nik === '1711161') ? 'kspi' : 'pegawai';
         } elseif ($dbRole === 'tpdpk') {
             $userLevel = '5';
             $rolePengaduan = 'tpdpk';
-        } elseif ($dbRole === 'kadiv' || $dbRole === 'kadivkategori') {
+        } elseif ($dbRole === 'kadiv' || $dbRole === 'kadivkategori' || in_array((string) $nik, ['1711571', '1711251'])) {
             $userLevel = '5';
             $rolePengaduan = 'kadiv';
+            if ((string) $nik === '1711571') {
+                $divisiKadiv = 'administrasi';
+            } elseif ((string) $nik === '1711251') {
+                $divisiKadiv = 'teknik';
+            }
         } elseif ($dbRole === 'admin' || $dbRole === 'sdm') {
             $userLevel = '1'; // Admin / SDM
             $rolePengaduan = 'sdm';

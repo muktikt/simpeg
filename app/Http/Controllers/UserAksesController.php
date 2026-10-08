@@ -18,8 +18,8 @@ class UserAksesController extends Controller
         '1711296' => 'keuangan123',
         '1711145' => 'keuangan123',
         '1711161' => 'kspi123',
-        '1711446' => 'kadivteknik123',
-        '1711479' => 'kadivadmin123',
+        '1711571' => 'kadivadmin123',
+        '1711251' => 'kadivteknik123',
     ];
 
     protected function all(): array
