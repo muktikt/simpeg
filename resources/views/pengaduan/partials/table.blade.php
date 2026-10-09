@@ -116,10 +116,17 @@
                     @endif
                 </td>
                 <td style="text-align:center;">
-                    <a href="{{ route('pengaduan.detail', $item->id) }}" 
-                       style="background:#0d2c6e; color:#fff; padding:6px 12px; border-radius:6px; font-size:12px; font-weight:600; text-decoration:none; display:inline-flex; align-items:center; gap:4px;">
-                        Lihat & Proses ➔
-                    </a>
+                    <div style="display:inline-flex; align-items:center; gap:6px; justify-content:center;">
+                        <a href="{{ route('pengaduan.surat', $item->id) }}" target="_blank" 
+                           style="background:#f1f5f9; color:#0d2c6e; border:1px solid #cbd5e1; padding:6px 10px; border-radius:6px; font-size:12px; font-weight:600; text-decoration:none; display:inline-flex; align-items:center; gap:4px;"
+                           title="Format Lembar Surat & Ekspor PDF">
+                            📄 Surat
+                        </a>
+                        <a href="{{ route('pengaduan.detail', $item->id) }}" 
+                           style="background:#0d2c6e; color:#fff; padding:6px 12px; border-radius:6px; font-size:12px; font-weight:600; text-decoration:none; display:inline-flex; align-items:center; gap:4px;">
+                            Lihat & Proses ➔
+                        </a>
+                    </div>
                 </td>
             </tr>
         @empty

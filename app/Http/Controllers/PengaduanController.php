@@ -393,6 +393,92 @@ class PengaduanController extends Controller
     }
 
     /**
+     * Halaman Format Lembar Surat Resmi & Ekspor PDF Pengaduan.
+     */
+    public function surat($id)
+    {
+        $ctx = $this->getUserContext();
+        $myRole = $ctx['role'];
+        $myNik = $ctx['nik'];
+
+        $pengaduan = DB::table('pengaduan_pegawai')->where('id', $id)->first();
+        if (!$pengaduan) {
+            abort(404, 'Pengaduan tidak ditemukan.');
+        }
+
+        // Cek izin akses: Pemilik pengaduan ATAU Role pemeriksa (Kadiv, KSPI, Dirut, TPDPK)
+        $isOwner = ($pengaduan->nik === $myNik);
+        $isPrivileged = in_array($myRole, ['kadiv', 'kspi', 'dirut', 'tpdpk']);
+
+        if ($myRole === 'sdm' && !$isOwner) {
+            $isTerbukti = strtolower((string)($pengaduan->kesimpulan_investigasi ?? '')) === 'terbukti';
+            $isValidStatus = in_array($pengaduan->status, ['menungguSdm', 'selesai']);
+            if (!$isTerbukti || !$isValidStatus) {
+                abort(403, 'Pihak SDM hanya dapat mengakses pengaduan yang telah dinyatakan Terbukti dan diteruskan oleh Direktur Utama.');
+            }
+        } elseif (!$isOwner && !$isPrivileged && $myRole !== 'sdm') {
+            abort(403, 'Anda tidak memiliki hak akses untuk melihat surat pengaduan ini.');
+        }
+
+        $riwayat = DB::table('riwayat_status_pengaduan')
+            ->where('pengaduan_id', $id)
+            ->orderBy('tanggal', 'asc')
+            ->get();
+
+        $tasks = DB::table('tasks')
+            ->leftJoin('pegawai', 'tasks.assigned_to', '=', 'pegawai.id')
+            ->select('tasks.*', 'pegawai.name as nama_eksekutor', 'pegawai.nik as nik_eksekutor', 'pegawai.jabatan as jabatan_eksekutor')
+            ->where('tasks.pengaduan_id', $id)
+            ->where('tasks.is_active', true)
+            ->orderByDesc('tasks.created_at')
+            ->get();
+
+        // Helper decoder array/json
+        $decodeList = function ($val) {
+            if (empty($val)) return [];
+            if (is_array($val)) return $val;
+            $res = json_decode($val, true);
+            return is_array($res) ? $res : [];
+        };
+
+        $fotoBukti = $decodeList($pengaduan->foto_bukti);
+        $dokumenPendukung = $decodeList($pengaduan->dokumen_pendukung);
+        $videoBukti = $decodeList($pengaduan->video_bukti ?? null);
+        $voiceNote = $decodeList($pengaduan->voice_note ?? null);
+
+        $investigasiFoto = $decodeList($pengaduan->investigasi_foto ?? null);
+        $investigasiDokumen = $decodeList($pengaduan->investigasi_dokumen ?? null);
+        $investigasiVideo = $decodeList($pengaduan->investigasi_video ?? null);
+        $investigasiVoice = $decodeList($pengaduan->investigasi_voice ?? null);
+
+        // Data Direktur Utama jika ada di sistem
+        $dirut = DB::table('pegawai')
+            ->where(function ($q) {
+                $q->whereRaw('LOWER(jabatan) LIKE ?', ['%direktur utama%'])
+                  ->orWhereRaw('LOWER(role) LIKE ?', ['%direktur%']);
+            })
+            ->first();
+
+        return view('pengaduan.surat', compact(
+            'pengaduan',
+            'riwayat',
+            'tasks',
+            'ctx',
+            'myRole',
+            'isOwner',
+            'fotoBukti',
+            'dokumenPendukung',
+            'videoBukti',
+            'voiceNote',
+            'investigasiFoto',
+            'investigasiDokumen',
+            'investigasiVideo',
+            'investigasiVoice',
+            'dirut'
+        ));
+    }
+
+    /**
      * KADIV — Verifikasi Pengaduan (Terima / Tolak dicatat) -> Teruskan ke KSPI.
      */
     public function kadivVerifikasi(Request $request, $id)

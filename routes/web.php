@@ -364,6 +364,7 @@ Route::middleware(['simpeg.auth'])->group(function () {
         Route::get('/', [PengaduanController::class, 'index'])->name('index');
         Route::post('/', [PengaduanController::class, 'store'])->name('store');
         Route::get('/{id}', [PengaduanController::class, 'detail'])->whereNumber('id')->name('detail');
+        Route::get('/{id}/surat', [PengaduanController::class, 'surat'])->whereNumber('id')->name('surat');
 
         // Aksi Role Kadiv
         Route::post('/{id}/kadiv-verifikasi', [PengaduanController::class, 'kadivVerifikasi'])->whereNumber('id')->name('kadiv-verifikasi');
