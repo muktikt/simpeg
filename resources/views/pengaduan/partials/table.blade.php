@@ -36,10 +36,10 @@
                     'menungguReviewKspi' => 'background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd;',
                     'menungguDirutTahap1' => 'background:#ffedd5; color:#c2410c; border:1px solid #fed7aa;',
                     'menungguDirutTahap2' => 'background:#ffedd5; color:#c2410c; border:1px solid #fed7aa;',
-                    'menungguPilihEksekutor' => 'background:#ede9fe; color:#6d28d9; border:1px solid #ddd6fe;',
-                    'investigasiBerjalan' => 'background:#e0e7ff; color:#4338ca; border:1px solid #c7d2fe;',
+                    'menungguPilihEksekutor' => 'background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd;',
+                    'investigasiBerjalan' => 'background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd;',
                     'revisiInvestigasi' => 'background:#fef3c7; color:#b45309; border:1px solid #fde68a;',
-                    'tindakLanjutBerjalan' => 'background:#e0e7ff; color:#4338ca; border:1px solid #c7d2fe;',
+                    'tindakLanjutBerjalan' => 'background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd;',
                     'menungguSdm' => 'background:#ffedd5; color:#c2410c; border:1px solid #fed7aa;',
                     'selesai' => 'background:#dcfce7; color:#15803d; border:1px solid #bbf7d0;',
                     'arsip' => 'background:#f1f5f9; color:#64748b; border:1px solid #cbd5e1;',
@@ -70,9 +70,50 @@
                     <small style="color:var(--text-muted); display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ $item->deskripsi }}</small>
                 </td>
                 <td>
-                    <span style="{{ $badgeStyle }} font-size:11.5px; font-weight:700; padding:4px 8px; border-radius:12px; display:inline-block;">
-                        {{ $badgeLabel }}
-                    </span>
+                    @php
+                        // Hitung tahapan 1..4 sama seperti di Flutter
+                        $stage = match($statusName) {
+                            'menungguKadiv', 'menungguVerifikasiKadiv' => 1,
+                            'reviewKspi', 'menungguReviewKspi', 'menungguDirutTahap1', 'menungguPilihEksekutor' => 2,
+                            'investigasiBerjalan', 'revisiInvestigasi', 'menungguDirutTahap2', 'tindakLanjutBerjalan', 'menungguSdm' => 3,
+                            default => 4,
+                        };
+                        $isArsip = ($statusName === 'arsip');
+                    @endphp
+
+                    <div style="margin-bottom:6px; display:flex; align-items:center; flex-wrap:wrap; gap:4px;">
+                        <span style="{{ $badgeStyle }} font-size:11.5px; font-weight:700; padding:3px 8px; border-radius:12px; display:inline-block;">
+                            {{ $badgeLabel }}
+                        </span>
+                        @if (!empty($item->kesimpulan_investigasi))
+                            @if ($item->kesimpulan_investigasi === 'terbukti')
+                                <span style="background:#dcfce7; color:#15803d; border:1px solid #bbf7d0; font-size:10.5px; font-weight:800; padding:2px 6px; border-radius:10px; display:inline-block;">⚖️ Terbukti</span>
+                            @else
+                                <span style="background:#fee2e2; color:#b91c1c; border:1px solid #fecaca; font-size:10.5px; font-weight:800; padding:2px 6px; border-radius:10px; display:inline-block;">🛡️ Tidak Terbukti</span>
+                            @endif
+                        @endif
+                    </div>
+
+                    <!-- Mini Stepper 4 Tahap -->
+                    <div style="display:flex; align-items:center; gap:3px; max-width:180px;">
+                        @for ($s = 1; $s <= 4; $s++)
+                            @php
+                                $dotColor = ($s < $stage || ($s === 4 && $stage === 4)) 
+                                    ? ($isArsip && $s === 4 ? '#64748b' : '#22c55e') 
+                                    : ($s === $stage ? '#0284c7' : '#cbd5e1');
+                            @endphp
+                            <div style="flex:1; height:4px; border-radius:2px; background:{{ $dotColor }};" title="Tahap {{ $s }}: {{ ['1' => 'Diajukan', '2' => 'Diverifikasi', '3' => 'Diproses', '4' => 'Selesai'][$s] }}"></div>
+                        @endfor
+                    </div>
+                    <div style="font-size:10px; color:#64748b; margin-top:2px;">
+                        Tahap {{ $stage }}/4: {{ ['1' => 'Diajukan', '2' => 'Diverifikasi', '3' => 'Diproses', '4' => ($isArsip ? 'Diarsipkan' : 'Selesai')][$stage] }}
+                    </div>
+
+                    @if (!empty($item->keterangan_terakhir))
+                        <div style="margin-top:6px; background:#eff6ff; border:1px solid #bfdbfe; border-radius:6px; padding:4px 8px; font-size:11px; color:#1e40af; line-height:1.3; max-width:230px;">
+                            📝 <strong>Catatan:</strong> {{ Str::limit(trim($item->keterangan_terakhir), 70) }}
+                        </div>
+                    @endif
                 </td>
                 <td style="text-align:center;">
                     <a href="{{ route('pengaduan.detail', $item->id) }}" 

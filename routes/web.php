@@ -382,6 +382,12 @@ Route::middleware(['simpeg.auth'])->group(function () {
 
         // Aksi Role TPDPK / Kadiv (Eksekutor Investigasi)
         Route::post('/{id}/tpdpk-hasil-investigasi', [PengaduanController::class, 'tpdpkHasilInvestigasi'])->whereNumber('id')->name('tpdpk-hasil-investigasi');
+
+        // Aksi Role SDM (Penerbitan Surat Putusan Sanksi)
+        Route::post('/{id}/sdm-putusan-sanksi', [PengaduanController::class, 'sdmPutusanSanksi'])->whereNumber('id')->name('sdm-putusan-sanksi');
+
+        // Aksi Eksekutor Tasks
+        Route::post('/tasks/{taskId}/update', [PengaduanController::class, 'updateTask'])->whereNumber('taskId')->name('task-update');
     });
 
     // Profile - Khusus role Pegawai (role 5) di web. Admin & Keuangan mengelola data via Data Pegawai.

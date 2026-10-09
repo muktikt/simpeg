@@ -19,25 +19,17 @@ class PengaduanController extends Controller
         $divisiKadiv = $sessionUser['divisi_kadiv'] ?? null;
         $nama = $sessionUser['nama_peg'] ?? 'Pegawai';
 
-        // Pastikan mapping NIK struktural Pengaduan selalu akurat
-        if ($nik === '1711161') {
-            $rolePengaduan = 'kspi';
-            $divisiKadiv = null;
-        } elseif ($nik === '1711571') {
-            $rolePengaduan = 'kadiv';
-            $divisiKadiv = 'administrasi';
-        } elseif ($nik === '1711251') {
-            $rolePengaduan = 'kadiv';
-            $divisiKadiv = 'teknik';
-        } elseif ($rolePengaduan === 'kspi' && $nik !== '1711161') {
-            // KSPI HANYA NIK 1711161
-            $rolePengaduan = 'pegawai';
-        } elseif (empty($sessionUser['role_pengaduan']) && !empty($nik)) {
+        $id = null;
+        if (!empty($nik)) {
             try {
                 $peg = DB::table('pegawai')->where('nik', $nik)->first();
                 if ($peg) {
+                    $id = $peg->id ?? null;
+                    if (empty($nama) || $nama === 'Pegawai') {
+                        $nama = $peg->name ?? $peg->nama_peg ?? 'Pegawai';
+                    }
                     $dbRole = strtolower($peg->role ?? '');
-                    $divisiKadiv = $peg->divisi_kadiv ?? null;
+                    $divisiKadiv = $peg->divisi_kadiv ?? $divisiKadiv;
 
                     if ($dbRole === 'direktur') {
                         $rolePengaduan = 'dirut';
@@ -51,14 +43,28 @@ class PengaduanController extends Controller
                         $rolePengaduan = 'sdm';
                     } elseif ($dbRole === 'keuangan' || $dbRole === 'keu') {
                         $rolePengaduan = 'keuangan';
-                    } else {
-                        $rolePengaduan = 'pegawai';
                     }
                 }
             } catch (\Throwable $e) {}
         }
 
+        // Pastikan mapping NIK struktural Pengaduan selalu akurat
+        if ($nik === '1711161') {
+            $rolePengaduan = 'kspi';
+            $divisiKadiv = null;
+        } elseif ($nik === '1711571') {
+            $rolePengaduan = 'kadiv';
+            $divisiKadiv = 'administrasi';
+        } elseif ($nik === '1711251') {
+            $rolePengaduan = 'kadiv';
+            $divisiKadiv = 'teknik';
+        } elseif ($rolePengaduan === 'kspi' && $nik !== '1711161') {
+            // KSPI HANYA NIK 1711161
+            $rolePengaduan = 'pegawai';
+        }
+
         return [
+            'id' => $id,
             'nik' => $nik,
             'nama' => $nama,
             'userlevel' => $userLevel,
@@ -81,10 +87,20 @@ class PengaduanController extends Controller
         $pengaduanMasuk = [];
         $pengaduanSaya = [];
         $pengaduanRiwayat = [];
+        $tugasSaya = [];
+        $daftarPegawai = [];
+
+        $baseQuery = function () {
+            return DB::table('pengaduan_pegawai')
+                ->select(
+                    'pengaduan_pegawai.*',
+                    DB::raw("(SELECT keterangan FROM riwayat_status_pengaduan WHERE pengaduan_id = pengaduan_pegawai.id AND keterangan IS NOT NULL AND TRIM(keterangan) != '' ORDER BY id DESC LIMIT 1) as keterangan_terakhir")
+                );
+        };
 
         try {
             // 1. Ambil pengaduan milik sendiri (Semua role punya tab ini)
-            $pengaduanSaya = DB::table('pengaduan_pegawai')
+            $pengaduanSaya = $baseQuery()
                 ->where('nik', $myNik)
                 ->orderByDesc('created_at')
                 ->get()
@@ -94,11 +110,7 @@ class PengaduanController extends Controller
             if ($myRole === 'kadiv') {
                 $divisiLabel = ($divisiKadiv === 'teknik') ? 'Pelanggaran Teknik' : 'Pelanggaran Administrasi';
 
-                // Aduan yang butuh tindakan Kadiv:
-                // a. Menunggu verifikasi awal sesuai kategori divisinya
-                // b. Sedang diinvestigasi oleh Kadiv divisi ini
-                // c. Sedang tindak lanjut oleh Kadiv divisi ini
-                $query = DB::table('pengaduan_pegawai')
+                $query = $baseQuery()
                     ->where(function ($q) use ($divisiLabel, $divisiKadiv) {
                         $q->where(function ($sub) use ($divisiLabel) {
                             $sub->whereIn('status', ['menungguKadiv', 'menungguVerifikasiKadiv'])
@@ -117,8 +129,7 @@ class PengaduanController extends Controller
 
                 $pengaduanMasuk = $query->get()->toArray();
 
-                // Riwayat pengaduan yang sudah pernah diverifikasi kadiv
-                $pengaduanRiwayat = DB::table('pengaduan_pegawai')
+                $pengaduanRiwayat = $baseQuery()
                     ->where('kategori', $divisiLabel)
                     ->whereNotIn('status', ['menungguKadiv', 'menungguVerifikasiKadiv'])
                     ->orderByDesc('updated_at')
@@ -127,14 +138,13 @@ class PengaduanController extends Controller
                     ->toArray();
 
             } elseif ($myRole === 'kspi') {
-                // KSPI: Review Awal (reviewKspi), Pilih Eksekutor (menungguPilihEksekutor), Review Hasil (menungguReviewKspi)
-                $pengaduanMasuk = DB::table('pengaduan_pegawai')
+                $pengaduanMasuk = $baseQuery()
                     ->whereIn('status', ['reviewKspi', 'menungguPilihEksekutor', 'menungguReviewKspi', 'ditolakDirektur'])
                     ->orderByDesc('created_at')
                     ->get()
                     ->toArray();
 
-                $pengaduanRiwayat = DB::table('pengaduan_pegawai')
+                $pengaduanRiwayat = $baseQuery()
                     ->whereNotIn('status', ['reviewKspi', 'menungguPilihEksekutor', 'menungguReviewKspi', 'ditolakDirektur'])
                     ->orderByDesc('updated_at')
                     ->limit(50)
@@ -142,14 +152,13 @@ class PengaduanController extends Controller
                     ->toArray();
 
             } elseif ($myRole === 'dirut') {
-                // DIRUT: Approval Tahap 1 (menungguDirutTahap1), Approval Tahap 2 (menungguDirutTahap2), Pilih Eksekutor Tindak Lanjut
-                $pengaduanMasuk = DB::table('pengaduan_pegawai')
+                $pengaduanMasuk = $baseQuery()
                     ->whereIn('status', ['menungguDirutTahap1', 'menungguDirutTahap2', 'menungguPilihEksekutorTindakLanjut'])
                     ->orderByDesc('created_at')
                     ->get()
                     ->toArray();
 
-                $pengaduanRiwayat = DB::table('pengaduan_pegawai')
+                $pengaduanRiwayat = $baseQuery()
                     ->whereIn('status', ['selesai', 'arsip', 'investigasiBerjalan', 'menungguReviewKspi'])
                     ->orderByDesc('updated_at')
                     ->limit(50)
@@ -157,22 +166,66 @@ class PengaduanController extends Controller
                     ->toArray();
 
             } elseif ($myRole === 'tpdpk') {
-                // TPDPK: Penugasan Investigasi (investigasiBerjalan, revisiInvestigasi) yang ditugaskan ke TPDPK
-                $pengaduanMasuk = DB::table('pengaduan_pegawai')
+                $pengaduanMasuk = $baseQuery()
                     ->where('eksekutor', 'tpdpk')
                     ->whereIn('status', ['investigasiBerjalan', 'revisiInvestigasi', 'tindakLanjutBerjalan'])
                     ->orderByDesc('created_at')
                     ->get()
                     ->toArray();
 
-                $pengaduanRiwayat = DB::table('pengaduan_pegawai')
+                $pengaduanRiwayat = $baseQuery()
                     ->where('eksekutor', 'tpdpk')
                     ->whereIn('status', ['menungguReviewKspi', 'menungguDirutTahap2', 'selesai', 'arsip'])
                     ->orderByDesc('updated_at')
                     ->limit(50)
                     ->get()
                     ->toArray();
+
+            } elseif ($myRole === 'sdm') {
+                // SDM HANYA bisa melihat pengaduan yang terbukti pada tahap menungguSdm
+                $pengaduanMasuk = $baseQuery()
+                    ->where('status', 'menungguSdm')
+                    ->where('kesimpulan_investigasi', 'terbukti')
+                    ->orderByDesc('created_at')
+                    ->get()
+                    ->toArray();
+
+                // Riwayat SDM: Pengaduan yang sudah selesai yang terbukti
+                $pengaduanRiwayat = $baseQuery()
+                    ->where('status', 'selesai')
+                    ->where('kesimpulan_investigasi', 'terbukti')
+                    ->orderByDesc('updated_at')
+                    ->limit(50)
+                    ->get()
+                    ->toArray();
             }
+
+            // 3. Ambil daftar tugas eksekutor yang ditugaskan ke user ini
+            if (!empty($ctx['id'])) {
+                $tugasSaya = DB::table('tasks')
+                    ->leftJoin('pengaduan_pegawai', 'tasks.pengaduan_id', '=', 'pengaduan_pegawai.id')
+                    ->select(
+                        'tasks.*',
+                        'pengaduan_pegawai.nomor_pengaduan',
+                        'pengaduan_pegawai.kategori as kategori_pengaduan',
+                        'pengaduan_pegawai.judul as judul_pengaduan',
+                        'pengaduan_pegawai.deskripsi as deskripsi_pengaduan',
+                        'pengaduan_pegawai.pihak_terlapor'
+                    )
+                    ->where('tasks.assigned_to', $ctx['id'])
+                    ->where('tasks.is_active', true)
+                    ->orderByDesc('tasks.created_at')
+                    ->get()
+                    ->toArray();
+            }
+
+            // 4. Daftar pegawai untuk modal pemilihan terlapor & eksekutor
+            $daftarPegawai = DB::table('pegawai')
+                ->select('id', 'nik', 'name', 'jabatan', 'unit_kerja', 'role')
+                ->whereNotNull('name')
+                ->orderBy('name')
+                ->get()
+                ->toArray();
 
         } catch (\Throwable $e) {
             // Fallback empty on DB error
@@ -185,7 +238,9 @@ class PengaduanController extends Controller
             'tab',
             'pengaduanMasuk',
             'pengaduanSaya',
-            'pengaduanRiwayat'
+            'pengaduanRiwayat',
+            'tugasSaya',
+            'daftarPegawai'
         ));
     }
 
@@ -303,7 +358,14 @@ class PengaduanController extends Controller
         $isOwner = ($pengaduan->nik === $myNik);
         $isPrivileged = in_array($myRole, ['kadiv', 'kspi', 'dirut', 'tpdpk']);
 
-        if (!$isOwner && !$isPrivileged && $myRole !== 'sdm') {
+        if ($myRole === 'sdm' && !$isOwner) {
+            // SDM HANYA berhak mengakses pengaduan yang telah terbukti dan diteruskan Dirut
+            $isTerbukti = strtolower((string)($pengaduan->kesimpulan_investigasi ?? '')) === 'terbukti';
+            $isValidStatus = in_array($pengaduan->status, ['menungguSdm', 'selesai']);
+            if (!$isTerbukti || !$isValidStatus) {
+                abort(403, 'Pihak SDM hanya dapat mengakses pengaduan yang telah dinyatakan Terbukti dan diteruskan oleh Direktur Utama.');
+            }
+        } elseif (!$isOwner && !$isPrivileged && $myRole !== 'sdm') {
             abort(403, 'Anda tidak memiliki hak akses untuk melihat pengaduan ini.');
         }
 
@@ -312,7 +374,22 @@ class PengaduanController extends Controller
             ->orderBy('tanggal', 'asc')
             ->get();
 
-        return view('pengaduan.detail', compact('pengaduan', 'riwayat', 'ctx', 'myRole', 'isOwner', 'isPrivileged'));
+        $tasks = DB::table('tasks')
+            ->leftJoin('pegawai', 'tasks.assigned_to', '=', 'pegawai.id')
+            ->select('tasks.*', 'pegawai.name as nama_eksekutor', 'pegawai.nik as nik_eksekutor', 'pegawai.jabatan as jabatan_eksekutor')
+            ->where('tasks.pengaduan_id', $id)
+            ->where('tasks.is_active', true)
+            ->orderByDesc('tasks.created_at')
+            ->get();
+
+        $daftarPegawai = DB::table('pegawai')
+            ->select('id', 'nik', 'name', 'jabatan', 'unit_kerja', 'role', 'divisi_kadiv', 'foto_url')
+            ->whereNotNull('name')
+            ->orderBy('name')
+            ->get()
+            ->toArray();
+
+        return view('pengaduan.detail', compact('pengaduan', 'riwayat', 'ctx', 'myRole', 'isOwner', 'isPrivileged', 'tasks', 'daftarPegawai'));
     }
 
     /**
@@ -458,32 +535,126 @@ class PengaduanController extends Controller
     }
 
     /**
-     * KSPI — Pilih Eksekutor Investigasi (TPDPK atau Kadiv).
+     * KSPI — Pilih Eksekutor Investigasi (TPDPK, Kadiv, atau Tim Pegawai).
      */
     public function kspiPilihEksekutor(Request $request, $id)
     {
         $request->validate([
-            'eksekutor' => 'required|in:tpdpk,kadiv',
-            'divisi_kadiv' => 'nullable|required_if:eksekutor,kadiv|in:administrasi,teknik',
-            'petugas_investigasi' => 'nullable|string|max:100',
+            'eksekutor' => 'nullable|string|in:tpdpk,kadiv,pegawai,kspi',
+            'divisi_kadiv' => 'nullable|in:administrasi,teknik',
+            'pegawai_ids' => 'nullable|array',
+            'pegawai_ids.*' => 'nullable|string',
+            'petugas_investigasi' => 'nullable|string|max:255',
             'catatan' => 'nullable|string',
         ]);
 
         $ctx = $this->getUserContext();
         $now = now();
-        $eksekutor = $request->eksekutor;
+
+        // Ambil data pengaduan
+        $pengaduan = DB::table('pengaduan_pegawai')->where('id', $id)->first();
+        if (!$pengaduan) {
+            return back()->with('error', 'Pengaduan tidak ditemukan.');
+        }
+
+        // Ambil daftar pegawai terpilih jika ada
+        $selectedPegawai = collect();
+        if (!empty($request->pegawai_ids)) {
+            $selectedPegawai = DB::table('pegawai')->whereIn('id', $request->pegawai_ids)->get();
+        }
+
+        if ($selectedPegawai->isEmpty() && empty($request->petugas_investigasi)) {
+            return back()->with('error', 'Harap pilih minimal 1 pegawai eksekutor investigasi.');
+        }
+
+        $petugasNames = $selectedPegawai->isNotEmpty()
+            ? $selectedPegawai->pluck('name')->implode(', ')
+            : ($request->petugas_investigasi ?? '');
+
+        $firstExecutor = $selectedPegawai->first();
+        $firstExecutorId = $firstExecutor->id ?? null;
+
+        // Resolve nilai kolom eksekutor agar memenuhi check constraint DB: 'kadiv', 'tpdpk', 'kspi'
+        // Sesuai dengan _resolveEksekutorCategory di aplikasi simpeg Flutter:
+        // Jika kadiv -> 'kadiv', jika kspi -> 'kspi', jika pegawai biasa / tpdpk / staf spi -> 'tpdpk'
+        $eksekutorInput = $request->eksekutor;
         $divisi = $request->divisi_kadiv;
-        $petugas = $request->petugas_investigasi;
+
+        $hasDodi = $selectedPegawai->contains(function ($p) {
+            return ($p->nik ?? '') === '1711161' || str_contains(strtolower($p->name ?? ''), 'dodi sudrajat');
+        });
+
+        $hasKadiv = $selectedPegawai->contains(function ($p) {
+            return str_contains(strtolower($p->role ?? ''), 'kadiv') || in_array($p->nik ?? '', ['1711251', '1711571']);
+        });
+
+        if ($hasDodi || $eksekutorInput === 'tpdpk') {
+            $dbEksekutor = 'tpdpk';
+            $divisi = null;
+        } elseif ($hasKadiv || $eksekutorInput === 'kadiv') {
+            $dbEksekutor = 'kadiv';
+            if (!$divisi && $firstExecutor) {
+                $divisi = $firstExecutor->divisi_kadiv ?: (str_contains(strtolower($firstExecutor->jabatan ?? ''), 'teknik') || ($firstExecutor->nik ?? '') === '1711251' ? 'teknik' : 'administrasi');
+            }
+        } else {
+            $dbEksekutor = 'tpdpk';
+        }
 
         DB::table('pengaduan_pegawai')->where('id', $id)->update([
             'status' => 'investigasiBerjalan',
-            'eksekutor' => $eksekutor,
+            'eksekutor' => $dbEksekutor,
+            'executor_id' => $firstExecutorId,
             'eksekutor_divisi_kadiv' => $divisi,
-            'petugas_investigasi' => $petugas,
+            'petugas_investigasi' => $petugasNames,
             'updated_at' => $now,
         ]);
 
-        $label = ($eksekutor === 'kadiv') ? "Kadiv ($divisi)" : "TPDPK";
+        // Nonaktifkan task lama jika ada perubahan tim eksekutor
+        if ($selectedPegawai->isNotEmpty()) {
+            DB::table('tasks')
+                ->where('pengaduan_id', $id)
+                ->where('is_active', true)
+                ->whereNotIn('assigned_to', $selectedPegawai->pluck('id'))
+                ->update([
+                    'is_active' => false,
+                    'status' => 'Dibatalkan',
+                    'updated_at' => $now,
+                ]);
+
+            $assignedById = (!empty($ctx['id']) && preg_match('/^[0-9a-f-]{36}$/i', (string)$ctx['id'])) ? $ctx['id'] : null;
+
+            // Buat record task baru untuk setiap pegawai yang belum memiliki task aktif
+            foreach ($selectedPegawai as $p) {
+                $exists = DB::table('tasks')
+                    ->where('pengaduan_id', $id)
+                    ->where('assigned_to', $p->id)
+                    ->where('is_active', true)
+                    ->exists();
+
+                if (!$exists) {
+                    DB::table('tasks')->insert([
+                        'pengaduan_id' => $id,
+                        'assigned_to' => $p->id,
+                        'assigned_by' => $assignedById,
+                        'assigned_by_name' => $ctx['nama'],
+                        'title' => 'Investigasi: ' . ($pengaduan->nomor_pengaduan ?? ('PGD-' . $id)),
+                        'category' => $pengaduan->kategori ?? 'Investigasi',
+                        'description' => $request->catatan ?: ($pengaduan->judul ?? 'Investigasi pengaduan'),
+                        'status' => 'Menunggu',
+                        'is_active' => true,
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ]);
+                }
+            }
+        }
+
+        $label = match ($dbEksekutor) {
+            'kadiv' => "Kadiv SPI ($divisi)",
+            'tpdpk' => 'Tim Eksekutor Investigasi',
+            'kspi' => 'KSPI',
+            default => 'Eksekutor',
+        };
 
         DB::table('riwayat_status_pengaduan')->insert([
             'pengaduan_id' => $id,
@@ -491,12 +662,81 @@ class PengaduanController extends Controller
             'status_lama' => 'menungguPilihEksekutor',
             'oleh' => $ctx['nama'],
             'role' => 'kspi',
-            'aksi' => "Memilih eksekutor investigasi: $label" . ($petugas ? " (Petugas: $petugas)" : ''),
+            'aksi' => "Memilih eksekutor investigasi: $label" . (!empty($petugasNames) ? " ($petugasNames)" : ''),
             'keterangan' => $request->catatan,
             'tanggal' => $now,
         ]);
 
-        return redirect()->route('pengaduan.detail', $id)->with('success', "Penugasan investigasi diberikan kepada $label.");
+        return redirect()->route('pengaduan.detail', $id)->with('success', "Penugasan investigasi diberikan kepada $label: $petugasNames.");
+    }
+
+    /**
+     * Eksekutor — Perbarui Status Tugas (Tasks).
+     */
+    public function updateTask(Request $request, $taskId)
+    {
+        $request->validate([
+            'status' => 'required|in:Diproses,Selesai',
+            'notes' => 'nullable|string',
+            'foto_bukti.*' => 'nullable|file|mimes:jpg,jpeg,png,webp|max:5120',
+            'dokumen.*' => 'nullable|file|mimes:pdf,doc,docx|max:10240',
+        ]);
+
+        $ctx = $this->getUserContext();
+        $task = DB::table('tasks')->where('id', $taskId)->first();
+        if (!$task) {
+            return back()->with('error', 'Tugas tidak ditemukan.');
+        }
+
+        if ($task->assigned_to !== $ctx['id'] && $ctx['role'] !== 'kspi') {
+            return back()->with('error', 'Anda tidak memiliki hak akses untuk memperbarui tugas ini.');
+        }
+
+        $now = now();
+        $uploadedFiles = [];
+        if ($request->hasFile('foto_bukti')) {
+            foreach ($request->file('foto_bukti') as $file) {
+                $path = $file->store('tasks_bukti', 'public');
+                $uploadedFiles[] = '/storage/' . $path;
+            }
+        }
+        if ($request->hasFile('dokumen')) {
+            foreach ($request->file('dokumen') as $file) {
+                $path = $file->store('tasks_dokumen', 'public');
+                $uploadedFiles[] = '/storage/' . $path;
+            }
+        }
+
+        $currentProof = json_decode($task->proof_files ?? '[]', true) ?: [];
+        $allProof = array_merge($currentProof, $uploadedFiles);
+
+        DB::table('tasks')->where('id', $taskId)->update([
+            'status' => $request->status,
+            'notes' => $request->notes ?: $task->notes,
+            'proof_files' => json_encode($allProof),
+            'updated_at' => $now,
+        ]);
+
+        if ($request->status === 'Selesai') {
+            DB::table('pengaduan_pegawai')->where('id', $task->pengaduan_id)->update([
+                'status' => 'menungguReviewKspi',
+                'hasil_investigasi' => $request->notes ?: 'Tugas investigasi diselesaikan oleh eksekutor.',
+                'updated_at' => $now,
+            ]);
+
+            DB::table('riwayat_status_pengaduan')->insert([
+                'pengaduan_id' => $task->pengaduan_id,
+                'status' => 'menungguReviewKspi',
+                'status_lama' => 'investigasiBerjalan',
+                'oleh' => $ctx['nama'],
+                'role' => $ctx['role'] ?: 'eksekutor',
+                'aksi' => 'Tugas investigasi diselesaikan oleh ' . $ctx['nama'],
+                'keterangan' => $request->notes,
+                'tanggal' => $now,
+            ]);
+        }
+
+        return back()->with('success', "Status tugas berhasil diperbarui menjadi {$request->status}.");
     }
 
     /**
@@ -560,13 +800,18 @@ class PengaduanController extends Controller
 
     /**
      * TPDPK / KADIV (Eksekutor) — Kirim Hasil Investigasi & Surat Rekomendasi Sanksi.
+     * Alur langsung ke Direktur Utama (menungguDirutTahap2) dengan kesimpulan 'terbukti' / 'tidak_terbukti'.
      */
     public function tpdpkHasilInvestigasi(Request $request, $id)
     {
         $request->validate([
+            'kesimpulan_investigasi' => 'required|in:terbukti,tidak_terbukti',
             'hasil_investigasi' => 'required|string',
             'surat_rekomendasi' => 'required|string',
-            'dokumen_investigasi.*' => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:10240',
+            'foto_bukti.*' => 'nullable|file|mimes:jpg,jpeg,png,webp|max:10240',
+            'video_bukti.*' => 'nullable|file|mimes:mp4,mov,avi,mkv,webm,3gp|max:102400',
+            'voice_bukti.*' => 'nullable|file|mimes:mp3,wav,ogg,m4a,aac,webm|max:51200',
+            'dokumen_investigasi.*' => 'nullable|file|mimes:pdf,doc,docx,xls,xlsx|max:20480',
         ]);
 
         $ctx = $this->getUserContext();
@@ -580,8 +825,33 @@ class PengaduanController extends Controller
             }
         }
 
+        $foto = [];
+        if ($request->hasFile('foto_bukti')) {
+            foreach ($request->file('foto_bukti') as $file) {
+                $path = $file->store('investigasi_foto', 'public');
+                $foto[] = '/storage/' . $path;
+            }
+        }
+
+        $video = [];
+        if ($request->hasFile('video_bukti')) {
+            foreach ($request->file('video_bukti') as $file) {
+                $path = $file->store('investigasi_video', 'public');
+                $video[] = '/storage/' . $path;
+            }
+        }
+
+        $voice = [];
+        if ($request->hasFile('voice_bukti')) {
+            foreach ($request->file('voice_bukti') as $file) {
+                $path = $file->store('investigasi_voice', 'public');
+                $voice[] = '/storage/' . $path;
+            }
+        }
+
         $update = [
-            'status' => 'menungguReviewKspi',
+            'status' => 'menungguDirutTahap2',
+            'kesimpulan_investigasi' => $request->kesimpulan_investigasi,
             'hasil_investigasi' => $request->hasil_investigasi,
             'surat_rekomendasi' => $request->surat_rekomendasi,
             'tanggal_hasil_investigasi' => $now,
@@ -590,21 +860,49 @@ class PengaduanController extends Controller
         if (!empty($dokumen)) {
             $update['investigasi_dokumen'] = json_encode($dokumen);
         }
+        if (!empty($foto)) {
+            $update['investigasi_foto'] = json_encode($foto);
+        }
+        if (!empty($video)) {
+            $update['investigasi_video'] = json_encode($video);
+        }
+        if (!empty($voice)) {
+            $update['investigasi_voice'] = json_encode($voice);
+        }
 
         DB::table('pengaduan_pegawai')->where('id', $id)->update($update);
 
+        // Update status tasks milik pengaduan ini menjadi Selesai
+        DB::table('tasks')
+            ->where('pengaduan_id', $id)
+            ->where('is_active', true)
+            ->update([
+                'status' => 'Selesai',
+                'notes' => 'Investigasi selesai: Kesimpulan ' . ($request->kesimpulan_investigasi === 'terbukti' ? 'TERBUKTI' : 'TIDAK TERBUKTI'),
+                'updated_at' => $now,
+            ]);
+
+        $kesimpulanLabel = ($request->kesimpulan_investigasi === 'terbukti') ? 'TERBUKTI' : 'TIDAK TERBUKTI';
+
         DB::table('riwayat_status_pengaduan')->insert([
             'pengaduan_id' => $id,
-            'status' => 'menungguReviewKspi',
+            'status' => 'menungguDirutTahap2',
             'status_lama' => 'investigasiBerjalan',
             'oleh' => $ctx['nama'],
-            'role' => $ctx['role'] === 'kadiv' ? 'kadivKategori' : 'tpdpk',
-            'aksi' => 'Mengirim hasil investigasi & surat rekomendasi, diteruskan ke KSPI',
-            'keterangan' => 'Hasil investigasi dan rekomendasi sanksi telah dilampirkan.',
+            'role' => $ctx['role'] === 'kadiv' ? 'kadiv' : 'tpdpk',
+            'aksi' => "Menyelesaikan investigasi (Kesimpulan: {$kesimpulanLabel}) & menerbitkan Surat Rekomendasi langsung ke Direktur Utama",
+            'keterangan' => $request->hasil_investigasi,
             'tanggal' => $now,
         ]);
 
-        return redirect()->route('pengaduan.detail', $id)->with('success', 'Hasil investigasi berhasil dikirim ke KSPI untuk peninjauan.');
+        $this->notifyPengaduanUpdate(
+            $id,
+            'Hasil Investigasi & Rekomendasi Masuk 📋',
+            "Hasil investigasi pengaduan $id ({$kesimpulanLabel}) dan Surat Rekomendasi telah masuk langsung ke Direktur Utama.",
+            ['direktur']
+        );
+
+        return redirect()->route('pengaduan.detail', $id)->with('success', "Hasil investigasi ($kesimpulanLabel) dan Surat Rekomendasi berhasil diterbitkan langsung ke Direktur Utama.");
     }
 
     /**
@@ -650,12 +948,16 @@ class PengaduanController extends Controller
     }
 
     /**
-     * DIRUT — Approval Tahap 2 (Terima Hasil Investigasi & Sanksi / Tolak).
+     * DIRUT — Approval Tahap 2 (Terima Hasil Investigasi / Tinjau Ulang / Tolak).
+     * Jika Tinjau Ulang -> kembali ke KSPI untuk memilih eksekutor ulang.
+     * Jika Terima:
+     *   - Tidak Terbukti -> Diarsipkan (selesai, pulihkan nama baik pihak terlapor)
+     *   - Terbukti -> Diteruskan ke SDM (menungguSdm) untuk dibuatkan Surat Putusan Sanksi.
      */
     public function dirutTahap2(Request $request, $id)
     {
         $request->validate([
-            'keputusan' => 'required|in:terima,tolak',
+            'keputusan' => 'required|in:terima,tinjau_ulang',
             'catatan' => 'nullable|string',
         ]);
 
@@ -663,13 +965,45 @@ class PengaduanController extends Controller
         $now = now();
         $keputusan = $request->keputusan;
 
-        if ($keputusan === 'tolak') {
+        $pengaduan = DB::table('pengaduan_pegawai')->where('id', $id)->first();
+        if (!$pengaduan) {
+            return back()->with('error', 'Pengaduan tidak ditemukan.');
+        }
+
+        if ($keputusan === 'tinjau_ulang') {
+            DB::table('pengaduan_pegawai')->where('id', $id)->update([
+                'status' => 'menungguPilihEksekutor',
+                'catatan_peninjauan_kembali' => $request->catatan,
+                'updated_at' => $now,
+            ]);
+
+            DB::table('riwayat_status_pengaduan')->insert([
+                'pengaduan_id' => $id,
+                'status' => 'menungguPilihEksekutor',
+                'status_lama' => 'menungguDirutTahap2',
+                'oleh' => $ctx['nama'],
+                'role' => 'direktur',
+                'aksi' => 'Meminta tinjau ulang, dikembalikan ke KSPI untuk menugaskan eksekutor ulang',
+                'keterangan' => $request->catatan,
+                'tanggal' => $now,
+            ]);
+
+            $this->notifyPengaduanUpdate($id, 'Pengaduan Diminta Tinjau Ulang', "Direktur Utama meminta tinjau ulang atas pengaduan $id ke KSPI.", ['kspi']);
+
+            return redirect()->route('pengaduan.detail', $id)->with('success', 'Permintaan tinjau ulang dikirim ke KSPI untuk pemilihan eksekutor ulang.');
+        }
+
+        // Keputusan == 'terima'
+        $kesimpulan = strtolower((string)($pengaduan->kesimpulan_investigasi ?? ''));
+
+        if ($kesimpulan === 'tidak_terbukti') {
+            // Jika TIDAK TERBUKTI -> langsung diarsipkan dan selesai
             DB::table('pengaduan_pegawai')->where('id', $id)->update([
                 'status' => 'arsip',
-                'keputusan_dirut_tahap2' => 'tolak',
+                'keputusan_dirut_tahap2' => 'terima',
                 'catatan_dirut_tahap2' => $request->catatan,
                 'arsip_pada_tahap' => 'dirutTahap2',
-                'alasan_arsip' => $request->catatan,
+                'alasan_arsip' => 'Hasil investigasi menyatakan TIDAK TERBUKTI. Pengaduan diarsipkan dan nama baik pihak terlapor dipulihkan.',
                 'updated_at' => $now,
             ]);
 
@@ -679,35 +1013,98 @@ class PengaduanController extends Controller
                 'status_lama' => 'menungguDirutTahap2',
                 'oleh' => $ctx['nama'],
                 'role' => 'direktur',
-                'aksi' => 'Menolak hasil investigasi, pengaduan diarsipkan',
-                'keterangan' => $request->catatan,
+                'aksi' => 'Menerima hasil investigasi: TIDAK TERBUKTI (Diarsipkan & nama baik terlapor dipulihkan)',
+                'keterangan' => $request->catatan ?: 'Hasil pemeriksaan menyatakan dugaan pelanggaran tidak terbukti. Kasus ditutup dan diarsipkan.',
                 'tanggal' => $now,
             ]);
 
-            return redirect()->route('pengaduan.detail', $id)->with('success', 'Hasil investigasi ditolak dan pengaduan diarsipkan.');
+            $this->notifyPengaduanUpdate($id, 'Pengaduan Dihentikan (Tidak Terbukti) 📂', "Hasil investigasi pengaduan $id tidak terbukti dan diarsipkan.");
+
+            return redirect()->route('pengaduan.detail', $id)->with('success', 'Hasil investigasi (Tidak Terbukti) diterima Direktur Utama. Pengaduan berhasil diarsipkan.');
+        } else {
+            // Jika TERBUKTI -> diteruskan ke SDM untuk dibuatkan surat putusan sanksi
+            DB::table('pengaduan_pegawai')->where('id', $id)->update([
+                'status' => 'menungguSdm',
+                'keputusan_dirut_tahap2' => 'terima',
+                'catatan_dirut_tahap2' => $request->catatan,
+                'updated_at' => $now,
+            ]);
+
+            DB::table('riwayat_status_pengaduan')->insert([
+                'pengaduan_id' => $id,
+                'status' => 'menungguSdm',
+                'status_lama' => 'menungguDirutTahap2',
+                'oleh' => $ctx['nama'],
+                'role' => 'direktur',
+                'aksi' => 'Menerima hasil investigasi: TERBUKTI (Diteruskan ke SDM untuk Surat Putusan Sanksi)',
+                'keterangan' => $request->catatan ?: 'Diteruskan ke Bagian SDM untuk penerbitan Surat Putusan Pemberian Sanksi.',
+                'tanggal' => $now,
+            ]);
+
+            $this->notifyPengaduanUpdate(
+                $id,
+                'Pengaduan Diteruskan ke SDM ⚠️',
+                "Hasil investigasi pengaduan $id terbukti dan diteruskan ke SDM untuk penetapan Surat Putusan Sanksi.",
+                ['sdm']
+            );
+
+            return redirect()->route('pengaduan.detail', $id)->with('success', 'Hasil investigasi (Terbukti) diterima Direktur Utama. Diteruskan ke Bagian SDM untuk penerbitan surat putusan sanksi.');
+        }
+    }
+
+    /**
+     * SDM — Menerbitkan Surat Putusan Sanksi Resmi (Nomor Surat, Jenis Sanksi, Upload Berkas).
+     * Pengaduan otomatis berstatus 'selesai'.
+     */
+    public function sdmPutusanSanksi(Request $request, $id)
+    {
+        $request->validate([
+            'nomor_surat_putusan' => 'required|string|max:100',
+            'jenis_sanksi' => 'required|string|max:100',
+            'catatan_sdm' => 'nullable|string',
+            'file_surat_putusan' => 'required|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:20480',
+        ]);
+
+        $ctx = $this->getUserContext();
+        if ($ctx['role'] !== 'sdm') {
+            return back()->with('error', 'Hanya Bagian SDM yang berwenang menerbitkan Surat Putusan Sanksi.');
+        }
+
+        $now = now();
+        $filePath = null;
+        if ($request->hasFile('file_surat_putusan')) {
+            $path = $request->file('file_surat_putusan')->store('surat_putusan', 'public');
+            $filePath = '/storage/' . $path;
         }
 
         DB::table('pengaduan_pegawai')->where('id', $id)->update([
             'status' => 'selesai',
-            'keputusan_dirut_tahap2' => 'terima',
-            'catatan_dirut_tahap2' => $request->catatan,
+            'nomor_surat_putusan' => $request->nomor_surat_putusan,
+            'jenis_sanksi' => $request->jenis_sanksi,
+            'catatan_sdm' => $request->catatan_sdm,
+            'file_surat_putusan' => $filePath,
+            'tanggal_surat_putusan' => $now,
             'updated_at' => $now,
         ]);
 
         DB::table('riwayat_status_pengaduan')->insert([
             'pengaduan_id' => $id,
             'status' => 'selesai',
-            'status_lama' => 'menungguDirutTahap2',
+            'status_lama' => 'menungguSdm',
             'oleh' => $ctx['nama'],
-            'role' => 'direktur',
-            'aksi' => 'Menerima hasil investigasi & rekomendasi sanksi (Selesai)',
-            'keterangan' => $request->catatan,
+            'role' => 'sdm',
+            'aksi' => "Menerbitkan Surat Putusan Sanksi No. {$request->nomor_surat_putusan} ({$request->jenis_sanksi})",
+            'keterangan' => $request->catatan_sdm ?: "Surat Keputusan Sanksi telah diterbitkan secara resmi oleh Bagian SDM.",
             'tanggal' => $now,
         ]);
 
-        $this->notifyPengaduanUpdate($id, 'Pengaduan Selesai Ditindaklanjuti ✅', "Hasil investigasi pengaduan $id telah disetujui Direktur Utama dan selesai.");
+        $this->notifyPengaduanUpdate(
+            $id,
+            'Surat Putusan Sanksi Diterbitkan ✅',
+            "Surat Putusan No. {$request->nomor_surat_putusan} ({$request->jenis_sanksi}) telah diterbitkan oleh SDM. Pengaduan $id selesai."
+        );
 
-        return redirect()->route('pengaduan.detail', $id)->with('success', 'Hasil investigasi dan rekomendasi sanksi disetujui Direktur Utama.');
+        return redirect()->route('pengaduan.detail', $id)->with('success', "Surat Putusan Sanksi No. {$request->nomor_surat_putusan} berhasil diterbitkan dan kasus telah selesai.");
     }
 
     /**
