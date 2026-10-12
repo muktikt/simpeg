@@ -81,8 +81,8 @@ class PengaduanController extends Controller
         $ctx = $this->getUserContext();
         $myRole = $ctx['role'];
         $myNik = $ctx['nik'];
-        $divisiKadiv = $ctx['divisi_kadiv'];
-        $tab = $request->query('tab', 'masuk');
+        $defaultTab = in_array($myRole, ['kadiv', 'kspi', 'dirut', 'tpdpk']) ? 'masuk' : 'saya';
+        $tab = $request->query('tab', $defaultTab);
 
         $pengaduanMasuk = [];
         $pengaduanSaya = [];
@@ -200,8 +200,8 @@ class PengaduanController extends Controller
                     ->toArray();
             }
 
-            // 3. Ambil daftar tugas eksekutor yang ditugaskan ke user ini
-            if (!empty($ctx['id'])) {
+            // 3. Ambil daftar tugas eksekutor yang ditugaskan ke user ini (hanya untuk eksekutor: kadiv & tpdpk)
+            if (in_array($myRole, ['kadiv', 'tpdpk']) && !empty($ctx['id'])) {
                 $tugasSaya = DB::table('tasks')
                     ->leftJoin('pengaduan_pegawai', 'tasks.pengaduan_id', '=', 'pengaduan_pegawai.id')
                     ->select(

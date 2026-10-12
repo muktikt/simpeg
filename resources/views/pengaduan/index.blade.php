@@ -40,6 +40,7 @@
 
 @php
     $isPrivileged = in_array($myRole, ['kadiv', 'kspi', 'dirut', 'tpdpk']);
+    $isEksekutor = in_array($myRole, ['kadiv', 'tpdpk']);
 @endphp
 
 {{-- TAB NAVIGASI PENGADUAN --}}
@@ -58,14 +59,16 @@
             </a>
         @endif
 
-        {{-- TAB TUGAS SAYA (Untuk semua role / eksekutor yang mendapat tugas) --}}
-        <a href="{{ route('pengaduan.index', ['tab' => 'tugas']) }}" 
-           style="text-decoration:none; padding:8px 16px; border-radius:6px; font-weight:600; font-size:13px; display:inline-flex; align-items:center; gap:6px; {{ $tab === 'tugas' ? 'background:#0284c7; color:#fff;' : 'background:#f1f5f9; color:#475569;' }}">
-            🎯 Tugas Saya
-            @if (count($tugasSaya) > 0)
-                <span style="background:{{ $tab === 'tugas' ? '#fff' : '#0284c7' }}; color:{{ $tab === 'tugas' ? '#0284c7' : '#fff' }}; font-size:10px; padding:2px 6px; border-radius:10px; font-weight:700;">{{ count($tugasSaya) }}</span>
-            @endif
-        </a>
+        {{-- TAB TUGAS SAYA (Hanya untuk Eksekutor: Kadiv SPI & TPDPK) --}}
+        @if ($isEksekutor)
+            <a href="{{ route('pengaduan.index', ['tab' => 'tugas']) }}" 
+               style="text-decoration:none; padding:8px 16px; border-radius:6px; font-weight:600; font-size:13px; display:inline-flex; align-items:center; gap:6px; {{ $tab === 'tugas' ? 'background:#0284c7; color:#fff;' : 'background:#f1f5f9; color:#475569;' }}">
+                🎯 Tugas Saya
+                @if (count($tugasSaya) > 0)
+                    <span style="background:{{ $tab === 'tugas' ? '#fff' : '#0284c7' }}; color:{{ $tab === 'tugas' ? '#0284c7' : '#fff' }}; font-size:10px; padding:2px 6px; border-radius:10px; font-weight:700;">{{ count($tugasSaya) }}</span>
+                @endif
+            </a>
+        @endif
 
         <a href="{{ route('pengaduan.index', ['tab' => 'saya']) }}" 
            style="text-decoration:none; padding:8px 16px; border-radius:6px; font-weight:600; font-size:13px; display:inline-flex; align-items:center; gap:6px; {{ $tab === 'saya' ? 'background:var(--primary, #0d2c6e); color:#fff;' : 'background:#f1f5f9; color:#475569;' }}">
@@ -110,7 +113,7 @@
             @include('pengaduan.partials.table', ['items' => $pengaduanRiwayat, 'action' => true])
         </div>
 
-    @elseif ($tab === 'tugas')
+    @elseif ($tab === 'tugas' && $isEksekutor)
         {{-- TAB TUGAS SAYA (TASKS EKSEKUTOR) --}}
         <div class="table-card">
             <div style="padding:16px 20px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
