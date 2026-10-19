@@ -200,7 +200,10 @@ class PegawaiController extends Controller
 
     public function create()
     {
-        return view('pegawai.create');
+        $jabatanList = $this->getJabatanList();
+        $unitKerjaList = $this->getUnitKerjaList();
+
+        return view('pegawai.create', compact('jabatanList', 'unitKerjaList'));
     }
 
     public function store(Request $request)
@@ -211,7 +214,16 @@ class PegawaiController extends Controller
 
         // 1. Simpan ke database Supabase PostgreSQL
         try {
-            \Illuminate\Support\Facades\DB::table('pegawai')->insert([
+            $jabatanRecord = \Illuminate\Support\Facades\DB::table('jabatan')
+                ->where('name', $validated['jabatan'])
+                ->first();
+
+            $branchRecord = \Illuminate\Support\Facades\DB::table('pegawai')
+                ->where('unit_kerja', $validated['unit_kerja'])
+                ->whereNotNull('branch_id')
+                ->first();
+
+            $insertData = [
                 'id' => $newUuid,
                 'nik' => $validated['nik'],
                 'name' => $validated['nama'],
@@ -222,7 +234,17 @@ class PegawaiController extends Controller
                 'alamat' => $validated['alamat'] ?? null,
                 'role' => 'pegawai',
                 'created_at' => now(),
-            ]);
+            ];
+
+            if ($jabatanRecord) {
+                $insertData['jabatan_id'] = $jabatanRecord->id;
+            }
+            if ($branchRecord && $branchRecord->branch_id) {
+                $insertData['branch_id'] = $branchRecord->branch_id;
+                $insertData['unit_kerja_singkat'] = $branchRecord->unit_kerja_singkat;
+            }
+
+            \Illuminate\Support\Facades\DB::table('pegawai')->insert($insertData);
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::warning('DB pegawai insert failed: ' . $e->getMessage());
         }
@@ -261,7 +283,10 @@ class PegawaiController extends Controller
 
         abort_if(! $pegawai, 404);
 
-        return view('pegawai.edit', compact('pegawai'));
+        $jabatanList = $this->getJabatanList();
+        $unitKerjaList = $this->getUnitKerjaList();
+
+        return view('pegawai.edit', compact('pegawai', 'jabatanList', 'unitKerjaList'));
     }
 
     public function update(Request $request, int $id)
@@ -273,7 +298,16 @@ class PegawaiController extends Controller
         $dbId = $pegawai['db_id'] ?? null;
         if ($dbId) {
             try {
-                \Illuminate\Support\Facades\DB::table('pegawai')->where('id', $dbId)->update([
+                $jabatanRecord = \Illuminate\Support\Facades\DB::table('jabatan')
+                    ->where('name', $validated['jabatan'])
+                    ->first();
+
+                $branchRecord = \Illuminate\Support\Facades\DB::table('pegawai')
+                    ->where('unit_kerja', $validated['unit_kerja'])
+                    ->whereNotNull('branch_id')
+                    ->first();
+
+                $updateData = [
                     'nik' => $validated['nik'],
                     'name' => $validated['nama'],
                     'jabatan' => $validated['jabatan'],
@@ -281,7 +315,17 @@ class PegawaiController extends Controller
                     'status' => $validated['status_peg'],
                     'no_telp' => $validated['telp'] ?? null,
                     'alamat' => $validated['alamat'] ?? null,
-                ]);
+                ];
+
+                if ($jabatanRecord) {
+                    $updateData['jabatan_id'] = $jabatanRecord->id;
+                }
+                if ($branchRecord && $branchRecord->branch_id) {
+                    $updateData['branch_id'] = $branchRecord->branch_id;
+                    $updateData['unit_kerja_singkat'] = $branchRecord->unit_kerja_singkat;
+                }
+
+                \Illuminate\Support\Facades\DB::table('pegawai')->where('id', $dbId)->update($updateData);
             } catch (\Throwable $e) {
                 \Illuminate\Support\Facades\Log::warning('DB pegawai update failed: ' . $e->getMessage());
             }
@@ -499,4 +543,64 @@ class PegawaiController extends Controller
         }
         return $url;
     }
+
+    public function getJabatanList(): array
+    {
+        return \Illuminate\Support\Facades\Cache::remember('simpeg_master_jabatan_list', 300, function () {
+            try {
+                return \Illuminate\Support\Facades\DB::table('jabatan')
+                    ->whereNotNull('name')
+                    ->where('name', '!=', '')
+                    ->orderBy('name', 'asc')
+                    ->pluck('name')
+                    ->unique()
+                    ->values()
+                    ->all();
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Get jabatan list failed: ' . $e->getMessage());
+                return [];
+            }
+        });
+    }
+
+    public function getUnitKerjaList(): array
+    {
+        return \Illuminate\Support\Facades\Cache::remember('simpeg_master_unit_kerja_list', 300, function () {
+            try {
+                // Ambil unit_kerja yang ada di tabel pegawai
+                $fromPegawai = \Illuminate\Support\Facades\DB::table('pegawai')
+                    ->whereNotNull('unit_kerja')
+                    ->where('unit_kerja', '!=', '')
+                    ->distinct()
+                    ->pluck('unit_kerja')
+                    ->all();
+
+                // Ambil juga unit dari tabel cabang jika ada yang belum tercatat di pegawai
+                $fromCabang = [];
+                $cabangs = \Illuminate\Support\Facades\DB::table('cabang')->get();
+                foreach ($cabangs as $c) {
+                    $nama = ucwords(trim($c->nama ?? ''));
+                    if (empty($nama)) {
+                        continue;
+                    }
+
+                    if ($c->jenis === 'pusat') {
+                        $fromCabang[] = 'Kantor Pusat';
+                    } elseif ($c->jenis === 'cabang') {
+                        $fromCabang[] = 'Cabang Pelayanan ' . $nama;
+                    } elseif ($c->jenis === 'unit') {
+                        $fromCabang[] = 'Unit Pelayanan ' . $nama;
+                    }
+                }
+
+                $merged = array_unique(array_merge($fromPegawai, $fromCabang));
+                sort($merged, SORT_STRING | SORT_FLAG_CASE);
+                return array_values($merged);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Get unit kerja list failed: ' . $e->getMessage());
+                return [];
+            }
+        });
+    }
 }
+

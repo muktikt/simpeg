@@ -20,12 +20,36 @@
     </div>
     <div class="form-group">
         <label for="jabatan">Jabatan</label>
-        <input type="text" id="jabatan" name="jabatan" value="{{ $old('jabatan') }}" required>
+        <select id="jabatan" name="jabatan" required>
+            <option value="">-- Pilih Jabatan --</option>
+            @php
+                $currentJabatan = $old('jabatan');
+                $jabatanOptions = $jabatanList ?? (app(\App\Http\Controllers\PegawaiController::class)->getJabatanList());
+                if ($currentJabatan && !in_array($currentJabatan, $jabatanOptions)) {
+                    array_unshift($jabatanOptions, $currentJabatan);
+                }
+            @endphp
+            @foreach ($jabatanOptions as $j)
+                <option value="{{ $j }}" @selected($currentJabatan === $j)>{{ $j }}</option>
+            @endforeach
+        </select>
         @error('jabatan') <div class="form-error">{{ $message }}</div> @enderror
     </div>
     <div class="form-group">
         <label for="unit_kerja">Unit Kerja</label>
-        <input type="text" id="unit_kerja" name="unit_kerja" value="{{ $old('unit_kerja') }}" required>
+        <select id="unit_kerja" name="unit_kerja" required>
+            <option value="">-- Pilih Unit Kerja --</option>
+            @php
+                $currentUnit = $old('unit_kerja');
+                $unitOptions = $unitKerjaList ?? (app(\App\Http\Controllers\PegawaiController::class)->getUnitKerjaList());
+                if ($currentUnit && !in_array($currentUnit, $unitOptions)) {
+                    array_unshift($unitOptions, $currentUnit);
+                }
+            @endphp
+            @foreach ($unitOptions as $u)
+                <option value="{{ $u }}" @selected($currentUnit === $u)>{{ $u }}</option>
+            @endforeach
+        </select>
         @error('unit_kerja') <div class="form-error">{{ $message }}</div> @enderror
     </div>
     <div class="form-group">
