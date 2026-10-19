@@ -98,7 +98,7 @@ class CutiController extends Controller
                 ->first();
 
             if ($cutiRow && ! empty($cutiRow->nik)) {
-                $statusLabel = $validated['status'] === 'DISETUJUI' ? 'Disetujui ✅' : 'Ditolak ❌';
+                $statusLabel = $validated['status'] === 'DISETUJUI' ? 'Disetujui' : 'Ditolak';
                 \App\Services\OneSignalService::kirimNotifikasiPegawai(
                     $cutiRow->nik,
                     'Pengajuan Cuti ' . $statusLabel,

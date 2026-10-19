@@ -526,7 +526,7 @@
     {{-- BAR AKSI DI LAYAR WEB (TIDAK TERCETAK DI PDF) --}}
     <div class="no-print-bar">
         <div>
-            <strong style="color:#0d2c6e;">📄 Surat Detail Pengaduan Pegawai</strong> &bull;
+            <strong style="color:#0d2c6e;">Surat Detail Pengaduan Pegawai</strong> &bull;
             <span style="color:#475569; font-weight:600;">{{ $pengaduan->nomor_pengaduan }}</span>
             <span class="badge-status" style="{{ $badgeStyle }} margin-left: 8px;">
                 {{ $statusLabel }}
@@ -626,7 +626,7 @@
                     <td>
                         @if (!empty($pengaduan->anonim))
                             <div style="color:#b91c1c; font-weight:bold; margin-bottom:4px;">
-                                🔒 RAHASIA (PELAPOR ANONIM)
+                                RAHASIA (PELAPOR ANONIM)
                             </div>
                             <div style="font-size:9pt; color:#475569; font-style:italic;">
                                 Identitas pelapor dilindungi penuh sesuai Peraturan Direksi & Sistem Pelaporan Pelanggaran (Whistleblowing System) Perumdam Tirta Darma Ayu.
@@ -682,11 +682,11 @@
                         <span class="info-val">
                             @if (strtolower($pengaduan->kesimpulan_investigasi) === 'terbukti')
                                 <span style="background:#dcfce7; color:#15803d; border:1px solid #86efac; padding:2px 8px; border-radius:6px; font-weight:bold; font-size:9pt;">
-                                    ⚖️ TERBUKTI
+                                    TERBUKTI
                                 </span>
                             @else
                                 <span style="background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; padding:2px 8px; border-radius:6px; font-weight:bold; font-size:9pt;">
-                                    🛡️ TIDAK TERBUKTI
+                                    TIDAK TERBUKTI
                                 </span>
                             @endif
                         </span>
@@ -752,8 +752,13 @@
                         <td style="font-family:'IBM Plex Mono', monospace; font-size:8.5pt;">
                             {{ date('d/m/Y H:i', strtotime($r->tanggal)) }} WIB
                         </td>
+                        @php
+                            $isPelakuAuto = !empty($r->keterangan) && str_starts_with(trim($r->keterangan), 'Pelaku diadukan:');
+                            $ketSanitized = $isPelakuAuto ? '-' : (!empty($r->keterangan) ? str_replace(['•', '·'], '-', $r->keterangan) : '-');
+                            $aksiSanitized = str_replace(['•', '·'], '-', $r->aksi ?? '-');
+                        @endphp
                         <td>
-                            <strong style="color:#0d2c6e;">{{ $r->aksi }}</strong>
+                            <strong style="color:#0d2c6e;">{{ $aksiSanitized }}</strong>
                         </td>
                         <td>
                             <strong>{{ $r->oleh }}</strong>
@@ -762,7 +767,7 @@
                             @endif
                         </td>
                         <td style="line-height:1.35; color:#334155;">
-                            {{ !empty($r->keterangan) ? $r->keterangan : '-' }}
+                            {{ $ketSanitized }}
                         </td>
                     </tr>
                 @empty
@@ -800,7 +805,7 @@
                             <img src="{{ $item['url'] }}" alt="{{ $item['label'] }}" class="attach-thumb" onerror="this.style.display='none';">
                         @else
                             <div style="margin-top:6px; font-size:8.5pt;">
-                                📎 Berkas dokumen: <a href="{{ $item['url'] }}" target="_blank" style="color:#0284c7; word-break:break-all;">{{ basename($item['url']) }}</a>
+                                Berkas dokumen: <a href="{{ $item['url'] }}" target="_blank" style="color:#0284c7; word-break:break-all;">{{ basename($item['url']) }}</a>
                             </div>
                         @endif
                     </div>

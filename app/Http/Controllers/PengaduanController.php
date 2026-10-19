@@ -81,7 +81,8 @@ class PengaduanController extends Controller
         $ctx = $this->getUserContext();
         $myRole = $ctx['role'];
         $myNik = $ctx['nik'];
-        $defaultTab = in_array($myRole, ['kadiv', 'kspi', 'dirut', 'tpdpk']) ? 'masuk' : 'saya';
+        $divisiKadiv = $ctx['divisi_kadiv'] ?? null;
+        $defaultTab = in_array($myRole, ['kadiv', 'kspi', 'dirut', 'tpdpk', 'sdm']) ? 'masuk' : 'saya';
         $tab = $request->query('tab', $defaultTab);
 
         $pengaduanMasuk = [];
@@ -200,8 +201,8 @@ class PengaduanController extends Controller
                     ->toArray();
             }
 
-            // 3. Ambil daftar tugas eksekutor yang ditugaskan ke user ini (hanya untuk eksekutor: kadiv & tpdpk)
-            if (in_array($myRole, ['kadiv', 'tpdpk']) && !empty($ctx['id'])) {
+            // 3. Ambil daftar tugas eksekutor yang ditugaskan ke user ini (eksekutor: kadiv, tpdpk, kspi)
+            if (in_array($myRole, ['kadiv', 'tpdpk', 'kspi']) && !empty($ctx['id'])) {
                 $tugasSaya = DB::table('tasks')
                     ->leftJoin('pengaduan_pegawai', 'tasks.pengaduan_id', '=', 'pengaduan_pegawai.id')
                     ->select(
@@ -332,7 +333,7 @@ class PengaduanController extends Controller
 
         $this->notifyPengaduanUpdate(
             $id,
-            'Pengaduan Berhasil Dikirim 📩',
+            'Pengaduan Berhasil Dikirim',
             "Pengaduan Anda ($nomorPengaduan) berhasil diterima dan menunggu verifikasi.",
             ['kadiv', 'kspi', 'sdm']
         );
@@ -389,7 +390,16 @@ class PengaduanController extends Controller
             ->get()
             ->toArray();
 
-        return view('pengaduan.detail', compact('pengaduan', 'riwayat', 'ctx', 'myRole', 'isOwner', 'isPrivileged', 'tasks', 'daftarPegawai'));
+        // Cari data pegawai terlapor untuk penetapan SK Sanksi oleh SDM
+        $pegawaiTerlapor = null;
+        if (!empty($pengaduan->nik_pelaku)) {
+            $pegawaiTerlapor = DB::table('pegawai')->where('nik', trim($pengaduan->nik_pelaku))->first();
+        }
+        if (!$pegawaiTerlapor && !empty($pengaduan->pihak_terlapor)) {
+            $pegawaiTerlapor = DB::table('pegawai')->where('name', 'ilike', '%' . trim($pengaduan->pihak_terlapor) . '%')->first();
+        }
+
+        return view('pengaduan.detail', compact('pengaduan', 'riwayat', 'ctx', 'myRole', 'isOwner', 'isPrivileged', 'tasks', 'daftarPegawai', 'pegawaiTerlapor'));
     }
 
     /**
@@ -983,7 +993,7 @@ class PengaduanController extends Controller
 
         $this->notifyPengaduanUpdate(
             $id,
-            'Hasil Investigasi & Rekomendasi Masuk 📋',
+            'Hasil Investigasi & Rekomendasi Masuk',
             "Hasil investigasi pengaduan $id ({$kesimpulanLabel}) dan Surat Rekomendasi telah masuk langsung ke Direktur Utama.",
             ['direktur']
         );
@@ -1104,7 +1114,7 @@ class PengaduanController extends Controller
                 'tanggal' => $now,
             ]);
 
-            $this->notifyPengaduanUpdate($id, 'Pengaduan Dihentikan (Tidak Terbukti) 📂', "Hasil investigasi pengaduan $id tidak terbukti dan diarsipkan.");
+            $this->notifyPengaduanUpdate($id, 'Pengaduan Dihentikan (Tidak Terbukti)', "Hasil investigasi pengaduan $id tidak terbukti dan diarsipkan.");
 
             return redirect()->route('pengaduan.detail', $id)->with('success', 'Hasil investigasi (Tidak Terbukti) diterima Direktur Utama. Pengaduan berhasil diarsipkan.');
         } else {
@@ -1129,7 +1139,7 @@ class PengaduanController extends Controller
 
             $this->notifyPengaduanUpdate(
                 $id,
-                'Pengaduan Diteruskan ke SDM ⚠️',
+                'Pengaduan Diteruskan ke SDM',
                 "Hasil investigasi pengaduan $id terbukti dan diteruskan ke SDM untuk penetapan Surat Putusan Sanksi.",
                 ['sdm']
             );
@@ -1149,11 +1159,21 @@ class PengaduanController extends Controller
             'jenis_sanksi' => 'required|string|max:100',
             'catatan_sdm' => 'nullable|string',
             'file_surat_putusan' => 'required|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:20480',
+            'nik_terlapor' => 'nullable|string|max:50',
+            'nama_terlapor' => 'nullable|string|max:150',
+            'jabatan_terlapor' => 'nullable|string|max:150',
+            'golongan_terlapor' => 'nullable|string|max:50',
+            'tanggal_berlaku' => 'nullable|date',
         ]);
 
         $ctx = $this->getUserContext();
         if ($ctx['role'] !== 'sdm') {
             return back()->with('error', 'Hanya Bagian SDM yang berwenang menerbitkan Surat Putusan Sanksi.');
+        }
+
+        $pengaduan = DB::table('pengaduan_pegawai')->where('id', $id)->first();
+        if (!$pengaduan) {
+            return back()->with('error', 'Pengaduan tidak ditemukan.');
         }
 
         $now = now();
@@ -1163,6 +1183,13 @@ class PengaduanController extends Controller
             $filePath = '/storage/' . $path;
         }
 
+        // Target Terlapor (Pelaku)
+        $terlaporNik = trim((string)($request->nik_terlapor ?: ($pengaduan->nik_pelaku ?? '')));
+        $terlaporNama = trim((string)($request->nama_terlapor ?: ($pengaduan->pihak_terlapor ?? '')));
+        $terlaporJabatan = trim((string)($request->jabatan_terlapor ?: ($pengaduan->jabatan_pelaku ?? '')));
+        $terlaporGolongan = trim((string)($request->golongan_terlapor ?? ''));
+
+        // Update status pengaduan ke selesai beserta nomor putusan & terlapor terverifikasi
         DB::table('pengaduan_pegawai')->where('id', $id)->update([
             'status' => 'selesai',
             'nomor_surat_putusan' => $request->nomor_surat_putusan,
@@ -1170,23 +1197,58 @@ class PengaduanController extends Controller
             'catatan_sdm' => $request->catatan_sdm,
             'file_surat_putusan' => $filePath,
             'tanggal_surat_putusan' => $now,
+            'nik_pelaku' => $terlaporNik ?: $pengaduan->nik_pelaku,
+            'pihak_terlapor' => $terlaporNama ?: $pengaduan->pihak_terlapor,
+            'jabatan_pelaku' => $terlaporJabatan ?: $pengaduan->jabatan_pelaku,
             'updated_at' => $now,
         ]);
 
+        // Integrasi langsung dengan tabel SK Sanksi Pegawai
+        try {
+            $pegawai = null;
+            if (!empty($terlaporNik)) {
+                $pegawai = DB::table('pegawai')->where('nik', $terlaporNik)->first();
+            }
+            if (!$pegawai && !empty($terlaporNama)) {
+                $pegawai = DB::table('pegawai')->where('name', 'ilike', '%' . $terlaporNama . '%')->first();
+            }
+
+            DB::table('sk_sanksi')->insert([
+                'nomor_sk' => $request->nomor_surat_putusan,
+                'pengaduan_id' => $id,
+                'pegawai_id' => $pegawai->id ?? null,
+                'nik' => $pegawai->nik ?? $terlaporNik,
+                'nama_pegawai' => $pegawai->name ?? $terlaporNama,
+                'jenis_sanksi' => $request->jenis_sanksi,
+                'jabatan_lama' => $pegawai->jabatan ?? ($terlaporJabatan ?: '-'),
+                'golongan_lama' => $pegawai->golongan ?? ($terlaporGolongan ?: '-'),
+                'tanggal_berlaku' => $request->tanggal_berlaku ?: $now->toDateString(),
+                'ringkasan_pelanggaran' => "{$pengaduan->judul} ({$pengaduan->nomor_pengaduan})",
+                'dokumen' => json_encode([
+                    'sk' => [$filePath]
+                ]),
+                'diterbitkan_oleh' => $ctx['nama'],
+                'created_at' => $now,
+            ]);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning("Sinkronisasi sk_sanksi gagal: " . $e->getMessage());
+        }
+
+        $labelTerlapor = !empty($terlaporNama) ? " untuk terlapor $terlaporNama" : "";
         DB::table('riwayat_status_pengaduan')->insert([
             'pengaduan_id' => $id,
             'status' => 'selesai',
             'status_lama' => 'menungguSdm',
             'oleh' => $ctx['nama'],
             'role' => 'sdm',
-            'aksi' => "Menerbitkan Surat Putusan Sanksi No. {$request->nomor_surat_putusan} ({$request->jenis_sanksi})",
+            'aksi' => "Menerbitkan Surat Putusan Sanksi No. {$request->nomor_surat_putusan} ({$request->jenis_sanksi}){$labelTerlapor}",
             'keterangan' => $request->catatan_sdm ?: "Surat Keputusan Sanksi telah diterbitkan secara resmi oleh Bagian SDM.",
             'tanggal' => $now,
         ]);
 
         $this->notifyPengaduanUpdate(
             $id,
-            'Surat Putusan Sanksi Diterbitkan ✅',
+            'Surat Putusan Sanksi Diterbitkan',
             "Surat Putusan No. {$request->nomor_surat_putusan} ({$request->jenis_sanksi}) telah diterbitkan oleh SDM. Pengaduan $id selesai."
         );
 

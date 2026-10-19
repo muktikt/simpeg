@@ -18,19 +18,19 @@
         </a>
         <a href="{{ route('pengumuman.index', ['filter' => 'tayang', 'q' => request('q')]) }}" 
            class="btn btn-sm {{ $filter === 'tayang' ? 'btn-primary' : 'btn-outline' }}" style="{{ $filter === 'tayang' ? 'background:#16A34A; border-color:#16A34A;' : '' }}">
-            🟢 Tayang ({{ $counts['tayang'] }})
+            Tayang ({{ $counts['tayang'] }})
         </a>
         <a href="{{ route('pengumuman.index', ['filter' => 'terjadwal', 'q' => request('q')]) }}" 
            class="btn btn-sm {{ $filter === 'terjadwal' ? 'btn-primary' : 'btn-outline' }}" style="{{ $filter === 'terjadwal' ? 'background:#D97706; border-color:#D97706;' : '' }}">
-            🕒 Terjadwal ({{ $counts['terjadwal'] }})
+            Terjadwal ({{ $counts['terjadwal'] }})
         </a>
         <a href="{{ route('pengumuman.index', ['filter' => 'kedaluwarsa', 'q' => request('q')]) }}" 
            class="btn btn-sm {{ $filter === 'kedaluwarsa' ? 'btn-primary' : 'btn-outline' }}" style="{{ $filter === 'kedaluwarsa' ? 'background:#DC2626; border-color:#DC2626;' : '' }}">
-            🔴 Kedaluwarsa ({{ $counts['kedaluwarsa'] }})
+            Kedaluwarsa ({{ $counts['kedaluwarsa'] }})
         </a>
         <a href="{{ route('pengumuman.index', ['filter' => 'nonaktif', 'q' => request('q')]) }}" 
            class="btn btn-sm {{ $filter === 'nonaktif' ? 'btn-primary' : 'btn-outline' }}">
-            ⚪ Nonaktif ({{ $counts['nonaktif'] }})
+            Nonaktif ({{ $counts['nonaktif'] }})
         </a>
     </div>
 
@@ -59,31 +59,31 @@
                     <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:6px;">
                         @if ($p['disematkan'] ?? false)
                             <span style="background:#DBEAFE; color:#1D4ED8; font-size:11px; font-weight:700; padding:3px 8px; border-radius:6px; display:inline-flex; align-items:center; gap:4px;">
-                                📌 Disematkan
+                                Disematkan
                             </span>
                         @endif
 
                         @if ($p['prioritas'] ?? false)
                             <span style="background:#FEE2E2; color:#DC2626; font-size:11px; font-weight:700; padding:3px 8px; border-radius:6px; display:inline-flex; align-items:center; gap:4px;">
-                                ⚡ PENTING
+                                PENTING
                             </span>
                         @endif
 
                         @if ($p['status_kode'] === 'tayang')
                             <span style="background:#DCFCE7; color:#16A34A; font-size:11px; font-weight:700; padding:3px 8px; border-radius:6px;">
-                                🟢 Sedang Tayang
+                                Sedang Tayang
                             </span>
                         @elseif ($p['status_kode'] === 'terjadwal')
                             <span style="background:#FEF3C7; color:#D97706; font-size:11px; font-weight:700; padding:3px 8px; border-radius:6px;">
-                                🕒 Terjadwal ({{ formatTglIndo($p['terbit_pada'], 'd M Y, H:i') }})
+                                Terjadwal ({{ formatTglIndo($p['terbit_pada'], 'd M Y, H:i') }})
                             </span>
                         @elseif ($p['status_kode'] === 'kedaluwarsa')
                             <span style="background:#FEE2E2; color:#DC2626; font-size:11px; font-weight:700; padding:3px 8px; border-radius:6px;">
-                                🔴 Kedaluwarsa
+                                Kedaluwarsa
                             </span>
                         @else
                             <span style="background:#F1F5F9; color:#64748B; font-size:11px; font-weight:700; padding:3px 8px; border-radius:6px;">
-                                ⚪ Nonaktif
+                                Nonaktif
                             </span>
                         @endif
 
@@ -131,7 +131,7 @@
 
                         @if (!empty($p['lampiran_url']) || !empty($p['lampiran_nama']))
                             <div>
-                                &bull; 📎 <a href="{{ $p['lampiran_url'] }}" target="_blank" style="color:#0284C7; font-weight:600; text-decoration:none;">{{ $p['lampiran_nama'] ?? 'Lihat Lampiran' }}</a>
+                                &bull; <a href="{{ $p['lampiran_url'] }}" target="_blank" style="color:#0284C7; font-weight:600; text-decoration:none;">{{ $p['lampiran_nama'] ?? 'Lihat Lampiran' }}</a>
                             </div>
                         @endif
                     </div>
@@ -147,7 +147,7 @@
                     <form action="{{ route('pengumuman.toggle-sematkan', $p['id']) }}" method="POST" style="margin:0; width:100%;">
                         @csrf
                         <button type="submit" class="btn btn-outline btn-sm" style="width:100%; font-size:11px;">
-                            {{ ($p['disematkan'] ?? false) ? '📌 Lepas Sematan' : '📌 Sematkan' }}
+                            {{ ($p['disematkan'] ?? false) ? 'Lepas Sematan' : 'Sematkan' }}
                         </button>
                     </form>
 

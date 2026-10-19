@@ -55,7 +55,7 @@
                 </td>
                 <td>
                     @if (!empty($item->anonim))
-                        <span style="background:#fee2e2; color:#991b1b; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:700;">🔒 Anonim</span>
+                        <span style="background:#fee2e2; color:#991b1b; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:700;">Anonim</span>
                     @else
                         <strong>{{ $item->nama_pegawai ?? '-' }}</strong><br>
                         <small style="color:var(--text-muted);">NIK: {{ $item->nik ?? '-' }}</small>
@@ -87,9 +87,9 @@
                         </span>
                         @if (!empty($item->kesimpulan_investigasi))
                             @if ($item->kesimpulan_investigasi === 'terbukti')
-                                <span style="background:#dcfce7; color:#15803d; border:1px solid #bbf7d0; font-size:10.5px; font-weight:800; padding:2px 6px; border-radius:10px; display:inline-block;">⚖️ Terbukti</span>
+                                <span style="background:#dcfce7; color:#15803d; border:1px solid #bbf7d0; font-size:10.5px; font-weight:800; padding:2px 6px; border-radius:10px; display:inline-block;">Terbukti</span>
                             @else
-                                <span style="background:#fee2e2; color:#b91c1c; border:1px solid #fecaca; font-size:10.5px; font-weight:800; padding:2px 6px; border-radius:10px; display:inline-block;">🛡️ Tidak Terbukti</span>
+                                <span style="background:#fee2e2; color:#b91c1c; border:1px solid #fecaca; font-size:10.5px; font-weight:800; padding:2px 6px; border-radius:10px; display:inline-block;">Tidak Terbukti</span>
                             @endif
                         @endif
                     </div>
@@ -111,7 +111,7 @@
 
                     @if (!empty($item->keterangan_terakhir))
                         <div style="margin-top:6px; background:#eff6ff; border:1px solid #bfdbfe; border-radius:6px; padding:4px 8px; font-size:11px; color:#1e40af; line-height:1.3; max-width:230px;">
-                            📝 <strong>Catatan:</strong> {{ Str::limit(trim($item->keterangan_terakhir), 70) }}
+                            <strong>Catatan:</strong> {{ Str::limit(trim(str_replace(['•', '·'], '-', $item->keterangan_terakhir)), 70) }}
                         </div>
                     @endif
                 </td>
@@ -120,7 +120,7 @@
                         <a href="{{ route('pengaduan.surat', $item->id) }}" target="_blank" 
                            style="background:#f1f5f9; color:#0d2c6e; border:1px solid #cbd5e1; padding:6px 10px; border-radius:6px; font-size:12px; font-weight:600; text-decoration:none; display:inline-flex; align-items:center; gap:4px;"
                            title="Format Lembar Surat & Ekspor PDF">
-                            📄 Surat
+                            Surat
                         </a>
                         <a href="{{ route('pengaduan.detail', $item->id) }}" 
                            style="background:#0d2c6e; color:#fff; padding:6px 12px; border-radius:6px; font-size:12px; font-weight:600; text-decoration:none; display:inline-flex; align-items:center; gap:4px;">

@@ -694,7 +694,7 @@ class GajiTigabelasController extends Controller
             try {
                 \App\Services\OneSignalService::kirimNotifikasiPegawai(
                     $row['nik'],
-                    'Gaji ke-13 Telah Cair! 💰',
+                    'Gaji ke-13 Telah Cair!',
                     'Gaji ke-13 Tahun ' . ($row['tahun'] ?? date('Y')) . ' telah diterbitkan. Silakan cek rincian di aplikasi SIMPEG.',
                     ['type' => 'gaji_13', 'tahun' => (string)($row['tahun'] ?? date('Y'))]
                 );

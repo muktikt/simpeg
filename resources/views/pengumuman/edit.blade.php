@@ -48,7 +48,7 @@
                 </label>
                 <select name="prioritas" style="width:100%; padding:9px 12px; border:1px solid #CBD5E1; border-radius:8px; font-size:13px; background:white;">
                     <option value="normal" @selected(old('prioritas', ($p['prioritas'] ?? false) ? 'penting' : 'normal') === 'normal')>Normal (Standar)</option>
-                    <option value="penting" @selected(old('prioritas', ($p['prioritas'] ?? false) ? 'penting' : 'normal') === 'penting')>⚡ Penting (High Priority)</option>
+                    <option value="penting" @selected(old('prioritas', ($p['prioritas'] ?? false) ? 'penting' : 'normal') === 'penting')>Penting (High Priority)</option>
                 </select>
             </div>
 
@@ -56,7 +56,7 @@
             <div style="display:flex; align-items:center; gap:10px; margin-top:22px;">
                 <input type="checkbox" id="disematkan" name="disematkan" value="1" @checked(old('disematkan', $p['disematkan'] ?? false)) style="width:18px; height:18px;">
                 <label for="disematkan" style="font-weight:600; color:#1E293B; font-size:13px; cursor:pointer;">
-                    📌 Sematkan ke Posisi Teratas (Pin)
+                    Sematkan ke Posisi Teratas (Pin)
                 </label>
             </div>
 
@@ -64,7 +64,7 @@
             <div style="display:flex; align-items:center; gap:10px; margin-top:22px;">
                 <input type="checkbox" id="aktif" name="aktif" value="1" @checked(old('aktif', ($p['aktif'] ?? false) ? '1' : '0') === '1') style="width:18px; height:18px;">
                 <label for="aktif" style="font-weight:600; color:#1E293B; font-size:13px; cursor:pointer;">
-                    🟢 Status Aktif (Tayang)
+                    Status Aktif (Tayang)
                 </label>
             </div>
         </div>
@@ -119,7 +119,7 @@
             </label>
             @if (!empty($p['lampiran_url']) || !empty($p['lampiran_nama']))
                 <div style="background:#F1F5F9; padding:10px 14px; border-radius:8px; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;">
-                    <div>📎 <a href="{{ $p['lampiran_url'] }}" target="_blank" style="color:#0284C7; font-weight:600; text-decoration:none;">{{ $p['lampiran_nama'] ?? 'Lihat Lampiran Saat Ini' }}</a></div>
+                    <div><a href="{{ $p['lampiran_url'] }}" target="_blank" style="color:#0284C7; font-weight:600; text-decoration:none;">{{ $p['lampiran_nama'] ?? 'Lihat Lampiran Saat Ini' }}</a></div>
                     <label style="font-size:12px; color:#DC2626; display:flex; align-items:center; gap:6px; cursor:pointer;">
                         <input type="checkbox" name="hapus_lampiran" value="1"> Hapus Lampiran
                     </label>

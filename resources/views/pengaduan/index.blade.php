@@ -39,8 +39,8 @@
 </div>
 
 @php
-    $isPrivileged = in_array($myRole, ['kadiv', 'kspi', 'dirut', 'tpdpk']);
-    $isEksekutor = in_array($myRole, ['kadiv', 'tpdpk']);
+    $isPrivileged = in_array($myRole, ['kadiv', 'kspi', 'dirut', 'tpdpk', 'sdm']);
+    $isEksekutor = in_array($myRole, ['kadiv', 'tpdpk', 'kspi']);
 @endphp
 
 {{-- TAB NAVIGASI PENGADUAN --}}
@@ -48,22 +48,22 @@
         @if ($isPrivileged)
             <a href="{{ route('pengaduan.index', ['tab' => 'masuk']) }}" 
                style="text-decoration:none; padding:8px 16px; border-radius:6px; font-weight:600; font-size:13px; display:inline-flex; align-items:center; gap:6px; {{ $tab === 'masuk' ? 'background:var(--primary, #0d2c6e); color:#fff;' : 'background:#f1f5f9; color:#475569;' }}">
-                📥 Kotak Masuk Tindakan
+                Kotak Masuk Tindakan
                 @if (count($pengaduanMasuk) > 0)
                     <span style="background:#ef4444; color:#fff; font-size:10px; padding:2px 6px; border-radius:10px;">{{ count($pengaduanMasuk) }}</span>
                 @endif
             </a>
             <a href="{{ route('pengaduan.index', ['tab' => 'riwayat']) }}" 
                style="text-decoration:none; padding:8px 16px; border-radius:6px; font-weight:600; font-size:13px; display:inline-flex; align-items:center; gap:6px; {{ $tab === 'riwayat' ? 'background:var(--primary, #0d2c6e); color:#fff;' : 'background:#f1f5f9; color:#475569;' }}">
-                📋 Riwayat Terproses ({{ count($pengaduanRiwayat) }})
+                Riwayat Terproses ({{ count($pengaduanRiwayat) }})
             </a>
         @endif
 
-        {{-- TAB TUGAS SAYA (Hanya untuk Eksekutor: Kadiv SPI & TPDPK) --}}
+        {{-- TAB TUGAS SAYA (Untuk Eksekutor: Kadiv SPI, TPDPK, KSPI) --}}
         @if ($isEksekutor)
             <a href="{{ route('pengaduan.index', ['tab' => 'tugas']) }}" 
                style="text-decoration:none; padding:8px 16px; border-radius:6px; font-weight:600; font-size:13px; display:inline-flex; align-items:center; gap:6px; {{ $tab === 'tugas' ? 'background:#0284c7; color:#fff;' : 'background:#f1f5f9; color:#475569;' }}">
-                🎯 Tugas Saya
+                Tugas Saya
                 @if (count($tugasSaya) > 0)
                     <span style="background:{{ $tab === 'tugas' ? '#fff' : '#0284c7' }}; color:{{ $tab === 'tugas' ? '#0284c7' : '#fff' }}; font-size:10px; padding:2px 6px; border-radius:10px; font-weight:700;">{{ count($tugasSaya) }}</span>
                 @endif
@@ -72,12 +72,12 @@
 
         <a href="{{ route('pengaduan.index', ['tab' => 'saya']) }}" 
            style="text-decoration:none; padding:8px 16px; border-radius:6px; font-weight:600; font-size:13px; display:inline-flex; align-items:center; gap:6px; {{ $tab === 'saya' ? 'background:var(--primary, #0d2c6e); color:#fff;' : 'background:#f1f5f9; color:#475569;' }}">
-            👤 Aduan Pribadi Saya ({{ count($pengaduanSaya) }})
+            Aduan Pribadi Saya ({{ count($pengaduanSaya) }})
         </a>
 
         <a href="{{ route('pengaduan.index', ['tab' => 'buat']) }}" 
            style="text-decoration:none; padding:8px 16px; border-radius:6px; font-weight:600; font-size:13px; display:inline-flex; align-items:center; gap:6px; margin-left:auto; {{ $tab === 'buat' ? 'background:#16a34a; color:#fff;' : 'background:#dcfce7; color:#15803d;' }}">
-            ➕ Buat Pengaduan Baru
+            + Buat Pengaduan Baru
         </a>
     </div>
 
@@ -96,6 +96,8 @@
                             Approval kelayakan investigasi & persetujuan sanksi
                         @elseif ($myRole === 'tpdpk')
                             Penugasan investigasi lapangan & penyusunan berita acara
+                        @elseif ($myRole === 'sdm')
+                            Penerbitan Surat Putusan Sanksi bagi pelanggaran yang telah dinyatakan terbukti
                         @endif
                     </p>
                 </div>
@@ -118,8 +120,8 @@
         <div class="table-card">
             <div style="padding:16px 20px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
                 <div>
-                    <h2 style="font-size:16px; margin:0; display:flex; align-items:center; gap:8px;">
-                        <span>🎯</span> Daftar Penugasan Investigasi & Eksekusi Saya
+                    <h2 style="font-size:16px; margin:0;">
+                        Daftar Penugasan Investigasi & Eksekusi Saya
                     </h2>
                     <p style="margin:2px 0 0; font-size:12.5px; color:var(--text-muted);">
                         Kelola tugas pemeriksaan dan investigasi pengaduan yang ditugaskan kepada Anda oleh KSPI.
@@ -181,7 +183,7 @@
                                         <button type="button" 
                                                 onclick="bukaModalUpdateTask('{{ $task->id }}', '{{ addslashes($task->title) }}', '{{ $task->status }}', '{{ addslashes($task->notes ?? '') }}')"
                                                 style="background:#0284c7; color:#fff; padding:6px 12px; border-radius:6px; font-size:12px; font-weight:600; border:none; cursor:pointer;">
-                                            ⚡ Proses Tugas
+                                            Proses Tugas
                                         </button>
                                     @endif
                                     <a href="{{ route('pengaduan.detail', $task->pengaduan_id) }}" 
@@ -226,7 +228,7 @@
     <div style="background:#fff; border-radius:12px; width:100%; max-width:540px; box-shadow:0 20px 25px -5px rgba(0,0,0,0.1); overflow:hidden;">
         <div style="padding:14px 18px; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; background:#f8fafc;">
             <div style="font-weight:700; font-size:15px; color:#0f172a;" id="task-modal-title">
-                ⚡ Perbarui Status Tugas
+                Perbarui Status Tugas
             </div>
             <button type="button" onclick="tutupModalUpdateTask()" style="background:none; border:none; font-size:20px; color:#64748b; cursor:pointer;">&times;</button>
         </div>
@@ -275,7 +277,7 @@ function bukaModalUpdateTask(taskId, title, status, notes) {
     const f = document.getElementById('form-update-task');
     if (m && f) {
         f.action = "{{ url('pengaduan/tasks') }}/" + taskId + "/update";
-        document.getElementById('task-modal-title').textContent = "⚡ " + title;
+        document.getElementById('task-modal-title').textContent = title;
         document.getElementById('task-modal-status').value = status === 'Menunggu' ? 'Diproses' : status;
         document.getElementById('task-modal-notes').value = notes || '';
         m.style.display = 'flex';

@@ -220,7 +220,7 @@ class DokumenSuratController extends Controller
             if ($targetNik) {
                 \App\Services\OneSignalService::kirimNotifikasiPegawai(
                     $targetNik,
-                    'Dokumen Resmi Baru Diterbitkan 📄',
+                    'Dokumen Resmi Baru Diterbitkan',
                     "{$kategoriLabel} Anda telah diunggah oleh SDM ({$validated['judul']}). Silakan periksa di menu Dokumen Resmi.",
                     ['type' => 'dokumen', 'kategori' => $kategoriDb]
                 );

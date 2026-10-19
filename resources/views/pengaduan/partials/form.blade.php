@@ -23,10 +23,10 @@
     <div style="background:#f0f9ff; border:1px solid #bae6fd; border-radius:8px; padding:12px 14px; margin-bottom:14px;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
             <label style="font-weight:700; font-size:13px; color:#0369a1; margin:0; display:flex; align-items:center; gap:6px;">
-                <span>👤</span> Pelaku / Pihak yang Diadukan *
+                Pelaku / Pihak yang Diadukan *
             </label>
             <button type="button" onclick="bukaModalPilihPegawai()" style="background:#0284c7; color:#fff; border:none; padding:5px 12px; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:5px;">
-                🔍 Pilih dari Data Pegawai
+                Pilih dari Data Pegawai
             </button>
         </div>
 
@@ -111,7 +111,7 @@
     <div style="background:#fff; border-radius:12px; width:100%; max-width:540px; max-height:85vh; display:flex; flex-direction:column; box-shadow:0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1); overflow:hidden;">
         <div style="padding:14px 18px; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; background:#f8fafc;">
             <div style="font-weight:700; font-size:15px; color:#0f172a; display:flex; align-items:center; gap:8px;">
-                <span>👤</span> Pilih Pegawai yang Diadukan
+                Pilih Pegawai yang Diadukan
             </div>
             <button type="button" onclick="tutupModalPilihPegawai()" style="background:none; border:none; font-size:20px; color:#64748b; cursor:pointer; line-height:1;">&times;</button>
         </div>

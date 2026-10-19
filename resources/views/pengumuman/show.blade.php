@@ -15,31 +15,31 @@
         <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:16px;">
             @if ($p['disematkan'] ?? false)
                 <span style="background:#DBEAFE; color:#1D4ED8; font-size:12px; font-weight:700; padding:4px 10px; border-radius:6px; display:inline-flex; align-items:center; gap:4px;">
-                    📌 Disematkan
+                    Disematkan
                 </span>
             @endif
 
             @if ($p['prioritas'] ?? false)
                 <span style="background:#FEE2E2; color:#DC2626; font-size:12px; font-weight:700; padding:4px 10px; border-radius:6px; display:inline-flex; align-items:center; gap:4px;">
-                    ⚡ PENTING
+                    PENTING
                 </span>
             @endif
 
             @if ($p['status_kode'] === 'tayang')
                 <span style="background:#DCFCE7; color:#16A34A; font-size:12px; font-weight:700; padding:4px 10px; border-radius:6px;">
-                    🟢 Sedang Tayang
+                    Sedang Tayang
                 </span>
             @elseif ($p['status_kode'] === 'terjadwal')
                 <span style="background:#FEF3C7; color:#D97706; font-size:12px; font-weight:700; padding:4px 10px; border-radius:6px;">
-                    🕒 Terjadwal ({{ formatTglIndo($p['terbit_pada']) }})
+                    Terjadwal ({{ formatTglIndo($p['terbit_pada']) }})
                 </span>
             @elseif ($p['status_kode'] === 'kedaluwarsa')
                 <span style="background:#FEE2E2; color:#DC2626; font-size:12px; font-weight:700; padding:4px 10px; border-radius:6px;">
-                    🔴 Kedaluwarsa
+                    Kedaluwarsa
                 </span>
             @else
                 <span style="background:#F1F5F9; color:#64748B; font-size:12px; font-weight:700; padding:4px 10px; border-radius:6px;">
-                    ⚪ Nonaktif
+                    Nonaktif
                 </span>
             @endif
         </div>
@@ -49,13 +49,13 @@
         </h2>
 
         <div style="font-size:13px; color:#64748B; margin-bottom:24px; padding-bottom:16px; border-bottom:1px solid #E2E8F0; display:flex; gap:16px; flex-wrap:wrap;">
-            <div>👤 Diterbitkan oleh: <strong>{{ $p['pembuat'] ?? 'SDM PERUMDAM' }}</strong></div>
-            <div>📅 Dibuat: <strong>{{ formatTglIndo($p['created_at']) }}</strong></div>
+            <div>Diterbitkan oleh: <strong>{{ $p['pembuat'] ?? 'SDM PERUMDAM' }}</strong></div>
+            <div>Dibuat: <strong>{{ formatTglIndo($p['created_at']) }}</strong></div>
             @if (!empty($p['terbit_pada']))
-                <div>🕒 Tayang: <strong>{{ formatTglIndo($p['terbit_pada']) }} {{ \Illuminate\Support\Carbon::parse($p['terbit_pada'])->setTimezone('Asia/Jakarta')->format('H:i') }} WIB</strong></div>
+                <div>Tayang: <strong>{{ formatTglIndo($p['terbit_pada']) }} {{ \Illuminate\Support\Carbon::parse($p['terbit_pada'])->setTimezone('Asia/Jakarta')->format('H:i') }} WIB</strong></div>
             @endif
             @if (!empty($p['kedaluwarsa_pada']))
-                <div>⌛ Kedaluwarsa: <strong>{{ formatTglIndo($p['kedaluwarsa_pada']) }} {{ \Illuminate\Support\Carbon::parse($p['kedaluwarsa_pada'])->setTimezone('Asia/Jakarta')->format('H:i') }} WIB</strong></div>
+                <div>Kedaluwarsa: <strong>{{ formatTglIndo($p['kedaluwarsa_pada']) }} {{ \Illuminate\Support\Carbon::parse($p['kedaluwarsa_pada'])->setTimezone('Asia/Jakarta')->format('H:i') }} WIB</strong></div>
             @endif
         </div>
 

@@ -556,7 +556,7 @@ class ThrController extends Controller
             try {
                 \App\Services\OneSignalService::kirimNotifikasiPegawai(
                     $row['nik'],
-                    'THR Telah Cair! 🎁',
+                    'THR Telah Cair!',
                     'Tunjangan Hari Raya (THR) Tahun ' . ($row['tahun'] ?? date('Y')) . ' telah diterbitkan. Silakan cek rincian di aplikasi SIMPEG.',
                     ['type' => 'thr', 'tahun' => (string)($row['tahun'] ?? date('Y'))]
                 );

@@ -47,7 +47,7 @@
                 </label>
                 <select name="prioritas" style="width:100%; padding:9px 12px; border:1px solid #CBD5E1; border-radius:8px; font-size:13px; background:white;">
                     <option value="normal" @selected(old('prioritas') === 'normal')>Normal (Standar)</option>
-                    <option value="penting" @selected(old('prioritas') === 'penting')>⚡ Penting (High Priority)</option>
+                    <option value="penting" @selected(old('prioritas') === 'penting')>Penting (High Priority)</option>
                 </select>
             </div>
 
@@ -55,7 +55,7 @@
             <div style="display:flex; align-items:center; gap:10px; margin-top:22px;">
                 <input type="checkbox" id="disematkan" name="disematkan" value="1" @checked(old('disematkan')) style="width:18px; height:18px;">
                 <label for="disematkan" style="font-weight:600; color:#1E293B; font-size:13px; cursor:pointer;">
-                    📌 Sematkan ke Posisi Teratas (Pin)
+                    Sematkan ke Posisi Teratas (Pin)
                 </label>
             </div>
 
@@ -63,7 +63,7 @@
             <div style="display:flex; align-items:center; gap:10px; margin-top:22px;">
                 <input type="checkbox" id="aktif" name="aktif" value="1" @checked(old('aktif', '1') === '1') style="width:18px; height:18px;">
                 <label for="aktif" style="font-weight:600; color:#1E293B; font-size:13px; cursor:pointer;">
-                    🟢 Publikasikan / Langsung Aktif
+                    Publikasikan / Langsung Aktif
                 </label>
             </div>
         </div>

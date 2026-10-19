@@ -61,10 +61,10 @@
             };
             $isArsip = ($statusName === 'arsip');
             $stages = [
-                1 => ['label' => 'Diajukan', 'desc' => 'Verifikasi Kadiv', 'icon' => '📤'],
-                2 => ['label' => 'Diverifikasi', 'desc' => 'KSPI & Dirut', 'icon' => '🔍'],
-                3 => ['label' => 'Diproses', 'desc' => 'Investigasi & Sanksi', 'icon' => '⚙️'],
-                4 => ['label' => $isArsip ? 'Diarsipkan' : 'Selesai', 'desc' => $isArsip ? 'Tutup Kasus' : 'Selesai', 'icon' => $isArsip ? '📁' : '✅'],
+                1 => ['label' => 'Diajukan', 'desc' => 'Verifikasi Kadiv', 'step' => '1'],
+                2 => ['label' => 'Diverifikasi', 'desc' => 'KSPI & Dirut', 'step' => '2'],
+                3 => ['label' => 'Diproses', 'desc' => 'Investigasi & Sanksi', 'step' => '3'],
+                4 => ['label' => $isArsip ? 'Diarsipkan' : 'Selesai', 'desc' => $isArsip ? 'Tutup Kasus' : 'Selesai', 'step' => '4'],
             ];
         @endphp
 
@@ -97,7 +97,7 @@
                             @if ($isCompleted)
                                 ✓
                             @else
-                                {{ $st['icon'] }}
+                                {{ $st['step'] }}
                             @endif
                         </div>
                         <div style="font-size:12px; font-weight:{{ $isCurrent || $isCompleted ? '700' : '500' }}; color:{{ $isCurrent || $isCompleted ? '#fff' : 'rgba(255,255,255,0.7)' }};">
@@ -128,7 +128,6 @@
         @endphp
         @if ($latestNote)
             <div style="background:#eff6ff; border:1px solid #bfdbfe; border-left:4px solid #2563eb; border-radius:8px; padding:12px 16px; margin-bottom:20px; display:flex; align-items:flex-start; gap:10px;">
-                <span style="font-size:18px;">📝</span>
                 <div style="flex:1;">
                     <div style="font-size:11.5px; font-weight:700; color:#1e40af; text-transform:uppercase;">
                         Catatan / Disposisi Terakhir (Oleh: {{ $latestNote->oleh }} · {{ date('d M Y H:i', strtotime($latestNote->tanggal)) }})
@@ -144,7 +143,7 @@
         @if (!empty($tasks) && count($tasks) > 0)
             <div class="ribbon-card" style="margin-bottom:20px; border-left:4px solid #0284c7;">
                 <div class="ribbon-head" style="margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;">
-                    <h2 style="font-size:15px; color:#0369a1; margin:0;">🎯 Tim Eksekutor & Penugasan Investigasi</h2>
+                    <h2 style="font-size:15px; color:#0369a1; margin:0;">Tim Eksekutor & Penugasan Investigasi</h2>
                     <span style="font-size:11.5px; background:#e0f2fe; color:#0369a1; padding:3px 8px; border-radius:10px; font-weight:700;">{{ count($tasks) }} Petugas</span>
                 </div>
                 <div style="display:flex; flex-direction:column; gap:8px;">
@@ -187,7 +186,7 @@
                 <div>
                     <small style="color:var(--text-muted); display:block; font-size:11.5px;">Identitas Pelapor:</small>
                     @if (!empty($pengaduan->anonim))
-                        <strong style="color:#dc2626;">🔒 Anonim (Dirahasiakan)</strong>
+                        <strong style="color:#dc2626;">Anonim (Dirahasiakan)</strong>
                     @else
                         <strong style="font-size:13.5px;">{{ $pengaduan->nama_pegawai ?? '-' }}</strong>
                         <div style="font-size:12px; color:#475569;">NIK: {{ $pengaduan->nik ?? '-' }} · {{ $pengaduan->cabang ?? '' }}</div>
@@ -225,12 +224,12 @@
                     <div style="display:flex; gap:10px; flex-wrap:wrap;">
                         @foreach ($fotoBukti as $f)
                             <a href="{{ $f }}" target="_blank" style="display:inline-flex; align-items:center; gap:6px; background:#f0f9ff; border:1px solid #bae6fd; color:#0369a1; padding:6px 12px; border-radius:6px; font-size:12px; text-decoration:none; font-weight:600;">
-                                📷 Lihat Foto Bukti
+                                Lihat Foto Bukti
                             </a>
                         @endforeach
                         @foreach ($dokumen as $d)
                             <a href="{{ $d }}" target="_blank" style="display:inline-flex; align-items:center; gap:6px; background:#f8fafc; border:1px solid #cbd5e1; color:#334155; padding:6px 12px; border-radius:6px; font-size:12px; text-decoration:none; font-weight:600;">
-                                📄 Unduh Dokumen
+                                Unduh Dokumen
                             </a>
                         @endforeach
                     </div>
@@ -242,15 +241,15 @@
         @if (!empty($pengaduan->hasil_investigasi) || !empty($pengaduan->surat_rekomendasi))
             <div class="ribbon-card" style="margin-bottom:20px; border-left:4px solid #0284c7;">
                 <div class="ribbon-head" style="margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-                    <h2 style="font-size:16px; color:#0369a1; margin:0;">📋 Laporan Hasil Investigasi & Rekomendasi Sanksi</h2>
+                    <h2 style="font-size:16px; color:#0369a1; margin:0;">Laporan Hasil Investigasi & Rekomendasi Sanksi</h2>
                     @if (!empty($pengaduan->kesimpulan_investigasi))
                         @if ($pengaduan->kesimpulan_investigasi === 'terbukti')
                             <span style="background:#dcfce7; color:#15803d; border:1.5px solid #86efac; padding:4px 12px; border-radius:20px; font-weight:800; font-size:12px; display:inline-flex; align-items:center; gap:5px;">
-                                <span>⚖️</span> KESIMPULAN: TERBUKTI
+                                KESIMPULAN: TERBUKTI
                             </span>
                         @else
                             <span style="background:#fee2e2; color:#b91c1c; border:1.5px solid #fca5a5; padding:4px 12px; border-radius:20px; font-weight:800; font-size:12px; display:inline-flex; align-items:center; gap:5px;">
-                                <span>🛡️</span> KESIMPULAN: TIDAK TERBUKTI
+                                KESIMPULAN: TIDAK TERBUKTI
                             </span>
                         @endif
                     @endif
@@ -294,11 +293,11 @@
                         {{-- Bukti Foto --}}
                         @if (!empty($invFoto))
                             <div style="margin-bottom:10px;">
-                                <div style="font-size:11.5px; font-weight:700; color:#0284c7; margin-bottom:4px;">📸 Foto Bukti Pemeriksaan:</div>
+                                <div style="font-size:11.5px; font-weight:700; color:#0284c7; margin-bottom:4px;">Foto Bukti Pemeriksaan:</div>
                                 <div style="display:flex; gap:8px; flex-wrap:wrap;">
                                     @foreach ($invFoto as $idx => $f)
                                         <a href="{{ $f }}" target="_blank" style="display:inline-flex; align-items:center; gap:6px; background:#e0f2fe; border:1px solid #bae6fd; color:#0369a1; padding:5px 10px; border-radius:6px; font-size:11.5px; text-decoration:none; font-weight:600;">
-                                            <span>📷 Foto {{ $idx + 1 }}</span>
+                                            <span>Foto {{ $idx + 1 }}</span>
                                         </a>
                                     @endforeach
                                 </div>
@@ -308,7 +307,7 @@
                         {{-- Bukti Video --}}
                         @if (!empty($invVideo))
                             <div style="margin-bottom:10px;">
-                                <div style="font-size:11.5px; font-weight:700; color:#0284c7; margin-bottom:4px;">🎥 Video Bukti Pemeriksaan:</div>
+                                <div style="font-size:11.5px; font-weight:700; color:#0284c7; margin-bottom:4px;">Video Bukti Pemeriksaan:</div>
                                 <div style="display:flex; flex-direction:column; gap:8px;">
                                     @foreach ($invVideo as $idx => $v)
                                         <div style="background:#0f172a; border-radius:8px; padding:6px; max-width:480px;">
@@ -328,7 +327,7 @@
                         {{-- Bukti Rekaman Suara / Voice Note --}}
                         @if (!empty($invVoice))
                             <div style="margin-bottom:10px;">
-                                <div style="font-size:11.5px; font-weight:700; color:#0284c7; margin-bottom:4px;">🎙️ Rekaman Suara / Audio Bukti:</div>
+                                <div style="font-size:11.5px; font-weight:700; color:#0284c7; margin-bottom:4px;">Rekaman Suara / Audio Bukti:</div>
                                 <div style="display:flex; flex-direction:column; gap:6px; max-width:480px;">
                                     @foreach ($invVoice as $idx => $vo)
                                         <div style="background:#f0f9ff; border:1px solid #bae6fd; border-radius:8px; padding:8px 10px;">
@@ -346,11 +345,11 @@
                         {{-- Dokumen BAP --}}
                         @if (!empty($invDok))
                             <div style="margin-bottom:4px;">
-                                <div style="font-size:11.5px; font-weight:700; color:#0284c7; margin-bottom:4px;">📑 Berkas Dokumen & BAP Resmi:</div>
+                                <div style="font-size:11.5px; font-weight:700; color:#0284c7; margin-bottom:4px;">Berkas Dokumen & BAP Resmi:</div>
                                 <div style="display:flex; gap:8px; flex-wrap:wrap;">
                                     @foreach ($invDok as $idx => $doc)
                                         <a href="{{ $doc }}" target="_blank" style="display:inline-flex; align-items:center; gap:6px; background:#f8fafc; border:1px solid #cbd5e1; color:#334155; padding:5px 12px; border-radius:6px; font-size:11.5px; text-decoration:none; font-weight:600;">
-                                            📄 Unduh BAP / Berkas #{{ $idx + 1 }}
+                                            Unduh BAP / Berkas #{{ $idx + 1 }}
                                         </a>
                                     @endforeach
                                 </div>
@@ -365,7 +364,7 @@
         @if (!empty($pengaduan->nomor_surat_putusan))
             <div class="ribbon-card" style="margin-bottom:20px; border-left:4px solid #0369a1; background:#f0f9ff; border:1.5px solid #bae6fd;">
                 <div class="ribbon-head" style="margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-                    <h2 style="font-size:16px; color:#0369a1; margin:0;">🏛️ Surat Putusan Sanksi Resmi (SDM)</h2>
+                    <h2 style="font-size:16px; color:#0369a1; margin:0;">Surat Putusan Sanksi Resmi (SDM)</h2>
                     <span style="background:#0284c7; color:#fff; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:800;">
                         KASUS SELESAI
                     </span>
@@ -400,7 +399,7 @@
                 @if (!empty($pengaduan->file_surat_putusan))
                     <div style="margin-top:10px;">
                         <a href="{{ $pengaduan->file_surat_putusan }}" target="_blank" style="display:inline-flex; align-items:center; gap:8px; background:#0284c7; color:#fff; padding:8px 16px; border-radius:8px; font-size:12.5px; font-weight:700; text-decoration:none; box-shadow:0 2px 4px rgba(2,132,199,0.2);">
-                            <span>📥 Unduh Berkas Surat Putusan Sanksi</span>
+                            <span>Unduh Berkas Surat Putusan Sanksi</span>
                         </a>
                     </div>
                 @endif
@@ -416,13 +415,14 @@
         @if ($myRole === 'kadiv' && in_array($statusName, ['menungguKadiv', 'menungguVerifikasiKadiv']))
             <div class="ribbon-card" style="margin-bottom:20px; border:2px solid #16a085;">
                 <div class="ribbon-head" style="margin-bottom:12px;">
-                    <h2 style="font-size:15px; color:#0f766e;">⚡ Tindakan Kadiv</h2>
+                    <h2 style="font-size:15px; color:#0f766e;">Tindakan Kadiv</h2>
                 </div>
                 <p style="font-size:12px; color:var(--text-muted); margin-bottom:14px;">
                     Verifikasi pengaduan masuk dan teruskan ke KSPI untuk peninjauan lebih lanjut.
                 </p>
 
-                <form method="POST" action="{{ route('pengaduan.kadiv-verifikasi', $pengaduan->id) }}" style="margin-bottom:14px;">
+                <form method="POST" action="{{ route('pengaduan.kadiv-verifikasi', $pengaduan->id) }}" style="margin-bottom:14px;"
+                      onsubmit="return confirmSubmit(event, 'Apakah Anda yakin ingin memverifikasi pengaduan ini dan meneruskannya ke KSPI?', 'Konfirmasi Verifikasi Kadiv', 'warning', 'Ya, Kirim ke KSPI')">
                     @csrf
                     <div class="field" style="margin-bottom:10px;">
                         <label style="font-weight:600; font-size:12px;">Keputusan Verifikasi:</label>
@@ -465,13 +465,14 @@
         @if ($myRole === 'kspi' && $statusName === 'reviewKspi')
             <div class="ribbon-card" style="margin-bottom:20px; border:2px solid #2e86ab;">
                 <div class="ribbon-head" style="margin-bottom:12px;">
-                    <h2 style="font-size:15px; color:#0369a1;">⚡ Tindakan KSPI (Review Awal)</h2>
+                    <h2 style="font-size:15px; color:#0369a1;">Tindakan KSPI (Review Awal)</h2>
                 </div>
                 <p style="font-size:12px; color:var(--text-muted); margin-bottom:14px;">
                     Hasil verifikasi dari Kadiv telah masuk. Teruskan ke Direktur Utama atau tolak/arsipkan jika tidak berdasar.
                 </p>
 
-                <form method="POST" action="{{ route('pengaduan.kspi-teruskan-dirut', $pengaduan->id) }}" style="margin-bottom:12px;">
+                <form method="POST" action="{{ route('pengaduan.kspi-teruskan-dirut', $pengaduan->id) }}" style="margin-bottom:12px;"
+                      onsubmit="return confirmSubmit(event, 'Apakah Anda yakin ingin meneruskan telaah pengaduan ini ke Direktur Utama?', 'Konfirmasi Teruskan ke Dirut', 'warning', 'Ya, Teruskan')">
                     @csrf
                     <div class="field" style="margin-bottom:8px;">
                         <label style="font-weight:600; font-size:12px;">Catatan Pengantar ke Dirut (Opsional):</label>
@@ -482,13 +483,14 @@
                     </button>
                 </form>
 
-                <form method="POST" action="{{ route('pengaduan.kspi-tolak', $pengaduan->id) }}">
+                <form method="POST" action="{{ route('pengaduan.kspi-tolak', $pengaduan->id) }}"
+                      onsubmit="return confirmSubmit(event, 'Apakah Anda yakin ingin menolak dan mengarsipkan pengaduan ini?', 'Konfirmasi Penolakan Pengaduan', 'danger', 'Ya, Tolak & Arsipkan')">
                     @csrf
                     <div class="field" style="margin-bottom:8px;">
                         <label style="font-weight:600; font-size:12px; color:#b91c1c;">Alasan Penolakan (Wajib jika ditolak):</label>
                         <textarea name="catatan" required rows="2" placeholder="Tuliskan alasan penolakan aduan..." style="width:100%; border:1px solid #fca5a5; border-radius:6px; padding:7px 10px; font-size:12px;"></textarea>
                     </div>
-                    <button type="submit" onclick="return confirm('Yakin ingin menolak dan mengarsipkan pengaduan ini?')" style="width:100%; padding:8px; background:#ef4444; color:#fff; border:none; border-radius:6px; font-weight:700; font-size:12px; cursor:pointer;">
+                    <button type="submit" style="width:100%; padding:8px; background:#ef4444; color:#fff; border:none; border-radius:6px; font-weight:700; font-size:12px; cursor:pointer;">
                         ✕ Tolak & Arsipkan
                     </button>
                 </form>
@@ -501,13 +503,14 @@
         @if ($myRole === 'dirut' && $statusName === 'menungguDirutTahap1')
             <div class="ribbon-card" style="margin-bottom:20px; border:2px solid #e67e22;">
                 <div class="ribbon-head" style="margin-bottom:12px;">
-                    <h2 style="font-size:15px; color:#c2410c;">⚡ Persetujuan Dirut (Tahap 1)</h2>
+                    <h2 style="font-size:15px; color:#c2410c;">Persetujuan Dirut (Tahap 1)</h2>
                 </div>
                 <p style="font-size:12px; color:var(--text-muted); margin-bottom:14px;">
                     Tentukan kelayakan pengaduan ini untuk dilakukan proses investigasi resmi.
                 </p>
 
-                <form method="POST" action="{{ route('pengaduan.dirut-tahap1', $pengaduan->id) }}">
+                <form method="POST" action="{{ route('pengaduan.dirut-tahap1', $pengaduan->id) }}"
+                      onsubmit="return confirmSubmit(event, 'Apakah Anda yakin ingin menyimpan keputusan tahap 1 untuk pengaduan ini?', 'Konfirmasi Keputusan Dirut', 'warning', 'Ya, Simpan Keputusan')">
                     @csrf
                     <div class="field" style="margin-bottom:10px;">
                         <label style="font-weight:600; font-size:12px;">Keputusan Direktur Utama:</label>
@@ -533,8 +536,8 @@
         @if ($myRole === 'kspi' && $statusName === 'menungguPilihEksekutor')
             <div class="ribbon-card" style="margin-bottom:20px; border:2px solid #0284c7; background:#ffffff; box-shadow:0 10px 25px -5px rgba(2,132,199,0.12);">
                 <div class="ribbon-head" style="margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;">
-                    <h2 style="font-size:15px; color:#0369a1; margin:0; display:flex; align-items:center; gap:8px;">
-                        <span>⚡</span> Penunjukan Tim Eksekutor Investigasi
+                    <h2 style="font-size:15px; color:#0369a1; margin:0;">
+                        Penunjukan Tim Eksekutor Investigasi
                     </h2>
                     <span style="font-size:11px; background:#e0f2fe; color:#0284c7; padding:3px 8px; border-radius:12px; font-weight:700;">
                         KSPI Task
@@ -546,8 +549,8 @@
 
                 <!-- Tombol Shortcut Pemilihan Cepat Eksekutor Resmi (TPDPK & Kadiv SPI) -->
                 <div style="margin-bottom:14px; background:#f0f9ff; border:1px solid #bae6fd; border-radius:12px; padding:12px 14px;">
-                    <div style="font-size:11px; font-weight:700; color:#0369a1; text-transform:uppercase; margin-bottom:8px; letter-spacing:0.3px; display:flex; align-items:center; gap:6px;">
-                        <span>⚡</span> Eksekutor Resmi Investigasi (Klik untuk Memilih):
+                    <div style="font-size:11px; font-weight:700; color:#0369a1; text-transform:uppercase; margin-bottom:8px; letter-spacing:0.3px;">
+                        Eksekutor Resmi Investigasi (Klik untuk Memilih):
                     </div>
                     <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:8px;">
                         <!-- Opsi 1: TPDPK (Dodi Sudrajat, S.E., M.M.) -->
@@ -597,7 +600,8 @@
                     </div>
                 </div>
 
-                <form method="POST" id="form-kspi-eksekutor" action="{{ route('pengaduan.kspi-pilih-eksekutor', $pengaduan->id) }}">
+                <form method="POST" id="form-kspi-eksekutor" action="{{ route('pengaduan.kspi-pilih-eksekutor', $pengaduan->id) }}"
+                      onsubmit="return confirmSubmit(event, 'Apakah Anda yakin ingin menetapkan eksekutor investigasi terpilih ini?', 'Konfirmasi Penetapan Eksekutor', 'warning', 'Ya, Tetapkan Eksekutor')">
                     @csrf
 
                     <!-- Hidden fields yang diisi otomatis secara reaktif -->
@@ -614,7 +618,7 @@
 
                         <!-- Box Kosong (Belum ada yang dipilih) -->
                         <div id="box-empty-eksekutor" onclick="openPegawaiPickerModal()" style="border:2px dashed #7dd3fc; background:#f0f9ff; border-radius:12px; padding:22px 16px; text-align:center; cursor:pointer; transition:all 0.2s;">
-                            <div style="font-size:26px; margin-bottom:6px;">👥➕</div>
+                            <div style="font-size:22px; margin-bottom:6px; color:#0284c7; font-weight:800;">+</div>
                             <div style="font-weight:700; color:#0284c7; font-size:13.5px;">+ Pilih Pegawai Eksekutor Investigasi</div>
                             <div style="font-size:11.5px; color:#64748b; margin-top:3px;">
                                 Klik di sini untuk membuka katalog pegawai SIMPEG & filter Kadiv / Staf SPI
@@ -626,7 +630,7 @@
                             <div id="list-selected-pegawai-cards" style="display:flex; flex-direction:column; gap:8px; margin-bottom:10px;"></div>
                             
                             <button type="button" onclick="openPegawaiPickerModal()" style="width:100%; background:#fff; border:1.5px dashed #0284c7; color:#0284c7; padding:8px; border-radius:8px; font-size:12px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px;">
-                                <span>➕</span> Tambah / Ubah Anggota Tim Eksekutor
+                                + Tambah / Ubah Anggota Tim Eksekutor
                             </button>
                         </div>
                     </div>
@@ -640,7 +644,7 @@
                     </div>
 
                     <button type="submit" id="btn-submit-penugasan" style="width:100%; padding:11px; background:#0284c7; color:#fff; border:none; border-radius:8px; font-weight:800; font-size:13px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; box-shadow:0 4px 6px -1px rgba(2,132,199,0.25); transition:all 0.2s;">
-                        <span>🚀</span> <span id="label-btn-submit">Tetapkan Eksekutor & Buat Tugas</span>
+                        <span id="label-btn-submit">Tetapkan Eksekutor & Buat Tugas</span>
                     </button>
                 </form>
             </div>
@@ -654,8 +658,8 @@
                     <!-- Header Modal -->
                     <div style="padding:16px 20px; background:linear-gradient(135deg, #0d2c6e 0%, #0284c7 100%); color:#ffffff; display:flex; justify-content:space-between; align-items:center;">
                         <div style="display:flex; align-items:center; gap:12px;">
-                            <div style="width:38px; height:38px; border-radius:10px; background:rgba(255,255,255,0.15); display:flex; align-items:center; justify-content:center; font-size:20px;">
-                                👥
+                            <div style="width:38px; height:38px; border-radius:10px; background:rgba(255,255,255,0.15); display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:800;">
+                                TIM
                             </div>
                             <div>
                                 <h3 style="margin:0; font-size:16px; font-weight:800; color:#ffffff;">Pilih Tim Eksekutor Investigasi</h3>
@@ -673,8 +677,8 @@
                     <div style="padding:14px 20px 10px; border-bottom:1px solid #e2e8f0; background:#f8fafc;">
                         <!-- Search Box -->
                         <div style="position:relative; margin-bottom:10px;">
-                            <span style="position:absolute; left:12px; top:50%; transform:translateY(-50%); font-size:15px; color:#94a3b8;">🔍</span>
-                            <input type="text" id="picker-search-input" oninput="onPickerSearchChange(this.value)" placeholder="Cari nama pegawai, NIK, jabatan, atau divisi..." style="width:100%; padding:9px 36px 9px 36px; border:1px solid #cbd5e1; border-radius:10px; font-size:13px; background:#ffffff; outline:none; transition:border 0.2s;">
+                            <span style="position:absolute; left:12px; top:50%; transform:translateY(-50%); font-size:12px; color:#64748b; font-weight:700;">Cari:</span>
+                            <input type="text" id="picker-search-input" oninput="onPickerSearchChange(this.value)" placeholder="Cari nama pegawai, NIK, jabatan, atau divisi..." style="width:100%; padding:9px 36px 9px 46px; border:1px solid #cbd5e1; border-radius:10px; font-size:13px; background:#ffffff; outline:none; transition:border 0.2s;">
                             <button type="button" id="picker-search-clear" onclick="clearPickerSearch()" style="display:none; position:absolute; right:10px; top:50%; transform:translateY(-50%); background:#e2e8f0; border:none; border-radius:50%; width:20px; height:20px; font-size:11px; cursor:pointer; align-items:center; justify-content:center; color:#475569;">✕</button>
                         </div>
 
@@ -1028,9 +1032,8 @@
                 if (filtered.length === 0) {
                     container.innerHTML = `
                         <div style="text-align:center; padding:32px 10px; color:#94a3b8;">
-                            <div style="font-size:32px; margin-bottom:8px;">🔍</div>
-                            <div style="font-size:13.5px; font-weight:600; color:#64748b;">Pegawai Tidak Ditemukan</div>
-                            <div style="font-size:11.5px; margin-top:2px;">Coba gunakan kata kunci nama atau NIK yang lain.</div>
+                            <div style="font-size:13.5px; font-weight:600; color:#64748b; margin-bottom:4px;">Pegawai Tidak Ditemukan</div>
+                            <div style="font-size:11.5px;">Coba gunakan kata kunci nama atau NIK yang lain.</div>
                         </div>
                     `;
                     return;
@@ -1201,13 +1204,14 @@
         @if ($isInvestigator && in_array($statusName, ['investigasiBerjalan', 'revisiInvestigasi']))
             <div class="ribbon-card" style="margin-bottom:20px; border:2px solid #0284c7;">
                 <div class="ribbon-head" style="margin-bottom:12px;">
-                    <h2 style="font-size:15px; color:#0369a1;">⚡ Laporan Hasil Investigasi & Surat Rekomendasi ({{ $pengaduan->eksekutor === 'kadiv' ? 'Kadiv SPI' : 'TPDPK' }})</h2>
+                    <h2 style="font-size:15px; color:#0369a1;">Laporan Hasil Investigasi & Surat Rekomendasi ({{ $pengaduan->eksekutor === 'kadiv' ? 'Kadiv SPI' : 'TPDPK' }})</h2>
                 </div>
                 <p style="font-size:12px; color:var(--text-muted); margin-bottom:14px;">
                     Tentukan kesimpulan pemeriksaan (Terbukti / Tidak Terbukti), uraikan fakta temuan, lampirkan bukti multimedia, serta terbitkan Surat Rekomendasi langsung ke Direktur Utama.
                 </p>
 
-                <form method="POST" action="{{ route('pengaduan.tpdpk-hasil-investigasi', $pengaduan->id) }}" enctype="multipart/form-data">
+                <form method="POST" action="{{ route('pengaduan.tpdpk-hasil-investigasi', $pengaduan->id) }}" enctype="multipart/form-data"
+                      onsubmit="return confirmSubmit(event, 'Apakah Anda yakin ingin mengirim laporan hasil investigasi & surat rekomendasi ini langsung ke Direktur Utama?', 'Konfirmasi Kirim Hasil Investigasi', 'warning', 'Ya, Kirim ke Dirut')">
                     @csrf
 
                     <!-- Pilihan Kesimpulan Investigasi: Terbukti vs Tidak Terbukti -->
@@ -1219,14 +1223,14 @@
                             <label id="opt-kesimpulan-terbukti" style="border:2px solid #22c55e; background:#f0fdf4; border-radius:10px; padding:10px 12px; cursor:pointer; display:flex; align-items:center; gap:8px; transition:all 0.2s;">
                                 <input type="radio" name="kesimpulan_investigasi" value="terbukti" required checked onchange="toggleKesimpulanStyle('terbukti')" style="accent-color:#16a34a; width:17px; height:17px;">
                                 <div>
-                                    <div style="font-weight:800; font-size:13px; color:#15803d;">⚖️ TERBUKTI</div>
+                                    <div style="font-weight:800; font-size:13px; color:#15803d;">TERBUKTI</div>
                                     <div style="font-size:10.5px; color:#166534;">Pelanggaran terbukti sah</div>
                                 </div>
                             </label>
                             <label id="opt-kesimpulan-tidak-terbukti" style="border:1.5px solid #cbd5e1; background:#ffffff; border-radius:10px; padding:10px 12px; cursor:pointer; display:flex; align-items:center; gap:8px; transition:all 0.2s;">
                                 <input type="radio" name="kesimpulan_investigasi" value="tidak_terbukti" required onchange="toggleKesimpulanStyle('tidak_terbukti')" style="accent-color:#dc2626; width:17px; height:17px;">
                                 <div>
-                                    <div style="font-weight:800; font-size:13px; color:#475569;">🛡️ TIDAK TERBUKTI</div>
+                                    <div style="font-weight:800; font-size:13px; color:#475569;">TIDAK TERBUKTI</div>
                                     <div style="font-size:10.5px; color:#64748b;">Tidak terbukti / bukti nihil</div>
                                 </div>
                             </label>
@@ -1245,8 +1249,8 @@
                     <div class="field" style="margin-bottom:14px;">
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
                             <label style="font-weight:600; font-size:12px; color:#0f172a;">Surat Rekomendasi Sanksi Resmi *</label>
-                            <button type="button" onclick="isiTemplateRekomendasi()" style="background:#e0f2fe; border:1px solid #7dd3fc; color:#0369a1; padding:3px 10px; border-radius:6px; font-size:11px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:4px;">
-                                <span>📋</span> Gunakan Template Surat
+                            <button type="button" onclick="isiTemplateRekomendasi()" style="background:#e0f2fe; border:1px solid #7dd3fc; color:#0369a1; padding:3px 10px; border-radius:6px; font-size:11px; font-weight:700; cursor:pointer;">
+                                Gunakan Template Surat
                             </button>
                         </div>
                         <textarea id="input_surat_rekomendasi" name="surat_rekomendasi" rows="4" required placeholder="Uraikan isi rekomendasi tindakan atau sanksi disiplin..." style="width:100%; border:1px solid #cbd5e1; border-radius:8px; padding:9px 12px; font-size:12.5px; line-height:1.5;"></textarea>
@@ -1255,30 +1259,30 @@
                     <!-- Unggah Bukti Multimedia (Foto, Video, Voice Note, Dokumen) -->
                     <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:12px; margin-bottom:14px;">
                         <div style="font-weight:700; font-size:12px; color:#0f172a; margin-bottom:8px;">
-                            📎 Unggah Lampiran Bukti Pemeriksaan (Opsional):
+                            Unggah Lampiran Bukti Pemeriksaan (Opsional):
                         </div>
                         <div style="display:grid; grid-template-columns:1fr; gap:8px;">
                             <div>
-                                <label style="font-size:11px; font-weight:600; color:#475569; display:block; margin-bottom:2px;">📷 Foto Bukti (JPG/PNG):</label>
+                                <label style="font-size:11px; font-weight:600; color:#475569; display:block; margin-bottom:2px;">Foto Bukti (JPG/PNG):</label>
                                 <input type="file" name="foto_bukti[]" multiple accept="image/*" style="font-size:11.5px; width:100%;">
                             </div>
                             <div>
-                                <label style="font-size:11px; font-weight:600; color:#475569; display:block; margin-bottom:2px;">🎥 Video Bukti (MP4/MOV/MKV/WebM):</label>
+                                <label style="font-size:11px; font-weight:600; color:#475569; display:block; margin-bottom:2px;">Video Bukti (MP4/MOV/MKV/WebM):</label>
                                 <input type="file" name="video_bukti[]" multiple accept="video/*" style="font-size:11.5px; width:100%;">
                             </div>
                             <div>
-                                <label style="font-size:11px; font-weight:600; color:#475569; display:block; margin-bottom:2px;">🎙️ Rekaman Suara / Audio (MP3/WAV/M4A):</label>
+                                <label style="font-size:11px; font-weight:600; color:#475569; display:block; margin-bottom:2px;">Rekaman Audio (MP3/WAV/M4A):</label>
                                 <input type="file" name="voice_bukti[]" multiple accept="audio/*" style="font-size:11.5px; width:100%;">
                             </div>
                             <div>
-                                <label style="font-size:11px; font-weight:600; color:#475569; display:block; margin-bottom:2px;">📑 Dokumen Berita Acara / BAP (PDF/DOC):</label>
+                                <label style="font-size:11px; font-weight:600; color:#475569; display:block; margin-bottom:2px;">Dokumen Berita Acara / BAP (PDF/DOC):</label>
                                 <input type="file" name="dokumen_investigasi[]" multiple accept=".pdf,.doc,.docx,.xls,.xlsx" style="font-size:11.5px; width:100%;">
                             </div>
                         </div>
                     </div>
 
                     <button type="submit" style="width:100%; padding:11px; background:#0284c7; color:#fff; border:none; border-radius:8px; font-weight:800; font-size:13px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; box-shadow:0 4px 6px -1px rgba(2,132,199,0.25);">
-                        <span>🚀</span> Kirim Rekomendasi Langsung ke Direktur Utama
+                        Kirim Rekomendasi Langsung ke Direktur Utama
                     </button>
                 </form>
             </div>
@@ -1323,7 +1327,7 @@
         @if ($myRole === 'kspi' && $statusName === 'menungguReviewKspi')
             <div class="ribbon-card" style="margin-bottom:20px; border:2px solid #2e86ab;">
                 <div class="ribbon-head" style="margin-bottom:12px;">
-                    <h2 style="font-size:15px; color:#0369a1;">⚡ Review Hasil Investigasi</h2>
+                    <h2 style="font-size:15px; color:#0369a1;">Review Hasil Investigasi</h2>
                 </div>
                 <p style="font-size:12px; color:var(--text-muted); margin-bottom:14px;">
                     Periksa kelengkapan laporan investigasi. Jika sesuai, teruskan ke Direktur Utama untuk persetujuan akhir.
@@ -1355,38 +1359,33 @@
         @if ($myRole === 'dirut' && $statusName === 'menungguDirutTahap2')
             <div class="ribbon-card" style="margin-bottom:20px; border:2px solid #0284c7;">
                 <div class="ribbon-head" style="margin-bottom:12px;">
-                    <h2 style="font-size:15px; color:#0369a1;">⚡ Keputusan Direktur Utama (Persetujuan Rekomendasi)</h2>
+                    <h2 style="font-size:15px; color:#0369a1;">Keputusan Direktur Utama (Persetujuan Rekomendasi)</h2>
                 </div>
                 
                 <!-- Status Kesimpulan Investigasi -->
                 @if ($pengaduan->kesimpulan_investigasi === 'terbukti')
                     <div style="background:#f0fdf4; border:1.5px solid #86efac; border-radius:10px; padding:10px 14px; margin-bottom:14px;">
-                        <div style="display:flex; align-items:center; gap:8px;">
-                            <span style="font-size:18px;">⚖️</span>
-                            <div>
-                                <div style="font-weight:800; font-size:13.5px; color:#15803d;">Hasil Investigasi: TERBUKTI</div>
-                                <div style="font-size:11.5px; color:#166534; margin-top:2px;">
-                                    Jika Anda <strong>Terima</strong>, pengaduan ini akan diteruskan ke <strong>Bagian SDM</strong> untuk penetapan Surat Putusan Sanksi.
-                                </div>
+                        <div>
+                            <div style="font-weight:800; font-size:13.5px; color:#15803d;">Hasil Investigasi: TERBUKTI</div>
+                            <div style="font-size:11.5px; color:#166534; margin-top:2px;">
+                                Jika Anda <strong>Terima</strong>, pengaduan ini akan diteruskan ke <strong>Bagian SDM</strong> untuk penetapan Surat Putusan Sanksi.
                             </div>
                         </div>
                     </div>
                 @else
                     <div style="background:#fef2f2; border:1.5px solid #fecaca; border-radius:10px; padding:10px 14px; margin-bottom:14px;">
-                        <div style="display:flex; align-items:center; gap:8px;">
-                            <span style="font-size:18px;">🛡️</span>
-                            <div>
-                                <div style="font-weight:800; font-size:13.5px; color:#b91c1c;">Hasil Investigasi: TIDAK TERBUKTI</div>
-                                <div style="font-size:11.5px; color:#991b1b; margin-top:2px;">
-                                    Jika Anda <strong>Terima</strong>, pengaduan ini akan <strong>Diarsipkan</strong> dan nama baik pihak terlapor dipulihkan.
-                                </div>
+                        <div>
+                            <div style="font-weight:800; font-size:13.5px; color:#b91c1c;">Hasil Investigasi: TIDAK TERBUKTI</div>
+                            <div style="font-size:11.5px; color:#991b1b; margin-top:2px;">
+                                Jika Anda <strong>Terima</strong>, pengaduan ini akan <strong>Diarsipkan</strong> dan nama baik pihak terlapor dipulihkan.
                             </div>
                         </div>
                     </div>
                 @endif
 
                 <!-- Form Terima Hasil Investigasi -->
-                <form method="POST" action="{{ route('pengaduan.dirut-tahap2', $pengaduan->id) }}" style="margin-bottom:16px;">
+                <form method="POST" action="{{ route('pengaduan.dirut-tahap2', $pengaduan->id) }}" style="margin-bottom:16px;"
+                      onsubmit="return confirmSubmit(event, 'Apakah Anda yakin ingin menerima hasil investigasi ini dan {{ $pengaduan->kesimpulan_investigasi === 'terbukti' ? 'meneruskannya ke SDM untuk penerbitan SK sanksi' : 'mengarsipkan pengaduan' }}?', 'Konfirmasi Putusan Direktur', 'warning', 'Ya, Terima Hasil')">
                     @csrf
                     <input type="hidden" name="keputusan" value="terima">
                     <div class="field" style="margin-bottom:10px;">
@@ -1399,7 +1398,8 @@
                 </form>
 
                 <!-- Form Tinjau Ulang (Kembalikan ke KSPI) -->
-                <form method="POST" action="{{ route('pengaduan.dirut-tahap2', $pengaduan->id) }}" style="border-top:1px dashed #cbd5e1; padding-top:14px;">
+                <form method="POST" action="{{ route('pengaduan.dirut-tahap2', $pengaduan->id) }}" style="border-top:1px dashed #cbd5e1; padding-top:14px;"
+                      onsubmit="return confirmSubmit(event, 'Apakah Anda yakin ingin mengembalikan hasil pemeriksaan ini ke KSPI untuk peninjauan/investigasi ulang?', 'Konfirmasi Tinjau Ulang', 'warning', 'Ya, Kembalikan ke KSPI')">
                     @csrf
                     <input type="hidden" name="keputusan" value="tinjau_ulang">
                     <div class="field" style="margin-bottom:10px;">
@@ -1419,23 +1419,77 @@
         {{-- 8. PANEL AKSI SDM (PENERBITAN SURAT PUTUSAN SANKSI) --}}
         {{-- ========================================================= --}}
         @if ($myRole === 'sdm' && $statusName === 'menungguSdm')
+            @php
+                $targetNama = $pegawaiTerlapor->name ?? ($pengaduan->pihak_terlapor ?? '');
+                $targetNik = $pegawaiTerlapor->nik ?? ($pengaduan->nik_pelaku ?? '');
+                $targetJabatan = $pegawaiTerlapor->jabatan ?? ($pengaduan->jabatan_pelaku ?? '');
+                $targetGolongan = $pegawaiTerlapor->golongan ?? '';
+                $defaultNomorSk = 'SP/SDM/' . date('Y') . '/' . str_pad($pengaduan->id, 3, '0', STR_PAD_LEFT);
+            @endphp
             <div class="ribbon-card" style="margin-bottom:20px; border:2px solid #0284c7; background:#ffffff;">
                 <div class="ribbon-head" style="margin-bottom:10px;">
-                    <h2 style="font-size:15px; color:#0369a1;">🏛️ Penetapan Surat Putusan Sanksi (Bagian SDM)</h2>
+                    <h2 style="font-size:15px; color:#0369a1;">Penetapan Surat Putusan Sanksi (Bagian SDM)</h2>
                 </div>
                 <div style="background:#e0f2fe; border:1px solid #bae6fd; border-radius:8px; padding:10px 12px; margin-bottom:14px; font-size:12px; color:#0369a1; line-height:1.45;">
-                    Pengaduan telah dinyatakan <strong>TERBUKTI</strong> dan disetujui Direktur Utama. Pihak SDM berwenang menerbitkan Surat Putusan Sanksi resmi dan melampirkan dokumen putusan.
+                    Pengaduan telah dinyatakan <strong>TERBUKTI</strong> dan disetujui Direktur Utama. Pihak SDM berwenang menerbitkan Surat Putusan Sanksi resmi untuk pegawai <strong>terlapor</strong> dan melampirkan berkas keputusan.
                 </div>
 
-                <form method="POST" action="{{ route('pengaduan.sdm-putusan-sanksi', $pengaduan->id) }}" enctype="multipart/form-data">
+                {{-- Ringkasan Identitas Pegawai Terlapor (Pelaku) --}}
+                <div style="background:#fff7ed; border:1px solid #fed7aa; border-radius:8px; padding:12px 14px; margin-bottom:14px;">
+                    <div style="font-size:12px; font-weight:800; color:#c2410c; margin-bottom:6px;">
+                        TARGET PENERBITAN SK SANKSI (PEGAWAI TERLAPOR):
+                    </div>
+                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:10px; font-size:12px; color:#1e293b;">
+                        <div>
+                            <span style="color:#64748b; display:block; font-size:11px;">Nama Terlapor:</span>
+                            <strong>{{ $targetNama ?: '-' }}</strong>
+                        </div>
+                        <div>
+                            <span style="color:#64748b; display:block; font-size:11px;">NIK Terlapor:</span>
+                            <strong>{{ $targetNik ?: '(Belum tercatat)' }}</strong>
+                        </div>
+                        <div>
+                            <span style="color:#64748b; display:block; font-size:11px;">Jabatan:</span>
+                            <strong>{{ $targetJabatan ?: '-' }}</strong>
+                        </div>
+                        <div>
+                            <span style="color:#64748b; display:block; font-size:11px;">Golongan:</span>
+                            <strong>{{ $targetGolongan ?: '-' }}</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <form method="POST" action="{{ route('pengaduan.sdm-putusan-sanksi', $pengaduan->id) }}" enctype="multipart/form-data"
+                      onsubmit="return confirmSubmit(event, 'Apakah Anda yakin ingin menerbitkan Surat Keputusan Sanksi untuk pegawai terlapor {{ $targetNama }}? Kasus pengaduan akan otomatis berstatus selesai dan tersinkronisasi pada riwayat kepegawaian.', 'Konfirmasi Penerbitan SK Sanksi', 'warning', 'Ya, Terbitkan SK')">
                     @csrf
+
+                    <input type="hidden" name="nama_terlapor" value="{{ $targetNama }}">
+                    <input type="hidden" name="jabatan_terlapor" value="{{ $targetJabatan }}">
+                    <input type="hidden" name="golongan_terlapor" value="{{ $targetGolongan }}">
+
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-bottom:12px;">
+                        <!-- NIK Terlapor -->
+                        <div>
+                            <label style="font-weight:700; font-size:12px; color:#0f172a; display:block; margin-bottom:4px;">
+                                NIK Pegawai Terlapor *:
+                            </label>
+                            <input type="text" name="nik_terlapor" value="{{ $targetNik }}" required placeholder="Masukkan NIK Terlapor" style="width:100%; border:1px solid #cbd5e1; border-radius:8px; padding:9px 12px; font-size:12.5px; background:{{ !empty($targetNik) ? '#f8fafc' : '#fff' }};">
+                        </div>
+                        <!-- Tanggal Berlaku SK -->
+                        <div>
+                            <label style="font-weight:700; font-size:12px; color:#0f172a; display:block; margin-bottom:4px;">
+                                Tanggal Mulai Berlaku SK *:
+                            </label>
+                            <input type="date" name="tanggal_berlaku" value="{{ date('Y-m-d') }}" required style="width:100%; border:1px solid #cbd5e1; border-radius:8px; padding:9px 12px; font-size:12.5px; background:#fff;">
+                        </div>
+                    </div>
 
                     <!-- Nomor Surat Putusan Sanksi -->
                     <div class="field" style="margin-bottom:12px;">
                         <label style="font-weight:700; font-size:12px; color:#0f172a; display:block; margin-bottom:4px;">
                             Nomor Surat Putusan Sanksi *:
                         </label>
-                        <input type="text" name="nomor_surat_putusan" required placeholder="Contoh: SP/SDM/{{ date('Y') }}/042" style="width:100%; border:1px solid #cbd5e1; border-radius:8px; padding:9px 12px; font-size:12.5px;">
+                        <input type="text" name="nomor_surat_putusan" value="{{ $defaultNomorSk }}" required placeholder="Contoh: SP/SDM/{{ date('Y') }}/042" style="width:100%; border:1px solid #cbd5e1; border-radius:8px; padding:9px 12px; font-size:12.5px;">
                     </div>
 
                     <!-- Jenis Sanksi Disiplin -->
@@ -1474,7 +1528,7 @@
                     </div>
 
                     <button type="submit" style="width:100%; padding:11px; background:#0284c7; color:#fff; border:none; border-radius:8px; font-weight:800; font-size:13px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; box-shadow:0 4px 6px -1px rgba(2,132,199,0.25);">
-                        <span>⚖️</span> Terbitkan Surat Putusan & Selesaikan Pengaduan
+                        Terbitkan Surat Putusan & Selesaikan Pengaduan
                     </button>
                 </form>
             </div>
@@ -1488,17 +1542,21 @@
 
             <div style="position:relative; padding-left:20px; border-left:2px solid #e2e8f0; margin-left:10px;">
                 @forelse ($riwayat as $r)
+                    @php
+                        $cleanAksi = str_replace(['•', '·'], '-', $r->aksi ?? $r->status);
+                        $isPelakuAuto = !empty($r->keterangan) && str_starts_with(trim($r->keterangan), 'Pelaku diadukan:');
+                    @endphp
                     <div style="position:relative; margin-bottom:18px;">
                         {{-- Bullet Dot --}}
                         <div style="position:absolute; left:-27px; top:2px; width:12px; height:12px; border-radius:50%; background:#0d2c6e; border:2px solid #fff; box-shadow:0 0 0 2px #cbd5e1;"></div>
                         
-                        <div style="font-size:13px; font-weight:700; color:#0f172a;">{{ $r->aksi ?? $r->status }}</div>
+                        <div style="font-size:13px; font-weight:700; color:#0f172a;">{{ $cleanAksi }}</div>
                         <div style="font-size:11.5px; color:var(--text-muted); margin-bottom:4px;">
                             Oleh: <strong>{{ $r->oleh }}</strong> ({{ $r->role ?? 'Sistem' }}) · {{ date('d M Y, H:i', strtotime($r->tanggal)) }}
                         </div>
-                        @if (!empty($r->keterangan))
-                            <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:6px 10px; font-size:12px; color:#475569;">
-                                {{ $r->keterangan }}
+                        @if (!empty($r->keterangan) && !$isPelakuAuto)
+                            <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:6px 10px; font-size:12px; color:#475569; display:flex; align-items:flex-start; gap:6px; margin-top:4px;">
+                                <div style="flex:1; font-style:italic;">{{ str_replace(['•', '·'], '-', $r->keterangan) }}</div>
                             </div>
                         @endif
                     </div>

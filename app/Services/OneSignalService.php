@@ -33,7 +33,7 @@ class OneSignalService
             }
             $pIds = $pegawaiQuery->pluck('id')->toArray();
             $pengumumanId = isset($customData['pengumuman_id']) ? (int)$customData['pengumuman_id'] : null;
-            self::simpanKeTabelNotifikasi($pIds, '📢 ' . $judul, $cleanIsi, $pengumumanId);
+            self::simpanKeTabelNotifikasi($pIds, $judul, $cleanIsi, $pengumumanId);
         } catch (\Throwable $e) {
             Log::warning('OneSignalService: Gagal sync pengumuman ke DB notifikasi: ' . $e->getMessage());
         }
@@ -47,8 +47,8 @@ class OneSignalService
         $payload = [
             'app_id' => $appId,
             'headings' => [
-                'en' => '📢 ' . $judul,
-                'id' => '📢 ' . $judul,
+                'en' => $judul,
+                'id' => $judul,
             ],
             'contents' => [
                 'en' => $cleanIsi,

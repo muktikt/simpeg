@@ -58,17 +58,17 @@
                 <a href="{{ request()->fullUrlWithQuery(['format' => 'tpendidikan']) }}" 
                    class="btn btn-sm {{ $format === 'tpendidikan' ? 'btn-primary' : 'btn-outline' }}" 
                    style="border-radius:8px; font-weight:600; display:inline-flex; align-items:center; gap:6px; border:none; {{ $format !== 'tpendidikan' ? 'background:transparent; color:#475569;' : '' }}">
-                    <span>📄</span> Format 1: Tunjangan Pendidikan
+                    Format 1: Tunjangan Pendidikan
                 </a>
                 <a href="{{ request()->fullUrlWithQuery(['format' => 'insentif']) }}" 
                    class="btn btn-sm {{ $format === 'insentif' ? 'btn-primary' : 'btn-outline' }}" 
                    style="border-radius:8px; font-weight:600; display:inline-flex; align-items:center; gap:6px; border:none; {{ $format !== 'insentif' ? 'background:transparent; color:#475569;' : '' }}">
-                    <span>📄</span> Format 2: Insentif Pendidikan
+                    Format 2: Insentif Pendidikan
                 </a>
                 <a href="{{ request()->fullUrlWithQuery(['format' => 'utuh']) }}" 
                    class="btn btn-sm {{ $format === 'utuh' ? 'btn-primary' : 'btn-outline' }}" 
                    style="border-radius:8px; font-weight:600; display:inline-flex; align-items:center; gap:6px; border:none; {{ $format !== 'utuh' ? 'background:transparent; color:#475569;' : '' }}">
-                    <span>📄</span> Format 3: Gaji 13 Utuh
+                    Format 3: Gaji 13 Utuh
                 </a>
             </div>
 

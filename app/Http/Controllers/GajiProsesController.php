@@ -843,7 +843,7 @@ class GajiProsesController extends Controller
                             $periodeLabel = $dbPayroll->periode ?? (($row['bulan'] ?? '') . ' ' . ($row['tahun'] ?? ''));
                             \App\Services\OneSignalService::kirimNotifikasiPegawai(
                                 $targetNik,
-                                'Gaji Masuk (' . $periodeLabel . ') 💳',
+                                'Gaji Masuk (' . $periodeLabel . ')',
                                 'Gaji bulan ' . $periodeLabel . ' telah diterbitkan. Silakan periksa slip gaji Anda di aplikasi SIMPEG.',
                                 ['type' => 'gaji', 'periode' => $periodeLabel]
                             );
