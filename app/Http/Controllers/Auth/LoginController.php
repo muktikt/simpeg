@@ -25,12 +25,16 @@ class LoginController extends Controller
     ];
 
     /**
-     * Pegawai (userlevel 5) diarahkan ke profil diri sendiri,
-     * role lain (Admin, Keuangan, Direksi) ke dashboard.
+     * Pegawai biasa (userlevel 5) diarahkan ke profil diri sendiri,
+     * role struktural (Admin SDM, Keuangan, Direksi, KSPI, Kadiv) ke dashboard.
      */
     protected function redirectRouteFor(array $user): string
     {
-        return $user['userlevel'] === '5' ? 'profile.show' : 'dashboard';
+        $rolePengaduan = $user['role_pengaduan'] ?? 'pegawai';
+        if (in_array($rolePengaduan, ['kspi', 'kadiv', 'dirut', 'sdm', 'keuangan']) || in_array($user['userlevel'], ['1', '2', '7'])) {
+            return 'dashboard';
+        }
+        return 'profile.show';
     }
 
     public function showLoginForm()

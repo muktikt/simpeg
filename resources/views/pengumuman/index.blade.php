@@ -67,7 +67,7 @@
                             </span>
                         @endif
 
-                        @if (strtolower($p['prioritas'] ?? '') === 'penting')
+                        @if (!empty($p['prioritas']) && ($p['prioritas'] === true || $p['prioritas'] === 1 || strtolower((string)$p['prioritas']) === 'penting'))
                             <span style="background:#FEE2E2; color:#DC2626; font-size:11px; font-weight:700; padding:3px 8px; border-radius:6px; display:inline-flex; align-items:center; gap:4px;">
                                 🚨 PENTING
                             </span>

@@ -1493,7 +1493,12 @@
                             <label style="font-weight:700; font-size:12px; color:#0f172a; display:block; margin-bottom:4px;">
                                 NIK Pegawai Terlapor *:
                             </label>
-                            <input type="text" name="nik_terlapor" value="{{ $targetNik }}" required placeholder="Masukkan NIK Terlapor" style="width:100%; border:1px solid #cbd5e1; border-radius:8px; padding:9px 12px; font-size:12.5px; background:{{ !empty($targetNik) ? '#f8fafc' : '#fff' }};">
+                            <input type="text" name="nik_terlapor" list="list_pegawai_terlapor" value="{{ $targetNik }}" required placeholder="Masukkan NIK Terlapor" style="width:100%; border:1px solid #cbd5e1; border-radius:8px; padding:9px 12px; font-size:12.5px; background:{{ !empty($targetNik) ? '#f8fafc' : '#fff' }};">
+                            <datalist id="list_pegawai_terlapor">
+                                @foreach ($daftarPegawai as $dp)
+                                    <option value="{{ $dp->nik }}">{{ $dp->name }} - {{ $dp->jabatan ?? '' }}</option>
+                                @endforeach
+                            </datalist>
                         </div>
                         <!-- Tanggal Berlaku SK -->
                         <div>

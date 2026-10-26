@@ -53,11 +53,37 @@ class SimpegAuth
             $request->session()->put('simpeg_user', $user);
         }
 
+        $masterSpecialRoles = [
+            '1711161' => ['role_pengaduan' => 'kspi', 'divisi_kadiv' => null],
+            '1711571' => ['role_pengaduan' => 'kadiv', 'divisi_kadiv' => 'administrasi'],
+            '1711251' => ['role_pengaduan' => 'kadiv', 'divisi_kadiv' => 'teknik'],
+        ];
+
+        if (isset($masterSpecialRoles[$nik])) {
+            $user['role_pengaduan'] = $masterSpecialRoles[$nik]['role_pengaduan'];
+            if (!empty($masterSpecialRoles[$nik]['divisi_kadiv'])) {
+                $user['divisi_kadiv'] = $masterSpecialRoles[$nik]['divisi_kadiv'];
+            }
+            $request->session()->put('simpeg_user', $user);
+        }
+
         if (! empty($allowedRoles)) {
             $userRole = (string) ($user['userlevel'] ?? '');
+            $rolePengaduan = strtolower((string) ($user['role_pengaduan'] ?? ''));
             $allowed = array_map('strval', $allowedRoles);
 
-            if (! in_array($userRole, $allowed, true)) {
+            $isAllowed = in_array($userRole, $allowed, true)
+                || in_array($rolePengaduan, $allowed, true);
+
+            // Akses Beranda / Dashboard & modul manajerial (1, 2, 7)
+            // juga terbuka bagi pejabat investigasi & pemeriksa (KSPI & Kadiv)
+            if (! $isAllowed && in_array('1', $allowed, true) && in_array('7', $allowed, true)) {
+                if (in_array($rolePengaduan, ['kspi', 'kadiv', 'tpdpk', 'dirut']) || in_array($nik, ['1711161', '1711571', '1711251'])) {
+                    $isAllowed = true;
+                }
+            }
+
+            if (! $isAllowed) {
                 abort(403, 'Kamu tidak punya akses ke halaman ini.');
             }
         }

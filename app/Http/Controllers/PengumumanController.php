@@ -119,17 +119,22 @@ class PengumumanController extends Controller
             });
         }
 
+        $isPentingCheck = function ($item) {
+            $val = $item['prioritas'] ?? null;
+            return $val === true || $val === 1 || $val === '1' || strtolower((string)$val) === 'penting';
+        };
+
         $counts = [
             'semua' => $rows->count(),
             'tayang' => $rows->where('status_kode', 'tayang')->count(),
-            'penting' => $rows->filter(fn ($item) => strtolower($item['prioritas'] ?? '') === 'penting')->count(),
+            'penting' => $rows->filter($isPentingCheck)->count(),
             'terjadwal' => $rows->where('status_kode', 'terjadwal')->count(),
             'kedaluwarsa' => $rows->where('status_kode', 'kedaluwarsa')->count(),
             'nonaktif' => $rows->where('status_kode', 'nonaktif')->count(),
         ];
 
         if ($filter === 'penting') {
-            $rows = $rows->filter(fn ($item) => strtolower($item['prioritas'] ?? '') === 'penting')->values();
+            $rows = $rows->filter($isPentingCheck)->values();
         } elseif ($filter !== 'semua' && in_array($filter, ['tayang', 'terjadwal', 'kedaluwarsa', 'nonaktif'])) {
             $rows = $rows->where('status_kode', $filter)->values();
         } else {

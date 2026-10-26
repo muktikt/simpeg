@@ -183,18 +183,16 @@ class PengaduanController extends Controller
                     ->toArray();
 
             } elseif ($myRole === 'sdm') {
-                // SDM HANYA bisa melihat pengaduan yang terbukti pada tahap menungguSdm
+                // SDM HANYA melihat pengaduan yang berstatus menungguSdm (diteruskan oleh Direktur Utama)
                 $pengaduanMasuk = $baseQuery()
                     ->where('status', 'menungguSdm')
-                    ->where('kesimpulan_investigasi', 'terbukti')
                     ->orderByDesc('created_at')
                     ->get()
                     ->toArray();
 
-                // Riwayat SDM: Pengaduan yang sudah selesai yang terbukti
+                // Riwayat SDM: Pengaduan yang sudah selesai yang ditangani SDM
                 $pengaduanRiwayat = $baseQuery()
                     ->where('status', 'selesai')
-                    ->where('kesimpulan_investigasi', 'terbukti')
                     ->orderByDesc('updated_at')
                     ->limit(50)
                     ->get()
@@ -360,10 +358,9 @@ class PengaduanController extends Controller
         $isPrivileged = in_array($myRole, ['kadiv', 'kspi', 'dirut', 'tpdpk']);
 
         if ($myRole === 'sdm' && !$isOwner) {
-            // SDM HANYA berhak mengakses pengaduan yang telah terbukti dan diteruskan Dirut
-            $isTerbukti = strtolower((string)($pengaduan->kesimpulan_investigasi ?? '')) === 'terbukti';
+            // SDM HANYA berhak mengakses pengaduan yang telah diteruskan Dirut (menungguSdm) atau sudah selesai
             $isValidStatus = in_array($pengaduan->status, ['menungguSdm', 'selesai']);
-            if (!$isTerbukti || !$isValidStatus) {
+            if (!$isValidStatus) {
                 abort(403, 'Pihak SDM hanya dapat mengakses pengaduan yang telah dinyatakan Terbukti dan diteruskan oleh Direktur Utama.');
             }
         } elseif (!$isOwner && !$isPrivileged && $myRole !== 'sdm') {
@@ -421,9 +418,8 @@ class PengaduanController extends Controller
         $isPrivileged = in_array($myRole, ['kadiv', 'kspi', 'dirut', 'tpdpk']);
 
         if ($myRole === 'sdm' && !$isOwner) {
-            $isTerbukti = strtolower((string)($pengaduan->kesimpulan_investigasi ?? '')) === 'terbukti';
             $isValidStatus = in_array($pengaduan->status, ['menungguSdm', 'selesai']);
-            if (!$isTerbukti || !$isValidStatus) {
+            if (!$isValidStatus) {
                 abort(403, 'Pihak SDM hanya dapat mengakses pengaduan yang telah dinyatakan Terbukti dan diteruskan oleh Direktur Utama.');
             }
         } elseif (!$isOwner && !$isPrivileged && $myRole !== 'sdm') {
@@ -1213,7 +1209,7 @@ class PengaduanController extends Controller
                 $pegawai = DB::table('pegawai')->where('name', 'ilike', '%' . $terlaporNama . '%')->first();
             }
 
-            DB::table('sk_sanksi')->insert([
+            $skId = DB::table('sk_sanksi')->insertGetId([
                 'nomor_sk' => $request->nomor_surat_putusan,
                 'pengaduan_id' => $id,
                 'pegawai_id' => $pegawai->id ?? null,
@@ -1230,8 +1226,44 @@ class PengaduanController extends Controller
                 'diterbitkan_oleh' => $ctx['nama'],
                 'created_at' => $now,
             ]);
+
+            // Sinkronisasi langsung ke tabel sanksi (Menu "SET Sanksi" SDM)
+            if ($pegawai && !empty($pegawai->id)) {
+                $tglBerlaku = $request->tanggal_berlaku ? \Illuminate\Support\Carbon::parse($request->tanggal_berlaku) : $now;
+                $tglFormatted = $tglBerlaku->locale('id')->isoFormat('dddd, D MMMM Y');
+
+                $ketParts = [
+                    "SK {$request->nomor_surat_putusan}",
+                ];
+                $jbtn = $pegawai->jabatan ?? ($terlaporJabatan ?: '');
+                if (!empty($jbtn)) {
+                    $ketParts[] = "Jabatan: {$jbtn}";
+                }
+                $ketParts[] = "{$pengaduan->judul} ({$pengaduan->nomor_pengaduan})";
+
+                DB::table('sanksi')->insert([
+                    'pegawai_id' => $pegawai->id,
+                    'jenis_sanksi' => $request->jenis_sanksi,
+                    'tanggal' => $tglFormatted,
+                    'keterangan' => implode(' · ', $ketParts),
+                    'tingkat' => 'Sedang',
+                    'created_at' => $now,
+                    'sk_sanksi_id' => $skId,
+                ]);
+            }
+
+            // Catat ke log aktivitas SDM
+            DB::table('activity_logs')->insert([
+                'user_nik' => $ctx['nik'] ?? 'SDM',
+                'user_name' => $ctx['nama'] ?? 'Bagian SDM',
+                'role' => 'sdm',
+                'action' => 'CREATE',
+                'module' => 'Sanksi Pegawai',
+                'description' => "Menerbitkan Surat Putusan Sanksi {$request->nomor_surat_putusan} ({$request->jenis_sanksi}) untuk pegawai " . ($pegawai->name ?? $terlaporNama) . " dari Pengaduan {$pengaduan->nomor_pengaduan}",
+                'created_at' => $now,
+            ]);
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::warning("Sinkronisasi sk_sanksi gagal: " . $e->getMessage());
+            \Illuminate\Support\Facades\Log::warning("Sinkronisasi sk_sanksi / sanksi gagal: " . $e->getMessage());
         }
 
         $labelTerlapor = !empty($terlaporNama) ? " untuk terlapor $terlaporNama" : "";

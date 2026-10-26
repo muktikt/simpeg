@@ -32,11 +32,12 @@ use App\Http\Controllers\PengumumanController;
 use App\Http\Controllers\DokumenSuratController;
 
 Route::get('/', [LoginController::class, 'showLoginForm'])->name('login');
+Route::get('/login', [LoginController::class, 'showLoginForm']);
 Route::post('/login', [LoginController::class, 'login'])->name('login.attempt');
 Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 
 Route::middleware(['simpeg.auth'])->group(function () {
-    Route::get('/beranda', [DashboardController::class, 'index'])->middleware(['simpeg.auth:1,2,7'])->name('dashboard');
+    Route::get('/beranda', [DashboardController::class, 'index'])->middleware(['simpeg.auth:1,2,7,kspi,kadiv'])->name('dashboard');
     Route::get('/dashboard', fn () => redirect()->route('dashboard'));
 
     // Data Pegawai - list & laporan perusahaan TIDAK untuk role Pegawai

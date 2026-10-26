@@ -22,7 +22,20 @@ class SanksiController extends Controller
      * Aturan sistem lama: satu pegawai tidak boleh punya lebih dari satu sanksi
      * di bulan & tahun yang sama - aturan ini dipertahankan di validateData().
      */
-    public const JENIS_SANKSI = ['Lisan', 'Tulisan', 'Dikeluarkan'];
+    public const JENIS_SANKSI = [
+        'Lisan',
+        'Tulisan',
+        'Penurunan Jabatan',
+        'Penurunan Gaji Berkala / Tunjangan',
+        'Penurunan Pangkat / Golongan 1 Tingkat',
+        'Pemindahan Tugas / Demosi Jabatan',
+        'Pembebasan Sementara Dari Tugas (Skorsing)',
+        'Pemberhentian Tidak Dengan Hormat (PTDH)',
+        'Dikeluarkan',
+        'Teguran Lisan / Peringatan I',
+        'Teguran Tertulis / Surat Peringatan (SP)',
+        'Sanksi Administratif Lainnya',
+    ];
 
     protected function all(): array
     {
@@ -104,15 +117,8 @@ class SanksiController extends Controller
     {
         $validated = $this->validateData($request);
 
-        $data = $this->all();
-        $newId = $data ? max(array_column($data, 'id')) + 1 : 1;
-        $validated['id'] = $newId;
-
-        $data[] = $validated;
-        $this->save($data);
-
         $pegawai = $this->pegawaiById($validated['pegawai_id']);
-        $dbPegId = $pegawai['db_id'] ?? null;
+        $dbPegId = $pegawai['id'] ?? ($pegawai['db_id'] ?? null);
         if (!$dbPegId && !empty($validated['pegawai_id'])) {
             $dbRow = \Illuminate\Support\Facades\DB::table('pegawai')
                 ->where('id', $validated['pegawai_id'])
@@ -161,7 +167,7 @@ class SanksiController extends Controller
         $validated = $this->validateData($request, $id);
 
         $pegawai = $this->pegawaiById($validated['pegawai_id']);
-        $dbPegId = $pegawai['db_id'] ?? null;
+        $dbPegId = $pegawai['id'] ?? ($pegawai['db_id'] ?? null);
         if (!$dbPegId && !empty($validated['pegawai_id'])) {
             $dbRow = \Illuminate\Support\Facades\DB::table('pegawai')
                 ->where('id', $validated['pegawai_id'])
@@ -178,19 +184,9 @@ class SanksiController extends Controller
                 'keterangan' => $validated['keterangan'] ?? '-',
                 'tingkat' => $validated['jenis_sanksi'] ?? 'Internal',
             ]);
-        } catch (\Throwable $e) {}
-
-        $data = collect($this->all())->map(function ($row) use ($id, $validated) {
-            if ($row['id'] === $id) {
-                $validated['id'] = $id;
-
-                return $validated;
-            }
-
-            return $row;
-        })->all();
-
-        $this->save($data);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('DB update sanksi failed: ' . $e->getMessage());
+        }
 
         return redirect()->route('sanksi.index')->with('success', 'Data sanksi berhasil diperbarui.');
     }
@@ -199,10 +195,9 @@ class SanksiController extends Controller
     {
         try {
             \Illuminate\Support\Facades\DB::table('sanksi')->where('id', $id)->delete();
-        } catch (\Throwable $e) {}
-
-        $data = collect($this->all())->reject(fn ($row) => $row['id'] === $id)->values()->all();
-        $this->save($data);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('DB delete sanksi failed: ' . $e->getMessage());
+        }
 
         return redirect()->route('sanksi.index')->with('success', 'Data sanksi berhasil dihapus.');
     }
@@ -210,32 +205,39 @@ class SanksiController extends Controller
     protected function validateData(Request $request, ?int $ignoreId = null): array
     {
         $validated = $request->validate([
-            'pegawai_id' => 'required|integer',
-            'tanggal' => 'required|date',
-            'jenis_sanksi' => ['required', Rule::in(self::JENIS_SANKSI)],
-            'keterangan' => 'nullable|string|max:255',
-            'potongan_persen' => 'required|numeric|min:0|max:100',
+            'pegawai_id' => 'required',
+            'tanggal' => 'required',
+            'jenis_sanksi' => 'required|string|max:150',
+            'keterangan' => 'nullable|string|max:500',
+            'potongan_persen' => 'nullable|numeric|min:0|max:100',
         ]);
 
-        // Aturan sistem lama: 1 pegawai cuma boleh 1 sanksi per bulan+tahun.
-        $bulan = \Illuminate\Support\Carbon::parse($validated['tanggal'])->month;
-        $tahun = \Illuminate\Support\Carbon::parse($validated['tanggal'])->year;
+        // Aturan sistem: 1 pegawai cuma boleh 1 sanksi per bulan+tahun
+        try {
+            $bulan = \Illuminate\Support\Carbon::parse($validated['tanggal'])->month;
+            $tahun = \Illuminate\Support\Carbon::parse($validated['tanggal'])->year;
 
-        $sudahAda = collect($this->all())
-            ->reject(fn ($row) => $row['id'] === $ignoreId)
-            ->contains(function ($row) use ($validated, $bulan, $tahun) {
-                $rowDate = \Illuminate\Support\Carbon::parse($row['tanggal']);
+            $sudahAda = collect($this->all())
+                ->reject(fn ($row) => (int) ($row['id'] ?? 0) === $ignoreId)
+                ->contains(function ($row) use ($validated, $bulan, $tahun) {
+                    try {
+                        $rowDate = \Illuminate\Support\Carbon::parse($row['tanggal']);
+                        return (string) ($row['pegawai_id'] ?? '') === (string) $validated['pegawai_id']
+                            && $rowDate->month === $bulan
+                            && $rowDate->year === $tahun;
+                    } catch (\Throwable $e) {
+                        return false;
+                    }
+                });
 
-                return $row['pegawai_id'] == $validated['pegawai_id']
-                    && $rowDate->month === $bulan
-                    && $rowDate->year === $tahun;
-            });
-
-        if ($sudahAda) {
-            throw \Illuminate\Validation\ValidationException::withMessages([
-                'pegawai_id' => 'Pegawai ini sudah punya data sanksi di bulan & tahun yang sama.',
-            ]);
-        }
+            if ($sudahAda) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'pegawai_id' => 'Pegawai ini sudah punya data sanksi di bulan & tahun yang sama.',
+                ]);
+            }
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
+        } catch (\Throwable $e) {}
 
         return $validated;
     }

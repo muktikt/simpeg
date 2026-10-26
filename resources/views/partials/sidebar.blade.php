@@ -1,6 +1,7 @@
 @php
     $menu = config('simpeg_menu');
-    $myRole = session('simpeg_user.userlevel');
+    $myRole = (string) session('simpeg_user.userlevel');
+    $myRolePengaduan = (string) session('simpeg_user.role_pengaduan', 'pegawai');
 
     $icons = [
         'home' => '<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/>',
@@ -13,7 +14,18 @@
     ];
 
     $slugify = fn ($label) => \Illuminate\Support\Str::slug($label);
-    $canSee = fn ($group) => empty($group['roles']) || in_array($myRole, $group['roles'], true);
+    $canSee = function ($group) use ($myRole, $myRolePengaduan) {
+        if (empty($group['roles'])) {
+            return true;
+        }
+        if (in_array($myRole, $group['roles'], true)) {
+            return true;
+        }
+        if (in_array($myRolePengaduan, ['kspi', 'kadiv', 'dirut']) && in_array($group['route_name'] ?? '', ['dashboard', 'pengaduan.index'])) {
+            return true;
+        }
+        return false;
+    };
 
     $currentRouteName = request()->route() ? request()->route()->getName() : '';
 

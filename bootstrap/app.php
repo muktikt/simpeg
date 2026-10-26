@@ -14,6 +14,8 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->validateCsrfTokens(except: [
             'api/*',
+            'login',
+            '/',
         ]);
         $middleware->alias([
             'simpeg.auth' => \App\Http\Middleware\SimpegAuth::class,
@@ -21,5 +23,7 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        $exceptions->render(function (\Illuminate\Session\TokenMismatchException $e, $request) {
+            return redirect()->route('login')->with('error', 'Sesi form telah kedaluwarsa. Silakan masukkan NIK dan kata sandi kembali.');
+        });
     })->create();

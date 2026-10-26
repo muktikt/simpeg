@@ -24,6 +24,9 @@
         <label for="jenis_sanksi">Jenis Sanksi</label>
         <select id="jenis_sanksi" name="jenis_sanksi" required>
             <option value="">-- Pilih Jenis --</option>
+            @if ($old('jenis_sanksi') && !in_array($old('jenis_sanksi'), $jenisSanksiList))
+                <option value="{{ $old('jenis_sanksi') }}" selected>{{ $old('jenis_sanksi') }}</option>
+            @endif
             @foreach ($jenisSanksiList as $jenis)
                 <option value="{{ $jenis }}" @selected($old('jenis_sanksi') === $jenis)>{{ $jenis }}</option>
             @endforeach

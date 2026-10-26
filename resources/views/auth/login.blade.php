@@ -34,6 +34,12 @@
             <p>Gunakan NIK dan kata sandi kepegawaian kamu.</p>
         </div>
 
+        @if (session('error'))
+            <div style="background:#fee2e2; border:1px solid #fca5a5; color:#b91c1c; padding:10px 14px; border-radius:8px; font-size:13px; margin-bottom:16px; line-height:1.4;">
+                {{ session('error') }}
+            </div>
+        @endif
+
         <form method="POST" action="{{ route('login.attempt') }}">
             @csrf
             <div class="field">
