@@ -68,11 +68,22 @@ class DashboardController extends Controller
                 $absensiHariIni = DB::table('absensi_harian')->where('tanggal', now()->toDateString())->count();
                 $jumlahUnitKerja = DB::table('pegawai')->whereNotNull('unit_kerja')->distinct()->count('unit_kerja');
 
+                $pengaduanPending = 0;
+                $pengaduanTotal = 0;
+                try {
+                    $pengaduanPending = DB::table('pengaduan_pegawai')
+                        ->whereNotIn('status', ['selesai', 'ditolak'])
+                        ->count();
+                    $pengaduanTotal = DB::table('pengaduan_pegawai')->count();
+                } catch (\Throwable $e) {}
+
                 $stats = [
                     'cuti_pending' => $cutiPending,
                     'absensi_hari_ini' => $absensiHariIni,
                     'periode_gaji_berjalan' => \App\Http\Controllers\AbsensiController::BULAN[now()->month] . ' ' . now()->year,
                     'jumlah_unit_kerja' => $jumlahUnitKerja ?: 1,
+                    'pengaduan_pending' => $pengaduanPending,
+                    'pengaduan_total' => $pengaduanTotal,
                 ];
 
                 // Aktivitas terbaru dari absensi harian
@@ -114,6 +125,8 @@ class DashboardController extends Controller
                 'absensi_hari_ini' => 0,
                 'periode_gaji_berjalan' => \App\Http\Controllers\AbsensiController::BULAN[now()->month] . ' ' . now()->year,
                 'jumlah_unit_kerja' => 2,
+                'pengaduan_pending' => 0,
+                'pengaduan_total' => 0,
             ];
             $aktivitas = [];
             return view('dashboard', compact('komposisi', 'total', 'stats', 'aktivitas'));

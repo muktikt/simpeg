@@ -182,14 +182,34 @@
                 <h2 style="font-size:16px;">Informasi Pokok Pengaduan</h2>
             </div>
 
+            @php
+                // Logika pembatasan visibilitas pelapor (sinkron dengan aplikasi mobile)
+                // Hanya KSPI dan Kadiv Kategori yang bisa melihat identitas pelapor.
+                // Terlapor (pihak yang diadukan) juga tidak boleh melihat identitas pelapor.
+                $bolehLihatPelapor = false;
+                if (!empty($pengaduan->anonim)) {
+                    $bolehLihatPelapor = false; // anonim selalu tersembunyi
+                } else {
+                    $nikTerlapor = trim($pengaduan->nik_pelaku ?? '');
+                    $namaTerlapor = strtolower(trim($pengaduan->pihak_terlapor ?? ''));
+                    $isTerlapor = ($nikTerlapor !== '' && $ctx['nik'] === $nikTerlapor)
+                        || ($namaTerlapor !== '' && strtolower(trim($ctx['nama'] ?? '')) === $namaTerlapor);
+
+                    $isPelapor = !empty($pengaduan->nik) && ($ctx['nik'] ?? '') === $pengaduan->nik;
+                    $bolehLihatPelapor = !$isTerlapor && (in_array($myRole, ['kspi', 'kadiv']) || $isPelapor);
+                }
+            @endphp
             <div style="display:grid; grid-template-columns: 1fr 1fr; gap:14px; margin-bottom:16px; background:#f8fafc; padding:14px; border-radius:8px; border:1px solid #e2e8f0;">
                 <div>
                     <small style="color:var(--text-muted); display:block; font-size:11.5px;">Identitas Pelapor:</small>
                     @if (!empty($pengaduan->anonim))
                         <strong style="color:#dc2626;">Anonim (Dirahasiakan)</strong>
-                    @else
+                    @elseif ($bolehLihatPelapor)
                         <strong style="font-size:13.5px;">{{ $pengaduan->nama_pegawai ?? '-' }}</strong>
                         <div style="font-size:12px; color:#475569;">NIK: {{ $pengaduan->nik ?? '-' }} · {{ $pengaduan->cabang ?? '' }}</div>
+                    @else
+                        <strong style="color:#64748b; font-size:13px;">Identitas Dilindungi</strong>
+                        <div style="font-size:11px; color:#94a3b8; font-style:italic;">Hanya KSPI & Kadiv Kategori yang dapat melihat</div>
                     @endif
                 </div>
                 <div>

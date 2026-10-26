@@ -122,12 +122,15 @@ class PengumumanController extends Controller
         $counts = [
             'semua' => $rows->count(),
             'tayang' => $rows->where('status_kode', 'tayang')->count(),
+            'penting' => $rows->filter(fn ($item) => strtolower($item['prioritas'] ?? '') === 'penting')->count(),
             'terjadwal' => $rows->where('status_kode', 'terjadwal')->count(),
             'kedaluwarsa' => $rows->where('status_kode', 'kedaluwarsa')->count(),
             'nonaktif' => $rows->where('status_kode', 'nonaktif')->count(),
         ];
 
-        if ($filter !== 'semua' && in_array($filter, ['tayang', 'terjadwal', 'kedaluwarsa', 'nonaktif'])) {
+        if ($filter === 'penting') {
+            $rows = $rows->filter(fn ($item) => strtolower($item['prioritas'] ?? '') === 'penting')->values();
+        } elseif ($filter !== 'semua' && in_array($filter, ['tayang', 'terjadwal', 'kedaluwarsa', 'nonaktif'])) {
             $rows = $rows->where('status_kode', $filter)->values();
         } else {
             $rows = $rows->values();

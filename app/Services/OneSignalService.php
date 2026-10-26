@@ -9,6 +9,22 @@ use Illuminate\Support\Facades\Log;
 class OneSignalService
 {
     /**
+     * Helper untuk mendapatkan OneSignal App ID dari konfigurasi atau env tanpa hardcoded fallback.
+     */
+    public static function getAppId(): ?string
+    {
+        return config('services.onesignal.app_id') ?: env('ONESIGNAL_APP_ID');
+    }
+
+    /**
+     * Helper untuk mendapatkan OneSignal REST API Key dari konfigurasi atau env.
+     */
+    public static function getRestApiKey(): ?string
+    {
+        return config('services.onesignal.rest_api_key') ?: env('ONESIGNAL_REST_API_KEY');
+    }
+
+    /**
      * Kirim Push Notification ke seluruh perangkat HP pegawai via OneSignal.
      * Sekaligus otomatis mencatat ke tabel `notifikasi` di database (Lonceng In-App Mobile).
      *
@@ -20,8 +36,8 @@ class OneSignalService
      */
     public static function kirimPengumuman(string $judul, string $isi, array $targetRoles = [], array $customData = []): bool
     {
-        $appId = config('services.onesignal.app_id') ?? env('ONESIGNAL_APP_ID', 'b7556b90-2f97-44f2-93e2-bd94abe8229e');
-        $restApiKey = config('services.onesignal.rest_api_key') ?? env('ONESIGNAL_REST_API_KEY');
+        $appId = self::getAppId();
+        $restApiKey = self::getRestApiKey();
 
         $cleanIsi = mb_substr(strip_tags($isi), 0, 160);
 
@@ -124,8 +140,8 @@ class OneSignalService
      */
     public static function kirimNotifikasiPegawai(string|array $niks, string $judul, string $isi, array $customData = []): bool
     {
-        $appId = config('services.onesignal.app_id') ?? env('ONESIGNAL_APP_ID', 'b7556b90-2f97-44f2-93e2-bd94abe8229e');
-        $restApiKey = config('services.onesignal.rest_api_key') ?? env('ONESIGNAL_REST_API_KEY');
+        $appId = self::getAppId();
+        $restApiKey = self::getRestApiKey();
 
         if (empty($niks)) {
             return false;
@@ -145,7 +161,9 @@ class OneSignalService
                 ->whereIn('nik', $nikList)
                 ->pluck('id')
                 ->toArray();
-            self::simpanKeTabelNotifikasi($pIds, $judul, $cleanIsi);
+            $pengumumanId = isset($customData['pengumuman_id']) ? (int)$customData['pengumuman_id'] : null;
+            $pengaduanId = isset($customData['pengaduan_id']) ? (int)$customData['pengaduan_id'] : null;
+            self::simpanKeTabelNotifikasi($pIds, $judul, $cleanIsi, $pengumumanId, $pengaduanId);
         } catch (\Throwable $e) {
             Log::warning('OneSignalService: Gagal sync pegawai ke DB notifikasi: ' . $e->getMessage());
         }
@@ -207,8 +225,8 @@ class OneSignalService
      */
     public static function kirimNotifikasiRole(array $roles, string $judul, string $isi, array $customData = []): bool
     {
-        $appId = config('services.onesignal.app_id') ?? env('ONESIGNAL_APP_ID', 'b7556b90-2f97-44f2-93e2-bd94abe8229e');
-        $restApiKey = config('services.onesignal.rest_api_key') ?? env('ONESIGNAL_REST_API_KEY');
+        $appId = self::getAppId();
+        $restApiKey = self::getRestApiKey();
 
         if (empty($roles)) {
             return false;
@@ -234,7 +252,9 @@ class OneSignalService
                 ->whereIn(DB::raw('LOWER(role)'), $expandedRoles)
                 ->pluck('id')
                 ->toArray();
-            self::simpanKeTabelNotifikasi($pIds, $judul, $cleanIsi);
+            $pengumumanId = isset($customData['pengumuman_id']) ? (int)$customData['pengumuman_id'] : null;
+            $pengaduanId = isset($customData['pengaduan_id']) ? (int)$customData['pengaduan_id'] : null;
+            self::simpanKeTabelNotifikasi($pIds, $judul, $cleanIsi, $pengumumanId, $pengaduanId);
         } catch (\Throwable $e) {
             Log::warning('OneSignalService: Gagal sync role ke DB notifikasi: ' . $e->getMessage());
         }
@@ -300,18 +320,40 @@ class OneSignalService
 
     /**
      * Helper internal untuk menyimpan riwayat notifikasi ke tabel `notifikasi` di database (Lonceng In-App).
+     * Dilengkapi fitur deduplikasi: mencegah pencatatan notifikasi ganda untuk konten yang sama dalam window 10 detik.
      */
-    protected static function simpanKeTabelNotifikasi(array $pegawaiIds, string $judul, string $pesan, ?int $pengumumanId = null): void
-    {
-        if (empty($pegawaiIds)) {
+    protected static function simpanKeTabelNotifikasi(
+        array $pegawaiIds,
+        string $judul,
+        string $pesan,
+        ?int $pengumumanId = null,
+        ?int $pengaduanId = null
+    ): void {
+        $uniquePids = array_values(array_filter(array_unique($pegawaiIds)));
+        if (empty($uniquePids)) {
             return;
         }
 
         try {
             $now = now();
+            // Deduplikasi 10 detik: Cek jika notifikasi serupa sudah dicatat untuk pegawai tersebut dalam 10 detik terakhir
+            $tenSecondsAgo = now()->subSeconds(10);
+            $alreadyNotifiedPids = DB::table('notifikasi')
+                ->whereIn('untuk_pegawai_id', $uniquePids)
+                ->where('judul', $judul)
+                ->where('pesan', $pesan)
+                ->where('waktu', '>=', $tenSecondsAgo)
+                ->pluck('untuk_pegawai_id')
+                ->toArray();
+
+            $duplicateMap = array_flip($alreadyNotifiedPids);
+
             $rows = [];
-            foreach (array_unique($pegawaiIds) as $pid) {
-                if (empty($pid)) continue;
+            foreach ($uniquePids as $pid) {
+                if (isset($duplicateMap[$pid])) {
+                    // Dilewati karena sudah dicatat dalam 10 detik terakhir
+                    continue;
+                }
                 $row = [
                     'untuk_pegawai_id' => $pid,
                     'judul' => $judul,
@@ -321,6 +363,9 @@ class OneSignalService
                 ];
                 if ($pengumumanId !== null) {
                     $row['pengumuman_id'] = $pengumumanId;
+                }
+                if ($pengaduanId !== null) {
+                    $row['pengaduan_id'] = $pengaduanId;
                 }
                 $rows[] = $row;
             }

@@ -624,6 +624,14 @@
             <tbody>
                 <tr>
                     <td>
+                        @php
+                            $nikTerlapor = trim($pengaduan->nik_pelaku ?? '');
+                            $namaTerlapor = strtolower(trim($pengaduan->pihak_terlapor ?? ''));
+                            $isTerlapor = ($nikTerlapor !== '' && ($ctx['nik'] ?? '') === $nikTerlapor)
+                                || ($namaTerlapor !== '' && strtolower(trim($ctx['nama'] ?? '')) === $namaTerlapor);
+                            $isPelapor = !empty($pengaduan->nik) && ($ctx['nik'] ?? '') === $pengaduan->nik;
+                            $bolehLihatPelaporSurat = !empty($pengaduan->anonim) ? false : (!$isTerlapor && (in_array($myRole ?? '', ['kspi', 'kadiv']) || $isPelapor));
+                        @endphp
                         @if (!empty($pengaduan->anonim))
                             <div style="color:#b91c1c; font-weight:bold; margin-bottom:4px;">
                                 RAHASIA (PELAPOR ANONIM)
@@ -631,7 +639,7 @@
                             <div style="font-size:9pt; color:#475569; font-style:italic;">
                                 Identitas pelapor dilindungi penuh sesuai Peraturan Direksi & Sistem Pelaporan Pelanggaran (Whistleblowing System) Perumdam Tirta Darma Ayu.
                             </div>
-                        @else
+                        @elseif ($bolehLihatPelaporSurat)
                             <div style="font-weight:bold; font-size:10.5pt; color:#0d2c6e; margin-bottom:2px;">
                                 {{ $pengaduan->nama_pegawai ?? '-' }}
                             </div>
@@ -639,6 +647,13 @@
                                 <div><strong>NIK:</strong> {{ $pengaduan->nik ?? '-' }}</div>
                                 <div><strong>Golongan:</strong> {{ !empty($pengaduan->golongan) ? $pengaduan->golongan : '-' }}</div>
                                 <div><strong>Unit Kerja/Cabang:</strong> {{ $pengaduan->cabang ?? '-' }}</div>
+                            </div>
+                        @else
+                            <div style="color:#64748b; font-weight:bold; margin-bottom:4px;">
+                                IDENTITAS DILINDUNGI
+                            </div>
+                            <div style="font-size:9pt; color:#64748b; font-style:italic;">
+                                Identitas pelapor dilindungi. Hanya KSPI & Kadiv Kategori yang berwenang melihat identitas pelapor.
                             </div>
                         @endif
                     </td>
@@ -818,21 +833,21 @@
             <div class="signature-box">
                 <div class="sig-city-date">&nbsp;</div>
                 <div class="sig-role">
-                    @if (!empty($pengaduan->anonim))
+                    @if (!empty($pengaduan->anonim) || !$bolehLihatPelaporSurat)
                         Tim Penanganan Pengaduan (KSPI)
                     @else
                         Pelapor / Pengadu
                     @endif
                 </div>
                 <div class="sig-name">
-                    @if (!empty($pengaduan->anonim))
+                    @if (!empty($pengaduan->anonim) || !$bolehLihatPelaporSurat)
                         KOMITE SUBSTANSI PENGAWASAN
                     @else
                         {{ $pengaduan->nama_pegawai ?? '-' }}
                     @endif
                 </div>
                 <div class="sig-nik">
-                    @if (!empty($pengaduan->anonim))
+                    @if (!empty($pengaduan->anonim) || !$bolehLihatPelaporSurat)
                         PDAM Tirta Darma Ayu
                     @else
                         NIK. {{ $pengaduan->nik ?? '-' }}

@@ -20,6 +20,10 @@
            class="btn btn-sm {{ $filter === 'tayang' ? 'btn-primary' : 'btn-outline' }}" style="{{ $filter === 'tayang' ? 'background:#16A34A; border-color:#16A34A;' : '' }}">
             Tayang ({{ $counts['tayang'] }})
         </a>
+        <a href="{{ route('pengumuman.index', ['filter' => 'penting', 'q' => request('q')]) }}" 
+           class="btn btn-sm {{ $filter === 'penting' ? 'btn-primary' : 'btn-outline' }}" style="{{ $filter === 'penting' ? 'background:#E11D48; border-color:#E11D48;' : '' }}">
+            🚨 Penting ({{ $counts['penting'] }})
+        </a>
         <a href="{{ route('pengumuman.index', ['filter' => 'terjadwal', 'q' => request('q')]) }}" 
            class="btn btn-sm {{ $filter === 'terjadwal' ? 'btn-primary' : 'btn-outline' }}" style="{{ $filter === 'terjadwal' ? 'background:#D97706; border-color:#D97706;' : '' }}">
             Terjadwal ({{ $counts['terjadwal'] }})
@@ -63,9 +67,9 @@
                             </span>
                         @endif
 
-                        @if ($p['prioritas'] ?? false)
+                        @if (strtolower($p['prioritas'] ?? '') === 'penting')
                             <span style="background:#FEE2E2; color:#DC2626; font-size:11px; font-weight:700; padding:3px 8px; border-radius:6px; display:inline-flex; align-items:center; gap:4px;">
-                                PENTING
+                                🚨 PENTING
                             </span>
                         @endif
 

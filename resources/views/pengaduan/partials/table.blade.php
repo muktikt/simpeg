@@ -47,6 +47,10 @@
                 ];
                 $badgeStyle = $statusBadges[$statusName] ?? 'background:#f1f5f9; color:#475569;';
                 $badgeLabel = $statusLabels[$statusName] ?? $statusName;
+
+                // Pembatasan visibilitas pelapor (sinkron dengan mobile):
+                // Hanya KSPI dan Kadiv yang boleh melihat identitas pelapor di tabel daftar.
+                $bolehLihatPelaporTabel = in_array($myRole ?? 'pegawai', ['kspi', 'kadiv']);
             @endphp
             <tr>
                 <td>
@@ -56,9 +60,11 @@
                 <td>
                     @if (!empty($item->anonim))
                         <span style="background:#fee2e2; color:#991b1b; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:700;">Anonim</span>
-                    @else
+                    @elseif ($bolehLihatPelaporTabel)
                         <strong>{{ $item->nama_pegawai ?? '-' }}</strong><br>
                         <small style="color:var(--text-muted);">NIK: {{ $item->nik ?? '-' }}</small>
+                    @else
+                        <span style="color:#64748b; font-size:12px; font-style:italic;">🔒 Dilindungi</span>
                     @endif
                 </td>
                 <td>
