@@ -12,7 +12,7 @@
     ];
     $tabLabels = [
         'keluarga' => 'Keluarga', 'golongan' => 'Golongan', 'jabatan_riwayat' => 'Jabatan',
-        'pendidikan' => 'Pendidikan', 'prestasi' => 'Prestasi', 'dok_surat' => 'Dokumen Surat (SDM)',
+        'pendidikan' => 'Pendidikan', 'prestasi' => 'Prestasi', 'dok_surat' => 'Dokumen Surat',
     ];
 @endphp
 
@@ -184,7 +184,7 @@
 <div class="tabs" id="pegawai-tabs">
     @foreach ($tabLabels as $type => $label)
         <button type="button" class="tab-btn {{ $loop->first ? 'active' : '' }}" data-tab="{{ $type }}" onclick="switchTab('{{ $type }}')">
-            {{ $label }} ({{ $type === 'dok_surat' ? ((!empty($pegawai['surat_kerja']) ? 1 : 0) + (!empty($pegawai['surat_diklat']) ? 1 : 0)) : count($pegawai[$type] ?? []) }})
+            {{ $label }}
         </button>
     @endforeach
 </div>
@@ -195,13 +195,13 @@
             <div class="ribbon-card" style="margin-top:8px;">
                 <div class="ribbon-head" style="margin-bottom:20px; display:flex; justify-content:space-between; align-items:center;">
                     <div>
-                        <h2 style="font-size:18px; color:#0F2A3D;">Dokumen Resmi Pegawai (SDM)</h2>
-                        <p style="font-size:13px; color:var(--text-muted); margin-top:4px;">Surat Kerja & Surat Diklat resmi yang diterbitkan dan diunggah oleh SDM.</p>
+                        <h2 style="font-size:18px; color:#0F2A3D;">Dokumen Resmi Pegawai</h2>
+                        <p style="font-size:13px; color:var(--text-muted); margin-top:4px;">Surat Kerja & Surat Diklat resmi yang diterbitkan.</p>
                     </div>
                     @if ($myRole === '1')
                         <button type="button" class="btn btn-primary btn-sm" onclick="document.getElementById('modal-upload-dokumen-pegawai').style.display='flex'">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                            Upload Dokumen (Admin SDM)
+                            Upload Dokumen
                         </button>
                     @endif
                 </div>

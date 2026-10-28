@@ -51,13 +51,20 @@ class PotonganKeuController extends Controller
         'pot_bpr'           => 'BPR',
     ];
 
-    protected function all(string $tipe): array
+    protected function all(string $tipe, mixed $bulan = null, ?int $tahun = null): array
     {
         try {
-            $rows = \Illuminate\Support\Facades\DB::table('potongan_keu')
-                ->where('tipe', $tipe)
-                ->orderBy('id', 'desc')
-                ->get();
+            $query = \Illuminate\Support\Facades\DB::table('potongan_keu')
+                ->where('tipe', $tipe);
+
+            if ($bulan !== null && $bulan !== 'all' && (int)$bulan > 0) {
+                $query->where('bulan', (int) $bulan);
+            }
+            if ($tahun !== null && (int)$tahun > 0) {
+                $query->where('tahun', (int) $tahun);
+            }
+
+            $rows = $query->orderBy('id', 'desc')->get();
 
             return $rows->map(fn ($r) => (array) $r)->all();
         } catch (\Throwable $e) {
@@ -98,10 +105,20 @@ class PotonganKeuController extends Controller
 
     protected function withCalculated(array $row, ?\Illuminate\Support\Collection $pegawaiMap = null): array
     {
+        $nik = (string) ($row['nik'] ?? '');
+        $pegId = (string) ($row['pegawai_id'] ?? '');
+
+        $p = null;
         if ($pegawaiMap) {
-            $p = $pegawaiMap->get($row['nik']);
+            $p = $pegawaiMap->get($nik)
+                ?: ($pegId ? $pegawaiMap->firstWhere('db_id', $pegId) : null)
+                ?: $pegawaiMap->get('TEMP' . $nik);
         } else {
-            $p = collect($this->pegawaiList())->firstWhere('nik', $row['nik']);
+            $p = collect($this->pegawaiList())->first(function ($item) use ($nik, $pegId) {
+                return (string) ($item['nik'] ?? '') === $nik
+                    || ($pegId !== '' && (string) ($item['db_id'] ?? '') === $pegId)
+                    || (string) ($item['nik'] ?? '') === 'TEMP' . $nik;
+            });
         }
 
         $row['nama'] = $p['nama'] ?? '(tidak ditemukan)';
@@ -130,8 +147,13 @@ class PotonganKeuController extends Controller
         $pegawaiMap = collect($pegawaiList)->keyBy('nik');
 
         $keyword = trim((string) $request->query('q', ''));
+        $bulanParam = $request->query('bulan');
+        $tahunParam = $request->query('tahun');
 
-        $allItems = collect($this->all($tipe))
+        $bulan = $bulanParam !== null ? ($bulanParam === 'all' ? 'all' : (int) $bulanParam) : (int) now()->month;
+        $tahun = $tahunParam !== null ? (int) $tahunParam : (int) now()->year;
+
+        $allItems = collect($this->all($tipe, $bulan, $tahun))
             ->map(fn ($row) => $this->withCalculated($row, $pegawaiMap))
             ->sortBy('nik')
             ->values();
@@ -148,12 +170,14 @@ class PotonganKeuController extends Controller
         }
 
         $totalPegawai = count($pegawaiList);
-        $sudahMasuk   = $allItems->count();
+        $sudahMasuk   = $allItems->pluck('nik')->unique()->count();
         $belumMasuk   = max(0, $totalPegawai - $sudahMasuk);
 
         return view('potongan-keu.index', [
             'items'       => $items,
             'keyword'     => $keyword,
+            'bulan'       => $bulan,
+            'tahun'       => $tahun,
             'totalItems'  => $allItems->count(),
             'tipe'        => $tipe,
             'tipeLabel'   => $this->tipeLabels[$tipe],
@@ -270,12 +294,18 @@ class PotonganKeuController extends Controller
     /**
      * Unduh template file spreadsheet (.csv) siap pakai untuk import potongan.
      */
-    public function downloadTemplate(string $tipe)
+    public function downloadTemplate(Request $request, string $tipe)
     {
         $this->validateTipe($tipe);
+        $isSample = $request->boolean('sample') || $request->query('format') === 'sample';
         $pegawaiList = $this->pegawaiList();
 
-        $filename = "Template_Set_Potongan_" . strtoupper($tipe) . "_" . date('Ymd') . ".csv";
+        if ($isSample) {
+            $pegawaiList = array_slice($pegawaiList, 0, 1);
+            $filename = "Template_Contoh_1_Pegawai_" . strtoupper($tipe) . "_" . date('Ymd') . ".csv";
+        } else {
+            $filename = "Template_Set_Potongan_" . strtoupper($tipe) . "_" . date('Ymd') . ".csv";
+        }
 
         $headers = [
             'Content-Type' => 'text/csv; charset=UTF-8',
@@ -365,26 +395,45 @@ class PotonganKeuController extends Controller
             }
         }
 
-        $pegawaiList = $this->pegawaiList();
-        $pegawaiMap = collect($pegawaiList)->keyBy('nik');
+        @set_time_limit(300);
+        @ini_set('memory_limit', '512M');
 
-        $existingData = $this->all($tipe);
-        $existingMap = collect($existingData)->keyBy('nik')->all();
+        $bulan = (int) now()->month;
+        $tahun = (int) now()->year;
+        $petugasEntri = session('simpeg_user.nama_peg', 'Admin (Excel Import)');
+        $now = now();
+        $today = $now->toDateString();
 
-        $maxId = $existingData ? max(array_column($existingData, 'id')) : 0;
+        // 1. Ambil semua NIK -> Pegawai UUID sekali saja dalam 1 query cepat
+        $pegawaiDbIds = \Illuminate\Support\Facades\DB::table('pegawai')->pluck('id', 'nik')->all();
+
+        // 2. Ambil data potongan_keu bulan ini sekali saja dalam 1 query cepat
+        $existingRows = \Illuminate\Support\Facades\DB::table('potongan_keu')
+            ->where('tipe', $tipe)
+            ->where('bulan', $bulan)
+            ->where('tahun', $tahun)
+            ->get()
+            ->keyBy('nik');
+
         $importedCount = 0;
         $updatedCount = 0;
+        $insertBatch = [];
+        $updateBatch = [];
 
         foreach ($rows as $r) {
-            $nik = trim((string) ($r[$headerMap['nik']] ?? ''));
-            // Hapus karakter non-digit/kutip
-            $nik = preg_replace('/[^0-9]/', '', $nik);
+            $rawNik = trim((string) ($r[$headerMap['nik']] ?? ''));
+            // Bersihkan petik/spasi tapi pertahankan huruf dan angka (karena NIK pegawai ada yang diawali TEMP seperti TEMP0027)
+            $nik = strtoupper(preg_replace('/[^A-Za-z0-9\-_]/', '', $rawNik));
 
-            if (empty($nik) || ! isset($pegawaiMap[$nik])) {
+            // Jika NIK hanya angka 4 digit dan ada padanannya dengan awalan TEMP di master pegawai, sesuaikan otomatis
+            if (strlen($nik) === 4 && isset($pegawaiDbIds['TEMP' . $nik])) {
+                $nik = 'TEMP' . $nik;
+            }
+
+            if (empty($nik)) {
                 continue;
             }
 
-            $peg = $pegawaiMap[$nik];
             $values = [];
             foreach ($this->kolom as $k) {
                 $colIdx = $headerMap[$k] ?? null;
@@ -393,48 +442,62 @@ class PotonganKeuController extends Controller
                 $values[$k] = $cleanVal;
             }
 
-            $dbPegId = $peg['db_id'] ?? null;
-            if (! $dbPegId && ! empty($nik)) {
-                $dbPegId = \Illuminate\Support\Facades\DB::table('pegawai')->where('nik', $nik)->value('id');
-            }
+            $dbPegId = $pegawaiDbIds[$nik] ?? ($pegawaiDbIds['TEMP' . $nik] ?? null);
 
-            $existing = \Illuminate\Support\Facades\DB::table('potongan_keu')
-                ->where('tipe', $tipe)
-                ->where('nik', $nik)
-                ->where('bulan', (int) now()->month)
-                ->where('tahun', (int) now()->year)
-                ->first();
-
-            if ($existing) {
+            if ($existingRows->has($nik)) {
                 if ($mode === 'update') {
-                    $updateVals = [
-        'petugas_entri' => session('simpeg_user.nama_peg', 'Admin (Excel Import)'),
-        'updated_at' => now(),
-    ];
+                    $existing = $existingRows->get($nik);
+                    $rowUpdate = [
+                        'id'            => $existing->id,
+                        'tipe'          => $existing->tipe,
+                        'tgl_potongan'  => $existing->tgl_potongan,
+                        'nik'           => $nik,
+                        'pegawai_id'    => $existing->pegawai_id ?: $dbPegId,
+                        'bulan'         => $bulan,
+                        'tahun'         => $tahun,
+                        'petugas_entri' => $petugasEntri,
+                        'status'        => $existing->status ?? 'N',
+                        'updated_at'    => $now,
+                    ];
                     foreach ($values as $k => $v) {
-                        $updateVals[$k] = $v;
+                        $rowUpdate[$k] = $v;
                     }
-                    \Illuminate\Support\Facades\DB::table('potongan_keu')->where('id', $existing->id)->update($updateVals);
+                    $updateBatch[] = $rowUpdate;
                     $updatedCount++;
                 }
             } else {
                 $newRow = [
-    'tipe'          => $tipe,
-    'tgl_potongan'  => now()->toDateString(),
-    'nik'           => $nik,
-    'pegawai_id'    => $dbPegId,
-    'bulan'         => (int) now()->month,
-    'tahun'         => (int) now()->year,
-    'petugas_entri' => session('simpeg_user.nama_peg', 'Admin (Excel Import)'),
-    'status'        => 'N',
-    'created_at'    => now(),
-    'updated_at'    => now(),
-];
+                    'tipe'          => $tipe,
+                    'tgl_potongan'  => $today,
+                    'nik'           => $nik,
+                    'pegawai_id'    => $dbPegId,
+                    'bulan'         => $bulan,
+                    'tahun'         => $tahun,
+                    'petugas_entri' => $petugasEntri,
+                    'status'        => 'N',
+                    'created_at'    => $now,
+                    'updated_at'    => $now,
+                ];
                 foreach ($values as $k => $v) {
                     $newRow[$k] = $v;
                 }
-                \Illuminate\Support\Facades\DB::table('potongan_keu')->insert($newRow);
+                $insertBatch[] = $newRow;
                 $importedCount++;
+            }
+        }
+
+        // 3. Batch insert semua data baru sekaligus per 100 baris (efisien & bebas timeout)
+        if (! empty($insertBatch)) {
+            foreach (array_chunk($insertBatch, 100) as $chunk) {
+                \Illuminate\Support\Facades\DB::table('potongan_keu')->insert($chunk);
+            }
+        }
+
+        // 4. Batch update data lama sekaligus per 100 baris menggunakan upsert
+        if (! empty($updateBatch)) {
+            $updateColumns = array_merge(['petugas_entri', 'updated_at', 'pegawai_id'], $this->kolom);
+            foreach (array_chunk($updateBatch, 100) as $chunk) {
+                \Illuminate\Support\Facades\DB::table('potongan_keu')->upsert($chunk, ['id'], $updateColumns);
             }
         }
 
@@ -527,22 +590,40 @@ class PotonganKeuController extends Controller
 
     // ───── PROSES TERBIT POTONGAN (REALTIME & BERJENJANG) ─────
 
-    public function terbitIndex(string $tipe)
+    public function terbitIndex(Request $request, string $tipe)
     {
         $this->validateTipe($tipe);
         $pegawaiList = $this->pegawaiList();
         $pegawaiMap = collect($pegawaiList)->keyBy('nik');
 
-        $allItems = collect($this->all($tipe))
+        $bulanParam = $request->query('bulan');
+        $tahunParam = $request->query('tahun');
+        $bulan = $bulanParam !== null ? ($bulanParam === 'all' ? 'all' : (int) $bulanParam) : (int) now()->month;
+        $tahun = $tahunParam !== null ? (int) $tahunParam : (int) now()->year;
+
+        $allItems = collect($this->all($tipe, $bulan, $tahun))
             ->map(fn ($row) => $this->withCalculated($row, $pegawaiMap))
             ->sortBy('nik')
             ->values();
 
-        // Siap Diterbitkan = status 'kepegawaian' atau 'N'
-        $items = $allItems->where('status', '!=', 'Y')->values();
-        $sudahDiterbitkan = $allItems->where('status', '===', 'Y')->count();
-        $disetujuiKepegawaian = $allItems->where('status', '===', 'kepegawaian')->count();
-        $menungguKepegawaian = $allItems->where('status', '===', 'N')->count();
+        // Hitung status berjenjang: Draft (N), Disetujui SDM (kepegawaian), Diterbitkan Final (Y)
+        $countDraft = $allItems->filter(fn ($r) => in_array($r['status'] ?? 'N', ['N', 'draft', null, ''], true))->count();
+        $countDisetujuiSdm = $allItems->filter(fn ($r) => ($r['status'] ?? '') === 'kepegawaian')->count();
+        $countFinal = $allItems->filter(fn ($r) => in_array($r['status'] ?? '', ['Y', 'terbit'], true))->count();
+
+        $items = $allItems;
+        $belumDiterbitkan = $countDraft + $countDisetujuiSdm;
+        $sudahDiterbitkan = $countFinal;
+
+        // Role approval check
+        $userLevel = (int) session('simpeg_user.userlevel', 0);
+        $userRole  = (int) session('simpeg_role', 0);
+        $userNik   = (string) session('simpeg_user.nik', '');
+        $sdmNik    = (string) config('simpeg_approval.kepegawaian', '1711254');
+        $keuNik    = (string) config('simpeg_approval.keuangan', '1711296');
+
+        $isSdm = ($userLevel === 1 || $userRole === 1 || $userNik === $sdmNik);
+        $isKeu = ($userLevel === 2 || $userRole === 2 || $userNik === $keuNik || $userLevel === 1);
 
         $totals = [];
         foreach ($this->kolom as $k) {
@@ -553,9 +634,15 @@ class PotonganKeuController extends Controller
         return view('potongan-keu.terbit', [
             'items'                => $items,
             'allItems'             => $allItems,
+            'countDraft'           => $countDraft,
+            'countDisetujuiSdm'    => $countDisetujuiSdm,
+            'countFinal'           => $countFinal,
+            'belumDiterbitkan'     => $belumDiterbitkan,
             'sudahDiterbitkan'     => $sudahDiterbitkan,
-            'disetujuiKepegawaian' => $disetujuiKepegawaian,
-            'menungguKepegawaian'  => $menungguKepegawaian,
+            'isSdm'                => $isSdm,
+            'isKeu'                => $isKeu,
+            'bulan'                => $bulan,
+            'tahun'                => $tahun,
             'tipe'                 => $tipe,
             'tipeLabel'            => $this->tipeLabels[$tipe],
             'kolom'                => $this->kolom,
@@ -567,22 +654,27 @@ class PotonganKeuController extends Controller
     /**
      * Endpoint API JSON untuk Polling Realtime Status Terbit Potongan.
      */
-    public function realtimeStatus(string $tipe)
+    public function realtimeStatus(Request $request, string $tipe)
     {
         $this->validateTipe($tipe);
         $pegawaiList = $this->pegawaiList();
         $pegawaiMap = collect($pegawaiList)->keyBy('nik');
 
-        $allItems = collect($this->all($tipe))
+        $bulanParam = $request->query('bulan');
+        $tahunParam = $request->query('tahun');
+        $bulan = $bulanParam !== null ? ($bulanParam === 'all' ? 'all' : (int) $bulanParam) : (int) now()->month;
+        $tahun = $tahunParam !== null ? (int) $tahunParam : (int) now()->year;
+
+        $allItems = collect($this->all($tipe, $bulan, $tahun))
             ->map(fn ($row) => $this->withCalculated($row, $pegawaiMap))
             ->sortBy('nik')
             ->values();
 
-        $itemsPending = $allItems->where('status', '!=', 'Y')->values();
-        $sudahDiterbitkan = $allItems->where('status', '===', 'Y')->count();
-        $disetujuiKepegawaian = $allItems->where('status', '===', 'kepegawaian')->count();
-        $menungguKepegawaian = $allItems->where('status', '===', 'N')->count();
+        $countDraft = $allItems->filter(fn ($r) => in_array($r['status'] ?? 'N', ['N', 'draft', null, ''], true))->count();
+        $countDisetujuiSdm = $allItems->filter(fn ($r) => ($r['status'] ?? '') === 'kepegawaian')->count();
+        $countFinal = $allItems->filter(fn ($r) => in_array($r['status'] ?? '', ['Y', 'terbit'], true))->count();
 
+        $itemsPending = $allItems->where('status', '!=', 'Y')->values();
         $totals = [];
         foreach ($this->kolom as $k) {
             $totals[$k] = $itemsPending->sum($k);
@@ -592,31 +684,43 @@ class PotonganKeuController extends Controller
         return response()->json([
             'success'              => true,
             'timestamp'            => now()->format('H:i:s'),
-            'totalPending'         => $itemsPending->count(),
-            'sudahDiterbitkan'     => $sudahDiterbitkan,
-            'disetujuiKepegawaian' => $disetujuiKepegawaian,
-            'menungguKepegawaian'  => $menungguKepegawaian,
+            'countDraft'           => $countDraft,
+            'countDisetujuiSdm'    => $countDisetujuiSdm,
+            'countFinal'           => $countFinal,
+            'totalPending'         => $countDraft + $countDisetujuiSdm,
+            'belumDiterbitkan'     => $countDraft + $countDisetujuiSdm,
+            'sudahDiterbitkan'     => $countFinal,
             'grandTotalFormatted'  => 'Rp ' . number_format($totals['grand_total'], 0, ',', '.'),
             'items'                => $allItems->map(function ($it) {
-                $statusLabel = 'Menunggu Kepegawaian';
-                $statusClass = 'badge-warning';
-                if ($it['status'] === 'kepegawaian') {
-                    $statusLabel = 'Disetujui Kepegawaian';
-                    $statusClass = 'badge-success';
-                } elseif ($it['status'] === 'Y' || $it['status'] === 'terbit') {
+                $status = $it['status'] ?? 'N';
+                $isTerbit = in_array($status, ['Y', 'terbit'], true);
+                $isSdmApproved = ($status === 'kepegawaian');
+                $isDraft = (!$isTerbit && !$isSdmApproved);
+
+                if ($isTerbit) {
                     $statusLabel = 'Diterbitkan Final';
-                    $statusClass = 'badge-primary';
+                    $statusClass = 'badge-status-terbit';
+                } elseif ($isSdmApproved) {
+                    $statusLabel = 'Disetujui SDM';
+                    $statusClass = 'badge-status-kepegawaian';
+                } else {
+                    $statusLabel = 'Draft (Menunggu SDM)';
+                    $statusClass = 'badge-status-menunggu';
                 }
+
                 return [
-                    'id'               => $it['id'],
-                    'nik'              => $it['nik'],
-                    'nama'             => $it['nama'],
-                    'status'           => $it['status'],
-                    'statusLabel'      => $statusLabel,
-                    'statusClass'      => $statusClass,
-                    'tgl_setuju'       => $it['tgl_setuju_kepegawaian'] ?? null,
-                    'disetujui_oleh'   => $it['disetujui_kepegawaian_oleh'] ?? $it['disetujui_oleh'] ?? '-',
-                    'totalFormatted'   => 'Rp ' . number_format($it['total'], 0, ',', '.'),
+                    'id'                        => $it['id'],
+                    'nik'                       => $it['nik'],
+                    'nama'                      => $it['nama'],
+                    'status'                    => $status,
+                    'statusLabel'               => $statusLabel,
+                    'statusClass'               => $statusClass,
+                    'isDraft'                   => $isDraft,
+                    'isSdmApproved'             => $isSdmApproved,
+                    'isTerbit'                  => $isTerbit,
+                    'disetujui_oleh'            => $it['disetujui_oleh'] ?? '-',
+                    'disetujui_kepegawaian_oleh' => $it['disetujui_kepegawaian_oleh'] ?? '-',
+                    'totalFormatted'            => 'Rp ' . number_format($it['total'], 0, ',', '.'),
                 ];
             }),
         ]);
@@ -624,78 +728,163 @@ class PotonganKeuController extends Controller
 
     /**
      * Aksi Persetujuan dari Kepegawaian (SDM).
+     * Mendukung persetujuan per-pegawai, per-checkbox (array IDs), atau massal seluruh draft.
      */
     public function setujuiKepegawaian(Request $request, string $tipe)
     {
         $this->validateTipe($tipe);
+        $targetIds = $request->input('ids');
         $targetId = $request->input('id');
         $approver = session('simpeg_user.nama_peg', 'SDM / Kepegawaian');
 
         $query = \Illuminate\Support\Facades\DB::table('potongan_keu')->where('tipe', $tipe);
-        if ($targetId) {
+
+        if (! empty($targetIds) && is_array($targetIds)) {
+            $query->whereIn('id', $targetIds);
+        } elseif ($targetId) {
             $query->where('id', $targetId);
         } else {
-            $query->where('status', 'N');
+            $query->where(function ($q) {
+                $q->where('status', 'N')->orWhere('status', 'draft')->orWhereNull('status');
+            });
+            $bulan = $request->input('bulan');
+            $tahun = $request->input('tahun');
+            if ($bulan && $bulan !== 'all') {
+                $query->where('bulan', (int) $bulan);
+            }
+            if ($tahun) {
+                $query->where('tahun', (int) $tahun);
+            }
         }
-        $query->update([
-    'status' => 'kepegawaian',
-    'disetujui_kepegawaian_oleh' => $approver,
-    'tgl_setuju_kepegawaian' => now(),
-    'updated_at' => now(),
-]);
+
+        $affectedCount = $query->update([
+            'status'                     => 'kepegawaian',
+            'disetujui_kepegawaian_oleh' => $approver,
+            'tgl_setuju_kepegawaian'     => now(),
+            'updated_at'                 => now(),
+        ]);
 
         // Sinkronisasi ke tabel payroll
-        $affectedRows = \Illuminate\Support\Facades\DB::table('potongan_keu')
-            ->where('tipe', $tipe)
-            ->when($targetId, fn ($q) => $q->where('id', $targetId))
-            ->get();
+        $affectedRowsQuery = \Illuminate\Support\Facades\DB::table('potongan_keu')->where('tipe', $tipe);
+        if (! empty($targetIds) && is_array($targetIds)) {
+            $affectedRowsQuery->whereIn('id', $targetIds);
+        } elseif ($targetId) {
+            $affectedRowsQuery->where('id', $targetId);
+        }
+        $affectedRows = $affectedRowsQuery->get();
         foreach ($affectedRows as $row) {
             $this->syncToPayroll($row);
         }
 
+        $msg = "{$affectedCount} data potongan {$this->tipeLabels[$tipe]} berhasil disetujui oleh Kepegawaian (SDM) dan siap diterbitkan final.";
+
         if ($request->wantsJson() || $request->ajax()) {
-            return response()->json(['success' => true, 'message' => 'Status berhasil disetujui oleh Kepegawaian di database.']);
+            return response()->json(['success' => true, 'message' => $msg, 'affectedCount' => $affectedCount]);
         }
 
-        return redirect()->route('potongan-keu.terbit', $tipe)->with('success', 'Potongan berhasil disetujui oleh Kepegawaian (SDM) dan tersimpan di database.');
+        return redirect()->route('potongan-keu.terbit', $tipe)->with('success', $msg);
     }
 
     /**
      * Aksi Penerbitan Final dari Keuangan.
+     * Mendukung penerbitan per-pegawai, per-checkbox (array IDs), atau massal yang siap terbit.
      */
     public function terbitkan(Request $request, string $tipe)
     {
         $this->validateTipe($tipe);
+        $targetIds = $request->input('ids');
         $targetId = $request->input('id');
         $approverNik = session('simpeg_user.nik', config('simpeg_approval.keuangan', '0'));
         $approverName = session('simpeg_user.nama_peg', 'Keuangan');
 
         $query = \Illuminate\Support\Facades\DB::table('potongan_keu')->where('tipe', $tipe);
-        if ($targetId) {
+
+        if (! empty($targetIds) && is_array($targetIds)) {
+            $query->whereIn('id', $targetIds);
+        } elseif ($targetId) {
             $query->where('id', $targetId);
         } else {
             $query->where('status', '!=', 'Y');
+            $bulan = $request->input('bulan');
+            $tahun = $request->input('tahun');
+            if ($bulan && $bulan !== 'all') {
+                $query->where('bulan', (int) $bulan);
+            }
+            if ($tahun) {
+                $query->where('tahun', (int) $tahun);
+            }
         }
-        $query->update([
-    'status' => 'Y',
-    'disetujui_oleh' => $approverName . ' (' . $approverNik . ')',
-    'updated_at' => now(),
-]);
+
+        $affectedCount = $query->update([
+            'status'         => 'Y',
+            'disetujui_oleh' => $approverName . ' (' . $approverNik . ')',
+            'updated_at'     => now(),
+        ]);
 
         // Sinkronisasi ke tabel payroll
-        $affectedRows = \Illuminate\Support\Facades\DB::table('potongan_keu')
-            ->where('tipe', $tipe)
-            ->when($targetId, fn ($q) => $q->where('id', $targetId))
-            ->get();
+        $affectedRowsQuery = \Illuminate\Support\Facades\DB::table('potongan_keu')->where('tipe', $tipe);
+        if (! empty($targetIds) && is_array($targetIds)) {
+            $affectedRowsQuery->whereIn('id', $targetIds);
+        } elseif ($targetId) {
+            $affectedRowsQuery->where('id', $targetId);
+        }
+        $affectedRows = $affectedRowsQuery->get();
         foreach ($affectedRows as $row) {
             $this->syncToPayroll($row);
         }
 
+        $msg = "{$affectedCount} data potongan {$this->tipeLabels[$tipe]} berhasil diterbitkan secara sah dan final di database.";
+
         if ($request->wantsJson() || $request->ajax()) {
-            return response()->json(['success' => true, 'message' => 'Potongan berhasil diterbitkan & disetujui secara final di database.']);
+            return response()->json(['success' => true, 'message' => $msg, 'affectedCount' => $affectedCount]);
         }
 
-        return redirect()->route('potongan-keu.terbit', $tipe)->with('success', 'Semua potongan ' . strtolower($this->tipeLabels[$tipe]) . ' berhasil diterbitkan dan disahkan di database.');
+        return redirect()->route('potongan-keu.terbit', $tipe)->with('success', $msg);
+    }
+
+    /**
+     * Aksi Batalkan Penerbitan (Kembalikan status ke Draf / Menunggu SDM).
+     * Mendukung per-pegawai, per-checkbox (array IDs), atau massal.
+     */
+    public function batalTerbit(Request $request, string $tipe)
+    {
+        $this->validateTipe($tipe);
+        $targetIds = $request->input('ids');
+        $targetId = $request->input('id');
+
+        $query = \Illuminate\Support\Facades\DB::table('potongan_keu')->where('tipe', $tipe);
+
+        if (! empty($targetIds) && is_array($targetIds)) {
+            $query->whereIn('id', $targetIds);
+        } elseif ($targetId) {
+            $query->where('id', $targetId);
+        } else {
+            $query->whereIn('status', ['Y', 'terbit', 'kepegawaian']);
+            $bulan = $request->input('bulan');
+            $tahun = $request->input('tahun');
+            if ($bulan && $bulan !== 'all') {
+                $query->where('bulan', (int) $bulan);
+            }
+            if ($tahun) {
+                $query->where('tahun', (int) $tahun);
+            }
+        }
+
+        $affectedCount = $query->update([
+            'status'                     => 'N',
+            'disetujui_oleh'             => null,
+            'disetujui_kepegawaian_oleh' => null,
+            'tgl_setuju_kepegawaian'     => null,
+            'updated_at'                 => now(),
+        ]);
+
+        $msg = "{$affectedCount} data potongan {$this->tipeLabels[$tipe]} berhasil dibatalkan penerbitannya dan dikembalikan ke status Draf.";
+
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json(['success' => true, 'message' => $msg, 'affectedCount' => $affectedCount]);
+        }
+
+        return redirect()->route('potongan-keu.terbit', $tipe)->with('success', $msg);
     }
 
     /**
@@ -827,16 +1016,30 @@ class PotonganKeuController extends Controller
 
     // ───── BELUM MASUK ─────
 
-    public function belumMasuk(string $tipe)
+    public function belumMasuk(Request $request, string $tipe)
     {
         $this->validateTipe($tipe);
-        $nikSudah = collect($this->all($tipe))->pluck('nik')->unique()->all();
+        $bulanParam = $request->query('bulan');
+        $tahunParam = $request->query('tahun');
+        $bulan = $bulanParam !== null && $bulanParam !== 'all' ? (int) $bulanParam : (int) now()->month;
+        $tahun = $tahunParam !== null ? (int) $tahunParam : (int) now()->year;
+
+        $nikSudah = \Illuminate\Support\Facades\DB::table('potongan_keu')
+            ->where('tipe', $tipe)
+            ->where('bulan', $bulan)
+            ->where('tahun', $tahun)
+            ->pluck('nik')
+            ->unique()
+            ->all();
+
         $belum = collect($this->pegawaiList())->reject(fn ($p) => in_array($p['nik'], $nikSudah));
 
         return view('potongan-keu.belum-masuk', [
             'pegawai'   => $belum->values(),
             'tipe'      => $tipe,
             'tipeLabel' => $this->tipeLabels[$tipe],
+            'bulan'     => $bulan,
+            'tahun'     => $tahun,
         ]);
     }
 

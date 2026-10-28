@@ -77,7 +77,7 @@
 </div>
 
 {{-- ========================================================================= --}}
-{{-- 1. FORMAT 1: SLIP TUNJANGAN PENDIDIKAN                                     --}}
+{{-- 1. FORMAT 1: SLIP TUNJANGAN PENDIDIKAN (PERSIS GAMBAR 1)                   --}}
 {{-- ========================================================================= --}}
 @if ($format === 'tpendidikan')
     @php
@@ -87,9 +87,8 @@
             ['label' => 'TUNJANGAN ANAK', 'value' => $tpendidikan['tunjangan_anak'] ?? 0],
         ];
         $tpenPotonganNon = [
-            ['label' => 'POTONGAN KOPERASI (' . $rasio['persen_tpendidikan'] . '%)', 'value' => $tpendidikan['potongan_koperasi'] ?? 0],
-            ['label' => 'POTONGAN KAS (' . $rasio['persen_tpendidikan'] . '%)', 'value' => $tpendidikan['potongan_kas'] ?? 0],
-            ['label' => 'POTONGAN ZAKAT', 'value' => $tpendidikan['potongan_zakat'] ?? 0],
+            ['label' => 'POTONGAN KOPERASI', 'value' => $tpendidikan['potongan_koperasi'] ?? 0],
+            ['label' => 'POTONGAN KAS', 'value' => $tpendidikan['potongan_kas'] ?? 0],
         ];
     @endphp
     @include('partials.official-slip', [
@@ -101,56 +100,71 @@
         'totalPendapatan' => $tpendidikan['total_pendapatan'],
         'totalPotonganPendapatan' => 0,
         'totalPotonganNonPendapatan' => $tpendidikan['total_potongan'],
+        'labelSubtotalPendapatan' => 'JUMLAH PENDAPATAN',
+        'labelPotonganNonPendapatan' => 'JUMLAH POTONGAN NON-INSENTIF',
         'pendapatanDiterima' => $tpendidikan['diterima'],
-        'labelDiterima' => 'JUMLAH PENDAPATAN DITERIMA',
+        'labelDiterima' => 'JUMLAH INSENTIF DITERIMA',
+        'disclaimerHtml' => 'SLIP GAJI INI SUDAH DISETUJUI OLEH DIREKSI NAMUN SEGALA BENTUK PENYALAH GUNAAN SLIP GAJI BUKAN MENJADI TANGGUNG JAWAB PERUMDAM TIRTA DARMA AYU.',
     ])
 
 {{-- ========================================================================= --}}
-{{-- 2. FORMAT 2: SLIP INSENTIF PENDIDIKAN                                     --}}
+{{-- 2. FORMAT 2: SLIP INSENTIF PENDIDIKAN (PERSIS GAMBAR 2)                   --}}
 {{-- ========================================================================= --}}
 @elseif ($format === 'insentif')
     @php
         $insPendapatan = [
-            ['label' => 'TUNJANGAN JABATAN', 'value' => $insentif['insentif_jabatan'] ?? 0],
-            ['label' => 'TUNJANGAN PRESTASI', 'value' => $insentif['insentif_prestasi'] ?? 0],
-            ['label' => 'TUNJANGAN TRANSPORTASI', 'value' => $insentif['insentif_transportasi'] ?? 0],
-            ['label' => 'TUNJANGAN PANGAN', 'value' => $insentif['insentif_pangan'] ?? 0],
-            ['label' => 'TUNJANGAN BPJS KESEHATAN', 'value' => $insentif['insentif_bpjs_kesehatan'] ?? 0],
-            ['label' => 'TUNJANGAN PERUMAHAN', 'value' => $insentif['insentif_perumahan'] ?? 0],
-            ['label' => 'TUNJANGAN BPJS TENAGA KERJA', 'value' => $insentif['insentif_bpjs_tenaga_kerja'] ?? 0],
-            ['label' => 'TUNJANGAN PERUSAHAAN', 'value' => $insentif['insentif_perusahaan'] ?? 0],
+            ['label' => 'INSENTIF JABATAN', 'value' => $insentif['insentif_jabatan'] ?? 0],
+            ['label' => 'INSENTIF PRESTASI', 'value' => $insentif['insentif_prestasi'] ?? 0],
+            ['label' => 'INSENTIF TRANSPORTASI', 'value' => $insentif['insentif_transportasi'] ?? 0],
+            ['label' => 'INSENTIF PANGAN', 'value' => $insentif['insentif_pangan'] ?? 0],
+            ['label' => 'INSENTIF BPJS KESEHATAN', 'value' => $insentif['insentif_bpjs_kesehatan'] ?? 0],
+            ['label' => 'INSENTIF PERUMAHAN', 'value' => $insentif['insentif_perumahan'] ?? 0],
+            ['label' => 'INSENTIF BPJS TENAGA KERJA', 'value' => $insentif['insentif_bpjs_tenaga_kerja'] ?? 0],
+            ['label' => 'INSENTIF PERUSAHAAN', 'value' => $insentif['insentif_perusahaan'] ?? 0],
             ['label' => 'LEMBUR', 'value' => $insentif['lembur'] ?? 0],
-            ['label' => 'TUNJANGAN PAJAK', 'value' => $insentif['insentif_pajak'] ?? 0],
-            ['label' => 'TUNJANGAN AIR MINUM', 'value' => $insentif['insentif_air_minum'] ?? 0],
-            ['label' => 'TUNJANGAN KOMUNIKASI', 'value' => $insentif['insentif_komunikasi'] ?? 0],
+            ['label' => 'INSENTIF PAJAK', 'value' => $insentif['insentif_pajak'] ?? 0],
+            ['label' => 'INSENTIF AIR MINUM', 'value' => $insentif['insentif_air_minum'] ?? 0],
+            ['label' => 'INSENTIF KOMUNIKASI', 'value' => $insentif['insentif_komunikasi'] ?? 0],
         ];
-        $insPotonganPend = [
+        $insPotonganInsentif = [
+            ['label' => 'POTONGAN SANKSI PERUSAHAAN', 'value' => $insentif['potongan_sanksi_perusahaan'] ?? 0],
+            ['label' => 'POTONGAN PMI / LAIN-LAIN', 'value' => $insentif['potongan_trandist_pmi_lain'] ?? 0],
+            ['label' => 'POTONGAN DAPENMA', 'value' => $insentif['potongan_dapenma'] ?? 0],
+            ['label' => 'POTONGAN BPJS TENAGA KERJA', 'value' => $insentif['potongan_bpjs_tenaga_kerja'] ?? 0],
+            ['label' => 'POTONGAN PERUMAHAN', 'value' => $insentif['potongan_perumahan'] ?? 0],
+            ['label' => 'POTONGAN INSENTIF PERUSAHAAN', 'value' => $insentif['potongan_tunjangan_perusahaan'] ?? 0],
+            ['label' => 'POTONGAN KORPRI', 'value' => $insentif['potongan_korpri'] ?? 0],
             ['label' => 'POTONGAN PAJAK', 'value' => $insentif['potongan_pajak'] ?? 0],
+            ['label' => 'POTONGAN BPJS KESEHATAN', 'value' => $insentif['potongan_bpjs_kesehatan'] ?? 0],
         ];
         $insPotonganNon = [
-            ['label' => 'POTONGAN KOPERASI (' . $rasio['persen_insentif'] . '%)', 'value' => $insentif['potongan_koperasi'] ?? 0],
-            ['label' => 'POTONGAN KAS (' . $rasio['persen_insentif'] . '%)', 'value' => $insentif['potongan_kas'] ?? 0],
+            ['label' => 'POTONGAN KOPERASI', 'value' => $insentif['potongan_koperasi'] ?? 0],
             ['label' => 'POTONGAN DARMA WANITA', 'value' => $insentif['potongan_darma_wanita'] ?? 0],
             ['label' => 'POTONGAN REKENING AIR MINUM', 'value' => $insentif['potongan_rekening_air_minum'] ?? 0],
+            ['label' => 'POTONGAN KAS', 'value' => $insentif['potongan_kas'] ?? 0],
             ['label' => 'POTONGAN BANK BJB', 'value' => $insentif['potongan_bank_bjb'] ?? 0],
             ['label' => 'POTONGAN BANK BJBS', 'value' => $insentif['potongan_bank_bjbs'] ?? 0],
             ['label' => 'POTONGAN BANK BTN', 'value' => $insentif['potongan_bank_btn'] ?? 0],
             ['label' => 'POTONGAN BANK BPR', 'value' => $insentif['potongan_bank_bpr'] ?? 0],
-            ['label' => 'POTONGAN ASURANSI/LAINNYA', 'value' => $insentif['potongan_asuransi'] ?? 0],
-            ['label' => 'POTONGAN ZAKAT', 'value' => $insentif['potongan_zakat_profesi'] ?? 0],
+            ['label' => 'POTONGAN ASURANSI', 'value' => $insentif['potongan_asuransi'] ?? 0],
+            ['label' => 'POTONGAN ZAKAT PROFESI', 'value' => $insentif['potongan_zakat_profesi'] ?? 0],
         ];
     @endphp
     @include('partials.official-slip', [
-        'judul' => 'DAFTAR INSENTIF PENDIDIKAN & POTONGAN BULAN : JULI ' . $gaji13['tahun'],
+        'judul' => 'DAFTAR INSENTIF & POTONGAN BULAN : JULI ' . $gaji13['tahun'],
         'data' => $gaji13,
         'pendapatanRows' => $insPendapatan,
-        'potonganPendapatanRows' => $insPotonganPend,
+        'potonganPendapatanRows' => $insPotonganInsentif,
         'potonganNonPendapatanRows' => $insPotonganNon,
         'totalPendapatan' => $insentif['total_insentif'],
-        'totalPotonganPendapatan' => $insentif['potongan_pajak'] ?? 0,
-        'totalPotonganNonPendapatan' => ($insentif['total_potongan'] ?? 0) - ($insentif['potongan_pajak'] ?? 0),
+        'totalPotonganPendapatan' => $insentif['total_potongan_insentif'] ?? array_sum(array_column($insPotonganInsentif, 'value')),
+        'totalPotonganNonPendapatan' => $insentif['total_potongan_non_insentif'] ?? array_sum(array_column($insPotonganNon, 'value')),
+        'labelSubtotalPendapatan' => 'JUMLAH INSENTIF',
+        'labelPotonganPendapatan' => 'JUMLAH POTONGAN INSENTIF',
+        'labelPotonganNonPendapatan' => 'JUMLAH POTONGAN NON-INSENTIF',
         'pendapatanDiterima' => $insentif['diterima'],
         'labelDiterima' => 'JUMLAH INSENTIF DITERIMA',
+        'disclaimerHtml' => 'SLIP INSENTIF INI SUDAH DISETUJUI OLEH DIREKSI<br>NAMUN SEGALA BENTUK PENYALAH GUNAAN SLIP<br>BUKAN MENJADI TANGGUNG JAWAB KAMI.',
     ])
 
 {{-- ========================================================================= --}}

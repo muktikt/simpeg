@@ -22,6 +22,7 @@ Route::prefix('v1')->group(function () {
     Route::get('/payroll/slip-gaji', [ApiPegawaiController::class, 'slipGaji']);
     Route::get('/payroll/thr', [ApiPegawaiController::class, 'slipThr']);
     Route::get('/payroll/gaji-13', [ApiPegawaiController::class, 'slipGaji13']);
+    Route::get('/payroll/tunjangan-pendidikan', [ApiPegawaiController::class, 'tunjanganPendidikan']);
     Route::get('/payroll/insentif', [ApiPegawaiController::class, 'insentif']);
 
     // Absensi Kehadiran

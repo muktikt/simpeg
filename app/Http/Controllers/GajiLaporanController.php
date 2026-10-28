@@ -196,6 +196,13 @@ class GajiLaporanController extends Controller
 
             // Ambil semua riwayat lembur milik pegawai ini dari tabel prestasi, lembur, & payroll
             $riwayatItems = collect();
+            $bulanIndo = \App\Http\Controllers\AbsensiController::BULAN;
+            $normalizeBulan = function ($str) {
+                if (!$str || $str === '-') return '-';
+                $en = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+                $id = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+                return trim(str_ireplace($en, $id, (string) $str));
+            };
 
             // Dari Prestasi
             try {
@@ -211,9 +218,14 @@ class GajiLaporanController extends Controller
                     $jam = (float) ($meta['jam_lembur'] ?? ($r->jam_lembur ?? 0));
                     $nominal = (float) ($meta['nominal_lembur'] ?? ($jam * PrestasiController::RATE_LEMBUR_PER_JAM));
                     if ($jam > 0 || $nominal > 0) {
-                        $tgl = $r->tanggal ? date('F Y', strtotime($r->tanggal)) : '-';
+                        $tgl = '-';
+                        if (!empty($r->tanggal) && ($t = strtotime($r->tanggal))) {
+                            $m = (int) date('n', $t);
+                            $y = date('Y', $t);
+                            $tgl = ($bulanIndo[$m] ?? date('F', $t)) . " $y";
+                        }
                         $riwayatItems->push([
-                            'bulan_nama' => $tgl,
+                            'bulan_nama' => $normalizeBulan($tgl),
                             'jam_lembur' => $jam,
                             'nominal_lembur' => $nominal,
                         ]);
@@ -232,7 +244,7 @@ class GajiLaporanController extends Controller
 
                 foreach ($lRows as $r) {
                     $riwayatItems->push([
-                        'bulan_nama' => $r->bulan ?? '-',
+                        'bulan_nama' => $normalizeBulan($r->bulan ?? '-'),
                         'jam_lembur' => (float) ($r->jam_lembur ?? 0),
                         'nominal_lembur' => (float) ($r->uang_lembur ?? 0),
                     ]);
@@ -253,7 +265,7 @@ class GajiLaporanController extends Controller
                 foreach ($payRows as $r) {
                     $nominal = (float) ($r->lembur ?? 0);
                     $riwayatItems->push([
-                        'bulan_nama' => $r->periode ?? "Bulan {$r->bulan} {$r->tahun}",
+                        'bulan_nama' => $normalizeBulan($r->periode ?? "Bulan {$r->bulan} {$r->tahun}"),
                         'jam_lembur' => round($nominal / PrestasiController::RATE_LEMBUR_PER_JAM, 1),
                         'nominal_lembur' => $nominal,
                     ]);

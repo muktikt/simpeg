@@ -43,7 +43,19 @@ trait HasApprovalChain
             return false;
         }
 
-        return session('simpeg_user.nik') === $this->approverNikFor($stage);
+        $expectedNik = $this->approverNikFor($stage);
+        $userNik = session('simpeg_user.nik');
+
+        if ($userNik === $expectedNik) {
+            return true;
+        }
+
+        // Admin SDM (role 1) berhak mengesahkan tahap awal (kepegawaian)
+        if ($stage === 'kepegawaian' && (session('simpeg_user.userlevel') === '1' || session('simpeg_role') == 1)) {
+            return true;
+        }
+
+        return false;
     }
 
     /**

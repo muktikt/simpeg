@@ -702,7 +702,7 @@ class GajiProsesController extends Controller
      * Menggantikan proses_terbit_gaji_dirum.php dkk - lihat trait
      * HasApprovalChain untuk detail alurnya.
      */
-    public function terbitkan(int $id)
+    public function terbitkanDirect(int $id): string
     {
         $row = $this->findItem($id);
         abort_if(! $row, 404);
@@ -873,8 +873,44 @@ class GajiProsesController extends Controller
             $this->save($updated);
         }
 
+        return $nextStatus;
+    }
+
+    public function terbitkan(int $id)
+    {
+        $nextStatus = $this->terbitkanDirect($id);
         $label = self::approvalStatusLabel($nextStatus);
         return redirect()->back()->with('success', "Gaji berhasil disetujui ({$label}) dan tersimpan di database.");
+    }
+
+    /**
+     * Batch Approval ("TERBITKAN SEMUA") sesuai alur SIMPEG Lama.
+     * Mengesahkan seluruh baris gaji pada periode aktif yang siap disetujui oleh akun login.
+     */
+    public function terbitkanSemua(Request $request)
+    {
+        $bulan = (int) $request->input('bulan', now()->month);
+        $tahun = (int) $request->input('tahun', now()->year);
+
+        $items = collect($this->all())
+            ->where('bulan', $bulan)
+            ->where('tahun', $tahun)
+            ->filter(fn ($row) => $this->canUserApprove($row['status']))
+            ->values();
+
+        if ($items->isEmpty()) {
+            return redirect()->back()->with('error', 'Tidak ada data gaji yang memerlukan persetujuan dari akun Anda saat ini.');
+        }
+
+        $count = 0;
+        $lastStatus = 'terbit';
+        foreach ($items as $item) {
+            $lastStatus = $this->terbitkanDirect((int) $item['id']);
+            $count++;
+        }
+
+        $label = self::approvalStatusLabel($lastStatus);
+        return redirect()->back()->with('success', "Berhasil Menerbitkan / Menyetujui {$count} data gaji sekaligus ({$label}).");
     }
 
     public function destroy(Request $request, int $id)

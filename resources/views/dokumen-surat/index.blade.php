@@ -550,7 +550,7 @@
 
 <div class="ds-header">
     <div>
-        <h1 class="ds-title">Unggah Dokumen Surat (SDM)</h1>
+        <h1 class="ds-title">Unggah Dokumen Surat</h1>
         <p class="ds-subtitle">Kelola penerbitan & pengunggahan Surat Kerja (SK) dan Surat Diklat/Pelatihan resmi untuk seluruh pegawai.</p>
     </div>
     <button type="button" class="ds-btn-primary" onclick="openUploadModal()">

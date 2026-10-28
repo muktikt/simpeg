@@ -78,6 +78,17 @@ return [
             ],
         ],
         [
+            'label' => 'Tunjangan & Insentif Pendidikan',
+            'icon' => 'calendar',
+            'roles' => ['1', '2', '7'],
+            'items' => [
+                ['label' => 'Input Tunjangan Pendidikan', 'route_name' => 'tunjangan-pendidikan.create', 'roles' => ['1']],
+                ['label' => 'Daftar Tunjangan Pendidikan', 'route_name' => 'tunjangan-pendidikan.index', 'roles' => ['1', '2', '7']],
+                ['label' => 'Input Insentif Pendidikan', 'route_name' => 'insentif-pendidikan.create', 'roles' => ['1']],
+                ['label' => 'Daftar Insentif Pendidikan', 'route_name' => 'insentif-pendidikan.index', 'roles' => ['1', '2', '7']],
+            ],
+        ],
+        [
             'label' => 'Pengaturan Asuransi',
             'icon' => 'shield',
             'roles' => ['1'],

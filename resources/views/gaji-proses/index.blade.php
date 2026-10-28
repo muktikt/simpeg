@@ -34,12 +34,26 @@
         </div>
     </div>
 
-    @if ($status !== 'terbit')
-        <a href="{{ route('gaji-proses.create', !empty($kategori) ? ['kategori' => $kategori] : []) }}" class="btn btn-primary">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
-            {{ !empty($kategori) && isset(\App\Http\Controllers\GajiProsesController::KATEGORI[$kategori]) ? 'Proses ' . \App\Http\Controllers\GajiProsesController::KATEGORI[$kategori] : 'Proses Gaji Pegawai' }}
-        </a>
-    @endif
+    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+        @if ($gaji->contains('bisa_approve', true))
+            <form action="{{ route('gaji-proses.terbitkan-semua') }}" method="POST" onsubmit="return confirmSubmit(event, 'Apakah Anda yakin ingin Menerbitkan / Menyetujui Semua Gaji periode ini ke tahap berikutnya?', 'Konfirmasi Persetujuan Massal', 'info', 'Ya, Terbitkan Semua');" style="margin:0;">
+                @csrf
+                <input type="hidden" name="bulan" value="{{ $bulan }}">
+                <input type="hidden" name="tahun" value="{{ $tahun }}">
+                <button type="submit" class="btn btn-success" style="padding:9px 18px; font-weight:700; font-size:13px; box-shadow:0 4px 12px rgba(39, 174, 96, 0.25);">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="margin-right:6px;"><path d="M20 6L9 17l-5-5"/></svg>
+                    TERBITKAN SEMUA
+                </button>
+            </form>
+        @endif
+
+        @if ($status !== 'terbit')
+            <a href="{{ route('gaji-proses.create', !empty($kategori) ? ['kategori' => $kategori] : []) }}" class="btn btn-primary">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+                {{ !empty($kategori) && isset(\App\Http\Controllers\GajiProsesController::KATEGORI[$kategori]) ? 'Proses ' . \App\Http\Controllers\GajiProsesController::KATEGORI[$kategori] : 'Proses Gaji Pegawai' }}
+            </a>
+        @endif
+    </div>
 </div>
 
 <div class="table-card">

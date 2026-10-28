@@ -174,7 +174,7 @@
     margin-top: 3px;
 }
 .official-slip-meta {
-    margin-bottom: 0;
+    margin-bottom: 12px;
 }
 .slip-meta-row {
     display: flex;
@@ -198,7 +198,11 @@
     font-size: 11px;
     text-transform: uppercase;
 }
-.slip-meta-row .slip-label,
+.slip-meta-row .slip-label {
+    width: 140px;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
 .slip-col-left .slip-label {
     width: 205px;
     flex-shrink: 0;
@@ -305,7 +309,7 @@
             <div class="doc-title">{{ $judul }}</div>
         </div>
 
-        <!-- METADATA PEGAWAI (FULL WIDTH CONTAINER: NIK, NAMA, GOLONGAN, UNIT KERJA) -->
+        <!-- METADATA PEGAWAI (FULL WIDTH CONTAINER: NIK, NAMA, GOLONGAN, UNIT KERJA, JABATAN) -->
         <div class="official-slip-meta">
             <div class="slip-meta-row">
                 <span class="slip-label">NIK</span>
@@ -327,18 +331,17 @@
                 <span class="slip-colon">:</span>
                 <span class="slip-val-meta">{{ $unitKerja }}</span>
             </div>
+            <div class="slip-meta-row">
+                <span class="slip-label">JABATAN</span>
+                <span class="slip-colon">:</span>
+                <span class="slip-val-meta">{{ $jabatan }}</span>
+            </div>
         </div>
 
         <!-- 2 KOLOM KONTINU (SEPERTI GAMBAR 2) -->
         <div class="official-slip-body">
-            <!-- KOLOM KIRI (JABATAN + PENDAPATAN + DISCLAIMER) -->
+            <!-- KOLOM KIRI (PENDAPATAN + DISCLAIMER) -->
             <div class="slip-col-left">
-                <!-- JABATAN (dimulai tepat di baris pertama sejajar dengan POTONGAN PMI) -->
-                <div class="slip-row">
-                    <span class="slip-label">JABATAN</span>
-                    <span class="slip-colon">:</span>
-                    <span class="slip-val-meta">{{ $jabatan }}</span>
-                </div>
 
                 <!-- Rincian Komponen Pendapatan -->
                 @foreach ($pendapatanRows as $item)
@@ -351,38 +354,38 @@
 
                 <!-- Subtotal Pendapatan -->
                 <div class="slip-row slip-row-bold">
-                    <span class="slip-label">JUMLAH PENDAPATAN</span>
+                    <span class="slip-label">{{ $labelSubtotalPendapatan ?? 'JUMLAH PENDAPATAN' }}</span>
                     <span class="slip-colon">:</span>
                     <span class="slip-val-num">{{ number_format($totalPendapatan, 0, ',', '.') }}</span>
                 </div>
 
                 <!-- Bottom Disclaimer (Italic, Uppercase) -->
                 <div class="slip-disclaimer">
-                    SLIP GAJI INI SUDAH DISETUJUI OLEH DIREKSI<br>
-                    NAMUN SEGALA BENTUK PENYALAH GUNAAN SLIP<br>
-                    BUKAN MENJADI TANGGUNG JAWAB PERUMDAM.
+                    {!! $disclaimerHtml ?? 'SLIP GAJI INI SUDAH DISETUJUI OLEH DIREKSI<br>NAMUN SEGALA BENTUK PENYALAH GUNAAN SLIP<br>BUKAN MENJADI TANGGUNG JAWAB PERUMDAM.' !!}
                 </div>
             </div>
 
             <!-- KOLOM KANAN (POTONGAN PENDAPATAN + NON-PENDAPATAN + THP) -->
             <div class="slip-col-right">
-                <!-- Komponen Potongan Pendapatan (langsung sejajar JABATAN di kiri) -->
-                @foreach ($potonganPendapatanRows as $item)
-                    <div class="slip-row">
-                        <span class="slip-label">{{ $item['label'] }}</span>
+                <!-- Komponen Potongan Pendapatan / Potongan Insentif -->
+                @if (!empty($potonganPendapatanRows))
+                    @foreach ($potonganPendapatanRows as $item)
+                        <div class="slip-row">
+                            <span class="slip-label">{{ $item['label'] }}</span>
+                            <span class="slip-colon">:</span>
+                            <span class="slip-val-num">{{ number_format($item['value'] ?? 0, 0, ',', '.') }}</span>
+                        </div>
+                    @endforeach
+
+                    <!-- Subtotal Potongan Pendapatan / Insentif -->
+                    <div class="slip-row slip-row-bold">
+                        <span class="slip-label">{{ $labelPotonganPendapatan ?? 'JUMLAH POTONGAN PENDAPATAN' }}</span>
                         <span class="slip-colon">:</span>
-                        <span class="slip-val-num">{{ number_format($item['value'] ?? 0, 0, ',', '.') }}</span>
+                        <span class="slip-val-num">{{ number_format($totalPotonganPendapatan, 0, ',', '.') }}</span>
                     </div>
-                @endforeach
+                @endif
 
-                <!-- Subtotal Potongan Pendapatan -->
-                <div class="slip-row slip-row-bold">
-                    <span class="slip-label">JUMLAH POTONGAN PENDAPATAN</span>
-                    <span class="slip-colon">:</span>
-                    <span class="slip-val-num">{{ number_format($totalPotonganPendapatan, 0, ',', '.') }}</span>
-                </div>
-
-                <!-- Komponen Potongan Non-Pendapatan -->
+                <!-- Komponen Potongan Non-Pendapatan / Non-Insentif -->
                 @foreach ($potonganNonPendapatanRows as $item)
                     <div class="slip-row">
                         <span class="slip-label">{{ $item['label'] }}</span>
@@ -391,9 +394,9 @@
                     </div>
                 @endforeach
 
-                <!-- Subtotal Potongan Non-Pendapatan -->
+                <!-- Subtotal Potongan Non-Pendapatan / Non-Insentif -->
                 <div class="slip-row slip-row-bold">
-                    <span class="slip-label">JUMLAH POTONGAN NON-PENDAPATAN</span>
+                    <span class="slip-label">{{ $labelPotonganNonPendapatan ?? 'JUMLAH POTONGAN NON-PENDAPATAN' }}</span>
                     <span class="slip-colon">:</span>
                     <span class="slip-val-num">{{ number_format($totalPotonganNonPendapatan, 0, ',', '.') }}</span>
                 </div>

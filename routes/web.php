@@ -30,6 +30,8 @@ use App\Http\Controllers\SettingAplikasiController;
 use App\Http\Controllers\PengaduanController;
 use App\Http\Controllers\PengumumanController;
 use App\Http\Controllers\DokumenSuratController;
+use App\Http\Controllers\TunjanganPendidikanController;
+use App\Http\Controllers\InsentifPendidikanController;
 
 Route::get('/', [LoginController::class, 'showLoginForm'])->name('login');
 Route::get('/login', [LoginController::class, 'showLoginForm']);
@@ -39,6 +41,7 @@ Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 Route::middleware(['simpeg.auth'])->group(function () {
     Route::get('/beranda', [DashboardController::class, 'index'])->middleware(['simpeg.auth:1,2,7,kspi,kadiv'])->name('dashboard');
     Route::get('/dashboard', fn () => redirect()->route('dashboard'));
+    Route::match(['put', 'post'], '/ganti-password', [ProfileController::class, 'updatePassword'])->name('password.update');
 
     // Data Pegawai - list & laporan perusahaan TIDAK untuk role Pegawai
     // (mereka hanya boleh lihat data diri sendiri lewat halaman Profil).
@@ -132,6 +135,7 @@ Route::middleware(['simpeg.auth'])->group(function () {
 
         Route::middleware(['simpeg.auth:1,7'])->group(function () {
             Route::get('/', [GajiProsesController::class, 'index'])->name('index');
+            Route::post('/terbitkan-semua', [GajiProsesController::class, 'terbitkanSemua'])->name('terbitkan-semua');
             Route::post('/{id}/terbitkan', [GajiProsesController::class, 'terbitkan'])->whereNumber('id')->name('terbitkan');
         });
 
@@ -192,6 +196,36 @@ Route::middleware(['simpeg.auth'])->group(function () {
             Route::post('/', [GajiTigabelasController::class, 'store'])->name('store');
             Route::delete('/{id}', [GajiTigabelasController::class, 'destroy'])->whereNumber('id')->name('destroy');
             Route::get('/ajax/hitung-keluarga/{pegawaiId}', [GajiTigabelasController::class, 'hitungKeluargaJson'])->whereNumber('pegawaiId')->name('hitung-keluarga');
+        });
+    });
+
+    // Tunjangan Pendidikan (Input & Slip Regulasi 2026 - Format Gambar 1)
+    Route::prefix('tunjangan-pendidikan')->name('tunjangan-pendidikan.')->group(function () {
+        Route::middleware(['simpeg.auth:1,2,5,7'])->group(function () {
+            Route::get('/', [TunjanganPendidikanController::class, 'index'])->name('index');
+            Route::get('/slip/{id}', [TunjanganPendidikanController::class, 'show'])->whereNumber('id')->name('show');
+            Route::get('/{id}', [TunjanganPendidikanController::class, 'show'])->whereNumber('id');
+        });
+        Route::middleware(['simpeg.auth:1,2'])->group(function () {
+            Route::get('/create', [TunjanganPendidikanController::class, 'create'])->name('create');
+            Route::post('/', [TunjanganPendidikanController::class, 'store'])->name('store');
+            Route::delete('/{id}', [TunjanganPendidikanController::class, 'destroy'])->whereNumber('id')->name('destroy');
+            Route::get('/ajax/hitung-keluarga/{nik}', [TunjanganPendidikanController::class, 'hitungKeluargaJson'])->name('hitung-keluarga');
+        });
+    });
+
+    // Insentif Pendidikan (Input & Slip Regulasi 2026 - Format Gambar 2)
+    Route::prefix('insentif-pendidikan')->name('insentif-pendidikan.')->group(function () {
+        Route::middleware(['simpeg.auth:1,2,5,7'])->group(function () {
+            Route::get('/', [InsentifPendidikanController::class, 'index'])->name('index');
+            Route::get('/slip/{id}', [InsentifPendidikanController::class, 'show'])->whereNumber('id')->name('show');
+            Route::get('/{id}', [InsentifPendidikanController::class, 'show'])->whereNumber('id');
+        });
+        Route::middleware(['simpeg.auth:1,2'])->group(function () {
+            Route::get('/create', [InsentifPendidikanController::class, 'create'])->name('create');
+            Route::post('/', [InsentifPendidikanController::class, 'store'])->name('store');
+            Route::delete('/{id}', [InsentifPendidikanController::class, 'destroy'])->whereNumber('id')->name('destroy');
+            Route::get('/ajax/hitung-insentif/{nik}', [InsentifPendidikanController::class, 'hitungInsentifJson'])->name('hitung-insentif');
         });
     });
 
@@ -319,6 +353,7 @@ Route::middleware(['simpeg.auth'])->group(function () {
         Route::put('/{tipe}/{id}', [PotonganKeuController::class, 'update'])->name('update')->where('tipe', 'gaji|thr|gaji13')->whereNumber('id');
         Route::delete('/{tipe}/{id}', [PotonganKeuController::class, 'destroy'])->name('destroy')->where('tipe', 'gaji|thr|gaji13')->whereNumber('id');
         Route::post('/{tipe}/terbitkan', [PotonganKeuController::class, 'terbitkan'])->name('terbitkan')->where('tipe', 'gaji|thr|gaji13');
+        Route::post('/{tipe}/batal-terbit', [PotonganKeuController::class, 'batalTerbit'])->name('batal-terbit')->where('tipe', 'gaji|thr|gaji13');
         Route::get('/{tipe}/belum-masuk', [PotonganKeuController::class, 'belumMasuk'])->name('belum-masuk')->where('tipe', 'gaji|thr|gaji13');
     });
 

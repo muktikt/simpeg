@@ -485,7 +485,20 @@ class GajiTigabelasController extends Controller
             return $row;
         })->sortBy('nama')->values();
 
-        return view('gaji-tigabelas.laporan-slip', compact('data', 'tahun', 'format'));
+        $tpData = null;
+        if (! empty($userLogin['nik'])) {
+            try {
+                $tpData = DB::table('tunjangan_pendidikan')
+                    ->leftJoin('pegawai', 'tunjangan_pendidikan.pegawai_id', '=', 'pegawai.id')
+                    ->select('tunjangan_pendidikan.*')
+                    ->where('pegawai.nik', $userLogin['nik'])
+                    ->where('tunjangan_pendidikan.bulan_label', 'like', "%{$tahun}%")
+                    ->orderByDesc('tunjangan_pendidikan.id')
+                    ->first();
+            } catch (\Throwable $e) {}
+        }
+
+        return view('gaji-tigabelas.laporan-slip', compact('data', 'tahun', 'format', 'tpData'));
     }
 
     public function laporanBukuBesar(Request $request)

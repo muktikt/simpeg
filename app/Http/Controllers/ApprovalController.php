@@ -47,22 +47,26 @@ class ApprovalController extends Controller
             }
         }
 
-        // 4. Potongan Keuangan (Gaji, THR, Gaji 13)
-        $kepegawaianNik = config('simpeg_approval.kepegawaian', '1711254');
+        // 4. Potongan Keuangan (Alur Berjenjang: Draft -> SDM -> Keuangan Final)
         $keuanganNik = config('simpeg_approval.keuangan', '1711296');
+        $sdmNik      = config('simpeg_approval.kepegawaian', '1711254');
+        $userLevel   = (int) session('simpeg_user.userlevel', 0);
+        $userRole    = (int) session('simpeg_role', 0);
 
         try {
-            $potonganQuery = \Illuminate\Support\Facades\DB::table('potongan_keu');
-            if ($userNik === $kepegawaianNik) {
-                // Kepegawaian (SDM) menyetujui potongan berstatus N / draft
-                $potonganQuery->where(function ($q) {
-                    $q->where('status', 'N')->orWhereNull('status')->orWhere('status', 'draft');
-                });
-            } elseif ($userNik === $keuanganNik) {
-                // Keuangan menerbitkan potongan yang sudah disetujui SDM
-                $potonganQuery->where('status', 'kepegawaian');
-            } else {
-                $potonganQuery = null;
+            $potonganQuery = null;
+            if ($userNik === $sdmNik || $userLevel === 1 || $userRole === 1) {
+                // SDM melihat draft potongan (status N/draft) yang menunggu persetujuan Kepegawaian
+                $potonganQuery = \Illuminate\Support\Facades\DB::table('potongan_keu')
+                    ->where(function ($q) {
+                        $q->whereIn('status', ['N', 'draft'])->orWhereNull('status');
+                    });
+            } elseif ($userNik === $keuanganNik || $userLevel === 2 || $userRole === 2) {
+                // Keuangan melihat potongan yang belum diterbitkan secara final
+                $potonganQuery = \Illuminate\Support\Facades\DB::table('potongan_keu')
+                    ->where(function ($q) {
+                        $q->where('status', '!=', 'Y')->orWhereNull('status');
+                    });
             }
 
             if ($potonganQuery) {

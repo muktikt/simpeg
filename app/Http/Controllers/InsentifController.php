@@ -23,11 +23,15 @@ class InsentifController extends Controller
         $tahun = (int) $request->get('tahun', now()->year);
         $bulan = (int) $request->get('bulan', now()->month);
 
+        $userLogin = session('simpeg_user') ?? [];
+        $isPegawai = ((string) ($userLogin['userlevel'] ?? '') === '5') || $request->has('my');
+        $myNik = $userLogin['nik'] ?? '';
+
         $data = collect();
 
         if ($sumber === 'gaji_bulanan') {
             try {
-                $rows = DB::table('payroll')
+                $query = DB::table('payroll')
                     ->leftJoin('pegawai', 'payroll.pegawai_id', '=', 'pegawai.id')
                     ->select(
                         'payroll.*',
@@ -40,19 +44,31 @@ class InsentifController extends Controller
                     )
                     ->where('payroll.tahun', $tahun)
                     ->where('payroll.bulan', $bulan)
-                    ->whereIn('payroll.status', ['terbit', 'DITERBITKAN'])
-                    ->orderBy('pegawai.name', 'asc')
-                    ->get();
+                    ->whereIn('payroll.status', ['terbit', 'DITERBITKAN']);
+
+                if ($isPegawai && !empty($myNik)) {
+                    $query->where('pegawai.nik', $myNik);
+                }
+
+                $rows = $query->orderBy('pegawai.name', 'asc')->get();
 
                 if ($rows->isEmpty()) {
                     // Fallback cek ke tabel insentif jika ada
-                    $insRows = DB::table('insentif')
+                    $insQuery = DB::table('insentif')
                         ->leftJoin('pegawai', 'insentif.pegawai_id', '=', 'pegawai.id')
                         ->select('insentif.*', 'pegawai.nik as p_nik', 'pegawai.name as p_name', 'pegawai.jabatan as p_jabatan', 'pegawai.unit_kerja as p_unit_kerja', 'pegawai.golongan as p_golongan')
-                        ->where('insentif.periode', 'like', '%' . ($bulan < 10 ? '0' . $bulan : $bulan) . '%' . $tahun . '%')
-                        ->orWhere('insentif.periode', 'like', '%' . (AbsensiController::BULAN[$bulan] ?? '') . '%' . $tahun . '%')
-                        ->get();
-                    $rows = $insRows;
+                        ->where(function ($q) use ($bulan, $tahun) {
+                            $mPadded = str_pad($bulan, 2, '0', STR_PAD_LEFT);
+                            $bulanNama = AbsensiController::BULAN[$bulan] ?? '';
+                            $q->where('insentif.periode', 'like', "%{$mPadded}%{$tahun}%")
+                              ->orWhere('insentif.periode', 'like', "%{$bulanNama}%{$tahun}%");
+                        });
+
+                    if ($isPegawai && !empty($myNik)) {
+                        $insQuery->where('pegawai.nik', $myNik);
+                    }
+
+                    $rows = $insQuery->get();
                 }
 
                 $data = $rows->map(function ($r) use ($bulan, $tahun) {
@@ -61,10 +77,40 @@ class InsentifController extends Controller
             } catch (\Throwable $e) {
                 Log::error('Ambil data insentif bulanan gagal: ' . $e->getMessage());
             }
+        } elseif ($sumber === 'insentif_pendidikan') {
+            try {
+                $queryIns = DB::table('insentif')
+                    ->leftJoin('pegawai', 'insentif.pegawai_id', '=', 'pegawai.id')
+                    ->select(
+                        'insentif.*',
+                        'pegawai.nik as p_nik',
+                        'pegawai.name as p_name',
+                        'pegawai.jabatan as p_jabatan',
+                        'pegawai.unit_kerja as p_unit_kerja',
+                        'pegawai.golongan as p_golongan',
+                        'pegawai.golongan_detail as p_golongan_detail'
+                    )
+                    ->where(function ($q) use ($tahun) {
+                        $q->where('insentif.periode', 'like', "%{$tahun}%")
+                          ->orWhere('insentif.judul', 'like', "%{$tahun}%");
+                    });
+
+                if ($isPegawai && ! empty($myNik)) {
+                    $queryIns->where('pegawai.nik', $myNik);
+                }
+
+                $rowsIns = $queryIns->orderByDesc('insentif.id')->get();
+
+                $data = $rowsIns->map(function ($r) use ($bulan, $tahun) {
+                    return $this->formatRowToInsentif($r, $bulan, $tahun, 'insentif_pendidikan');
+                });
+            } catch (\Throwable $e) {
+                Log::error('Ambil data insentif pendidikan gagal: ' . $e->getMessage());
+            }
         } else {
             // Sumber Gaji 13 / Tunjangan Pendidikan
             try {
-                $rows13 = DB::table('gaji_13')
+                $query13 = DB::table('gaji_13')
                     ->leftJoin('pegawai', 'gaji_13.pegawai_id', '=', 'pegawai.id')
                     ->select(
                         'gaji_13.*',
@@ -75,9 +121,13 @@ class InsentifController extends Controller
                         'pegawai.golongan as p_golongan'
                     )
                     ->where('gaji_13.tahun', $tahun)
-                    ->whereIn('gaji_13.status', ['terbit', 'DITERBITKAN'])
-                    ->orderBy('pegawai.name', 'asc')
-                    ->get();
+                    ->whereIn('gaji_13.status', ['terbit', 'DITERBITKAN']);
+
+                if ($isPegawai && ! empty($myNik)) {
+                    $query13->where('pegawai.nik', $myNik);
+                }
+
+                $rows13 = $query13->orderBy('pegawai.name', 'asc')->get();
 
                 $data = $rows13->map(function ($r) use ($bulan, $tahun) {
                     return $this->formatRowToInsentif($r, $bulan, $tahun, 'gaji13');
@@ -95,8 +145,13 @@ class InsentifController extends Controller
      */
     protected function formatRowToInsentif(object $r, int $bulan, int $tahun, string $sumber = 'gaji_bulanan'): array
     {
-        $bulanNama = AbsensiController::BULAN[$bulan] ?? ('Bulan ' . $bulan);
-        $periodeLabel = ($sumber === 'gaji13') ? "Gaji 13 Tahun $tahun" : "$bulanNama $tahun";
+        if ($sumber === 'gaji13') {
+            $periodeLabel = "Gaji 13 Tahun $tahun";
+        } elseif ($sumber === 'insentif_pendidikan') {
+            $periodeLabel = ! empty($r->periode) ? $r->periode : "Insentif Pendidikan $tahun";
+        } else {
+            $periodeLabel = "$bulanNama $tahun";
+        }
 
         // Identitas Pegawai
         $id = $r->id ?? 0;
@@ -164,38 +219,6 @@ class InsentifController extends Controller
             $insentifBpjstk = (int) ($r->tunjangan_bpjs_tenaga_kerja ?? ($r->tunjangan_bpjstk ?? ($r->insentif_bpjs_tenaga_kerja ?? 0)));
             $insentifPerusahaan = (int) ($r->tunjangan_perusahaan ?? ($r->insentif_perusahaan ?? 0));
             $lembur = (int) ($r->lembur ?? 0);
-            if (!empty($pegawaiId)) {
-                $prefix = sprintf('%04d-%02d', $tahun, $bulan);
-                $monthPadded = str_pad($bulan, 2, '0', STR_PAD_LEFT);
-                try {
-                    $pRow = DB::table('prestasi')
-                        ->where('pegawai_id', $pegawaiId)
-                        ->where(function ($q) use ($prefix, $tahun, $bulan, $monthPadded) {
-                            $q->where('tanggal', 'like', "$prefix%")
-                              ->orWhere('tanggal', 'like', "%$tahun-$monthPadded-%")
-                              ->orWhere('tanggal', 'like', "%$tahun-$bulan-%");
-                        })
-                        ->orderByDesc('id')
-                        ->first();
-
-                    if ($pRow) {
-                        $meta = json_decode($pRow->keterangan ?? '{}', true) ?: [];
-                        $jam = (float) ($meta['jam_lembur'] ?? ($pRow->jam_lembur ?? 0));
-                        $lembur = (int) ($meta['nominal_lembur'] ?? round($jam * PrestasiController::RATE_LEMBUR_PER_JAM));
-                    } else {
-                        $bulanNama = AbsensiController::BULAN[$bulan] ?? '';
-                        $lRow = DB::table('lembur')
-                            ->where('pegawai_id', $pegawaiId)
-                            ->where(function ($q) use ($bulanNama, $tahun) {
-                                $q->where('bulan', 'ilike', "%$bulanNama $tahun%");
-                            })
-                            ->first();
-                        if ($lRow) {
-                            $lembur = (int) ($lRow->uang_lembur ?? 0);
-                        }
-                    }
-                } catch (\Throwable $e) {}
-            }
             $insentifPajak = (int) ($r->tunjangan_pajak ?? ($r->insentif_pajak ?? 0));
             $insentifAirMinum = (int) ($r->tunjangan_air_minum ?? ($r->tunjangan_airminum ?? ($r->insentif_air_minum ?? 0)));
             $insentifKomunikasi = (int) ($r->tunjangan_komunikasi ?? ($r->insentif_komunikasi ?? 0));
@@ -324,6 +347,7 @@ class InsentifController extends Controller
                     })
                     ->orderBy('tahun', 'desc')
                     ->orderBy('bulan', 'desc')
+                    ->limit(12)
                     ->get();
 
                 foreach ($allPayrolls as $p) {

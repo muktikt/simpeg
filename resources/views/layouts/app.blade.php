@@ -318,12 +318,18 @@ input.css-input:focus {
                             </div>
                         </div>
                     @endif
-                    <form action="{{ route('logout') }}" method="POST" class="logout-form" id="logout-form">
-                        @csrf
-                        <button type="button" class="logout-btn" title="Keluar" onclick="openLogoutModal()">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="16" height="16"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+                    <div style="display:flex; align-items:center; gap:8px; margin-left:8px;">
+                        <button type="button" onclick="openGantiPasswordModal()" title="Ganti Password" style="background:#ffffff; border:1px solid #CBD5E1; color:#0F2A3D; padding:6px 12px; border-radius:8px; font-size:12.5px; font-weight:600; display:inline-flex; align-items:center; gap:6px; cursor:pointer; transition:all 0.15s;">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" style="color:#0284C7;"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                            <span>Ganti Password</span>
                         </button>
-                    </form>
+                        <form action="{{ route('logout') }}" method="POST" class="logout-form" id="logout-form" style="margin:0;">
+                            @csrf
+                            <button type="button" class="logout-btn" title="Keluar" onclick="openLogoutModal()">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="16" height="16"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+                            </button>
+                        </form>
+                    </div>
                 </div>
             </div>
         </header>
@@ -375,6 +381,64 @@ input.css-input:focus {
             <button type="button" id="global-modal-cancel" class="btn-cancel" onclick="closeCustomModal()">Batal</button>
             <button type="button" id="global-modal-confirm" class="btn-confirm">Ya, Lanjutkan</button>
         </div>
+    </div>
+<!-- Global Ganti Password Modal -->
+<div id="global-ganti-password-modal" class="modal-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(15, 23, 42, 0.6); backdrop-filter:blur(3px); z-index:999999; justify-content:center; align-items:center;">
+    <div style="background:#ffffff; width:100%; max-width:420px; border-radius:16px; padding:24px 28px; box-shadow:0 20px 25px -5px rgba(0,0,0,0.2), 0 10px 10px -5px rgba(0,0,0,0.1); position:relative; margin:16px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px;">
+            <div style="display:flex; align-items:center; gap:10px;">
+                <div style="width:38px; height:38px; border-radius:10px; background:#E0F2FE; display:flex; align-items:center; justify-content:center; color:#0284C7;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                </div>
+                <div>
+                    <h3 style="margin:0; font-size:16px; font-weight:700; color:#0F172A;">Ganti Kata Sandi</h3>
+                    <div style="font-size:12px; color:#64748B;">Perbarui password akun SIMPEG Anda</div>
+                </div>
+            </div>
+            <button type="button" onclick="closeGantiPasswordModal()" style="background:none; border:none; cursor:pointer; color:#94A3B8; padding:4px; border-radius:6px;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            </button>
+        </div>
+
+        <form action="{{ route('password.update') }}" method="POST" id="form-global-ganti-password">
+            @csrf
+            @method('PUT')
+
+            <div style="margin-bottom:14px;">
+                <label style="display:block; font-size:12.5px; font-weight:600; color:#334155; margin-bottom:6px;">Password Lama</label>
+                <div style="position:relative;">
+                    <input type="password" id="modal_current_password" name="current_password" required placeholder="Masukkan password lama" style="width:100%; padding:10px 38px 10px 12px; border:1px solid #CBD5E1; border-radius:9px; font-size:13px; box-sizing:border-box;">
+                    <button type="button" onclick="togglePassVisibility('modal_current_password', this)" style="position:absolute; right:8px; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer; color:#94A3B8; padding:4px;" tabindex="-1">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                    </button>
+                </div>
+            </div>
+
+            <div style="margin-bottom:14px;">
+                <label style="display:block; font-size:12.5px; font-weight:600; color:#334155; margin-bottom:6px;">Password Baru</label>
+                <div style="position:relative;">
+                    <input type="password" id="modal_new_password" name="new_password" required minlength="4" placeholder="Minimal 4 karakter" style="width:100%; padding:10px 38px 10px 12px; border:1px solid #CBD5E1; border-radius:9px; font-size:13px; box-sizing:border-box;">
+                    <button type="button" onclick="togglePassVisibility('modal_new_password', this)" style="position:absolute; right:8px; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer; color:#94A3B8; padding:4px;" tabindex="-1">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                    </button>
+                </div>
+            </div>
+
+            <div style="margin-bottom:20px;">
+                <label style="display:block; font-size:12.5px; font-weight:600; color:#334155; margin-bottom:6px;">Konfirmasi Password Baru</label>
+                <div style="position:relative;">
+                    <input type="password" id="modal_new_password_confirmation" name="new_password_confirmation" required minlength="4" placeholder="Ulangi password baru" style="width:100%; padding:10px 38px 10px 12px; border:1px solid #CBD5E1; border-radius:9px; font-size:13px; box-sizing:border-box;">
+                    <button type="button" onclick="togglePassVisibility('modal_new_password_confirmation', this)" style="position:absolute; right:8px; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer; color:#94A3B8; padding:4px;" tabindex="-1">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                    </button>
+                </div>
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; gap:10px;">
+                <button type="button" onclick="closeGantiPasswordModal()" class="btn btn-outline" style="padding:9px 16px; font-size:13px; border-radius:8px;">Batal</button>
+                <button type="submit" class="btn btn-primary" style="padding:9px 18px; font-size:13px; font-weight:600; border-radius:8px;">Simpan Perubahan</button>
+            </div>
+        </form>
     </div>
 </div>
 
@@ -481,6 +545,43 @@ function openLogoutModal() {
         }
     });
 }
+
+function openGantiPasswordModal() {
+    const modal = document.getElementById('global-ganti-password-modal');
+    if (modal) {
+        modal.style.display = 'flex';
+        const firstInput = document.getElementById('modal_current_password');
+        if (firstInput) setTimeout(() => firstInput.focus(), 100);
+    }
+}
+
+function closeGantiPasswordModal() {
+    const modal = document.getElementById('global-ganti-password-modal');
+    if (modal) {
+        modal.style.display = 'none';
+        const form = document.getElementById('form-global-ganti-password');
+        if (form) form.reset();
+    }
+}
+
+function togglePassVisibility(inputId, btn) {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    if (input.type === 'password') {
+        input.type = 'text';
+        btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>`;
+    } else {
+        input.type = 'password';
+        btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`;
+    }
+}
+
+// Close ganti password modal on outside click or Escape
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        closeGantiPasswordModal();
+    }
+});
 
 function confirmSubmit(event, message, title = 'Konfirmasi', type = 'warning', confirmText = 'Ya, Lanjutkan') {
     event.preventDefault();

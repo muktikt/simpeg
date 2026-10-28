@@ -16,7 +16,7 @@
         'jabatan_riwayat' => 'Jabatan',
         'pendidikan' => 'Pendidikan',
         'prestasi' => 'Prestasi',
-        'dok_surat' => 'Dokumen Surat (SDM)',
+        'dok_surat' => 'Dokumen Surat',
         'cv' => 'Curriculum Vitae (CV)',
         'pengaturan' => 'Pengaturan Akun',
     ];
@@ -49,11 +49,8 @@
  
 <div class="tabs" id="profile-tabs">
     @foreach ($tabLabels as $type => $label)
-        @php
-            $count = in_array($type, ['pengaturan', 'cv'], true) ? null : count($pegawai[$type] ?? []);
-        @endphp
         <button type="button" class="tab-btn {{ $type === $defaultTab ? 'active' : '' }}" data-tab="{{ $type }}" onclick="switchTab('{{ $type }}')">
-            {{ $label }} {{ $count !== null ? "($count)" : '' }}
+            {{ $label }}
         </button>
     @endforeach
 </div>
@@ -208,11 +205,11 @@
             <div class="ribbon-card" style="margin-top:8px;">
                 <div class="ribbon-head" style="margin-bottom:20px;">
                     <div>
-                        <h2 style="font-size:18px; color:#0F2A3D;">Dokumen Resmi Pegawai (SDM)</h2>
-                        <p style="font-size:13px; color:var(--text-muted); margin-top:4px;">Surat Kerja & Surat Diklat resmi yang diterbitkan dan diunggah oleh SDM.</p>
+                        <h2 style="font-size:18px; color:#0F2A3D;">Dokumen Resmi Pegawai</h2>
+                        <p style="font-size:13px; color:var(--text-muted); margin-top:4px;">Surat Kerja & Surat Diklat resmi yang diterbitkan.</p>
                     </div>
                     @if (session('simpeg_user.userlevel') === '1')
-                        <button type="button" class="btn-submit" onclick="document.getElementById('modal-upload-dokumen').style.display='flex'">+ Upload Dokumen (Admin SDM)</button>
+                        <button type="button" class="btn-submit" onclick="document.getElementById('modal-upload-dokumen').style.display='flex'">+ Upload Dokumen</button>
                     @endif
                 </div>
  
