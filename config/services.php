@@ -37,7 +37,7 @@ return [
 
     'simpeg' => [
         'api_key' => env('SIMPEG_API_KEY'),
-        'jwt_secret' => env('JWT_SECRET'),
+        'jwt_secret' => env('JWT_SECRET') ?: env('APP_KEY'),
     ],
 
     'onesignal' => [

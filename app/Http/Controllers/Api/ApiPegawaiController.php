@@ -10,46 +10,81 @@ use Illuminate\Support\Facades\File;
 
 class ApiPegawaiController extends Controller
 {
-    protected array $defaultPasswords = [
-        '1711001' => 'dirut123',
-        '1711002' => 'dirum123',
-        '1711003' => 'dirtek123',
-        '1711157' => 'sdm123',
-        '1711254' => 'sdm123',
-        '1711296' => 'keuangan123',
-        '1711145' => 'keuangan123',
-        '1711161' => 'kspi123',
-        '1711571' => 'kadivadmin123',
-        '1711251' => 'kadivteknik123',
-    ];
-
     /**
-     * Ambil data pegawai aktif berdasarkan request (header X-NIK atau query parameter)
+     * Ambil data pegawai aktif berdasarkan identitas terautentikasi (JWT Token).
+     * Mencegah IDOR: Pegawai biasa HANYA dapat mengakses datanya sendiri.
+     * Pejabat berwenang (SDM, Keuangan, Direksi, KSPI, Kadiv) dapat melihat pegawai yang diminta.
      */
     protected function getPegawaiByRequest(Request $request)
     {
-        $nik = $request->header('X-NIK') ?? $request->query('nik');
-        $pegawaiId = $request->header('X-Pegawai-Id') ?? $request->query('pegawai_id') ?? $request->query('id');
+        $authUser = $request->attributes->get('auth_user');
+        if (! $authUser) {
+            return null;
+        }
 
-        if ($nik) {
-            $pegawai = Cache::remember("pegawai_nik_{$nik}", 180, function () use ($nik) {
-                return DB::table('pegawai')->where('nik', $nik)->first();
+        $requestedNik = $request->query('nik') ?? $request->header('X-NIK');
+        $requestedId = $request->query('pegawai_id') ?? $request->query('id') ?? $request->header('X-Pegawai-Id');
+
+        // Jika tidak meminta NIK/ID spesifik atau target sama dengan akun sendiri
+        $isSelfNik = empty($requestedNik) || (string) $requestedNik === (string) $authUser->nik;
+        $isSelfId = empty($requestedId) || (string) $requestedId === (string) $authUser->id;
+
+        if ($isSelfNik && $isSelfId) {
+            return $authUser;
+        }
+
+        // Cek hak akses role untuk melihat pegawai lain
+        $userLevel = (string) ($authUser->userlevel ?? $authUser->role ?? '5');
+        $dbRole = strtolower($authUser->role ?? '');
+        $isPrivileged = in_array($userLevel, ['1', '2', '7']) || in_array($dbRole, ['sdm', 'admin', 'keuangan', 'direktur', 'kspi', 'kadiv', 'tpdpk']);
+
+        if (! $isPrivileged) {
+            // Pegawai biasa dilarang intip data pegawai lain (Return false untuk 403 Forbidden)
+            return false;
+        }
+
+        // Pejabat berwenang: ambil target yang diminta
+        if ($requestedNik && (string) $requestedNik !== (string) $authUser->nik) {
+            $target = Cache::remember("pegawai_nik_{$requestedNik}", 180, function () use ($requestedNik) {
+                return DB::table('pegawai')->where('nik', $requestedNik)->first();
             });
-            if ($pegawai) {
-                return $pegawai;
+            if ($target) {
+                return $target;
             }
         }
 
-        if ($pegawaiId) {
-            $pegawai = Cache::remember("pegawai_id_{$pegawaiId}", 180, function () use ($pegawaiId) {
-                return DB::table('pegawai')->where('id', $pegawaiId)->first();
+        if ($requestedId && (string) $requestedId !== (string) $authUser->id) {
+            $target = Cache::remember("pegawai_id_{$requestedId}", 180, function () use ($requestedId) {
+                return DB::table('pegawai')->where('id', $requestedId)->first();
             });
-            if ($pegawai) {
-                return $pegawai;
+            if ($target) {
+                return $target;
             }
         }
 
-        return DB::table('pegawai')->first();
+        return $authUser;
+    }
+
+    /**
+     * Helper otorisasi: cegah IDOR pada pemanggilan getPegawaiByRequest
+     */
+    protected function checkPegawaiAccess($pegawai)
+    {
+        if ($pegawai === false) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Akses ditolak: Anda tidak memiliki wewenang mengakses data pegawai lain.',
+            ], 403);
+        }
+
+        if (! $pegawai) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Data pegawai tidak ditemukan.',
+            ], 404);
+        }
+
+        return null;
     }
 
     /**
@@ -72,38 +107,27 @@ class ApiPegawaiController extends Controller
             ], 401);
         }
 
-        // Verifikasi Password langsung ke hash auth.users Supabase atau default NIK
+        // Verifikasi Password terhadap kolom password di tabel pegawai lokal PostgreSQL
         $passwordValid = false;
-        try {
-            $authUser = DB::table('auth.users')->where('id', $pegawai->id)->first();
-            if (! $authUser) {
-                $authUser = DB::table('auth.users')->where('email', "{$nik}@tirtadarmaayu.local")->first();
+        if (! empty($pegawai->password)) {
+            if (password_verify($request->password, $pegawai->password)) {
+                $passwordValid = true;
             }
-            if (! $authUser && ! empty($pegawai->email)) {
-                $authUser = DB::table('auth.users')->where('email', $pegawai->email)->first();
-            }
-            if (! $authUser) {
-                $authUser = DB::table('auth.users')->where('email', "{$nik}@gmail.com")->first();
-            }
-
-            if ($authUser && ! empty($authUser->encrypted_password)) {
-                if (password_verify($request->password, $authUser->encrypted_password)) {
-                    $passwordValid = true;
-                }
-            }
-        } catch (\Throwable $e) {
-            // Fallback to static verify
         }
-
-        $expectedPass = $this->defaultPasswords[$nik] ?? $nik;
-        if (! $passwordValid && ($request->password === $nik || $request->password === $expectedPass || $request->password === 'password')) {
+        // Fallback pra-produksi: jika password cocok langsung dengan NIK atau 'password'
+        if (! $passwordValid && ($request->password === (string) $pegawai->nik || $request->password === 'password')) {
             $passwordValid = true;
+            try {
+                DB::table('pegawai')->where('id', $pegawai->id)->update([
+                    'password' => password_hash($request->password, PASSWORD_BCRYPT),
+                ]);
+            } catch (\Throwable $e) {}
         }
 
         if (! $passwordValid) {
             return response()->json([
                 'success' => false,
-                'message' => 'Kata sandi salah.',
+                'message' => 'Kata sandi salah atau akun belum dikonfigurasi password.',
             ], 401);
         }
 
@@ -142,7 +166,25 @@ class ApiPegawaiController extends Controller
             $userLevel = '5';
         }
 
-        $token = base64_encode($pegawai->nik . ':' . time());
+        // Generate token JWT HS256 resmi yang ditandatangani secara kriptografis
+        $secret = config('services.simpeg.jwt_secret') ?: env('JWT_SECRET') ?: config('app.key');
+        $header = json_encode(['alg' => 'HS256', 'typ' => 'JWT']);
+        $payload = json_encode([
+            'iss' => 'simpeg-api',
+            'sub' => (string) $pegawai->id,
+            'nik' => (string) $pegawai->nik,
+            'nama' => (string) $pegawai->name,
+            'role' => $roleKode,
+            'userlevel' => (string) $userLevel,
+            'iat' => time(),
+            'exp' => time() + (30 * 86400), // Masa berlaku 30 hari
+        ]);
+
+        $b64Header = rtrim(strtr(base64_encode($header), '+/', '-_'), '=');
+        $b64Payload = rtrim(strtr(base64_encode($payload), '+/', '-_'), '=');
+        $signature = hash_hmac('sha256', "$b64Header.$b64Payload", $secret, true);
+        $b64Sig = rtrim(strtr(base64_encode($signature), '+/', '-_'), '=');
+        $token = "$b64Header.$b64Payload.$b64Sig";
 
         return response()->json([
             'success' => true,
@@ -152,12 +194,23 @@ class ApiPegawaiController extends Controller
                     'id' => $pegawai->id,
                     'nik' => $pegawai->nik,
                     'nama' => $pegawai->name,
-                    'jabatan' => $pegawai->jabatan,
+                    'name' => $pegawai->name,
+                    'gelar' => $pegawai->gelar ?? '',
+                    'jabatan' => $pegawai->jabatan ?? '-',
                     'unit_kerja' => $pegawai->unit_kerja ?? 'PDAM Tirta Darma Ayu',
+                    'unit_kerja_singkat' => $pegawai->unit_kerja_singkat ?? '',
                     'golongan' => $pegawai->golongan ?? '',
-                    'userlevel' => $userLevel,
+                    'status' => $pegawai->status ?? 'Pegawai Tetap',
+                    'tempat_tanggal_lahir' => $pegawai->tempat_tanggal_lahir ?? '',
+                    'status_pernikahan' => $pegawai->status_pernikahan ?? '',
+                    'alamat' => $pegawai->alamat ?? '',
+                    'no_telp' => $pegawai->no_telp ?? '',
+                    'foto_url' => $pegawai->foto_url ?? null,
+                    'email' => $pegawai->email ?? '',
+                    'userlevel' => (string) $userLevel,
                     'role' => $roleKode,
                     'divisi_kadiv' => $divisiKadiv,
+                    'must_change_password' => (bool) ($pegawai->must_change_password ?? false),
                 ],
                 'token' => $token,
             ]
@@ -165,65 +218,66 @@ class ApiPegawaiController extends Controller
     }
 
     /**
-     * Auth - Ganti Password
+     * Auth - Ganti Password (Wajib Terautentikasi)
      */
     public function gantiPassword(Request $request)
     {
+        $authUser = $request->attributes->get('auth_user');
+        if (! $authUser) {
+            return response()->json(['success' => false, 'message' => 'Autentikasi gagal: Sesi tidak valid.'], 401);
+        }
+
+        $targetNik = (string) trim($request->input('nik', $authUser->nik));
+        if ($targetNik !== (string) $authUser->nik) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Anda hanya berhak mengganti password akun Anda sendiri.',
+            ], 403);
+        }
+
         $request->validate([
-            'nik' => 'required|string',
-            'old_password' => 'required|string',
-            'new_password' => 'required|string|min:4',
+            'old_password' => 'nullable|string',
+            'password_lama' => 'nullable|string',
+            'new_password' => 'nullable|string|min:4',
+            'password_baru' => 'nullable|string|min:4',
         ]);
 
-        $nik = (string) trim($request->nik);
-        $pegawai = DB::table('pegawai')->where('nik', $nik)->first();
-        if (! $pegawai) {
-            return response()->json(['success' => false, 'message' => 'Pegawai tidak ditemukan.'], 404);
+        $oldPassword = $request->input('old_password') ?: $request->input('password_lama');
+        $newPassword = $request->input('new_password') ?: $request->input('password_baru');
+
+        if (empty($newPassword)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Password baru wajib diisi.',
+            ], 422);
         }
 
-        // Verifikasi password lama
-        $passwordValid = false;
-        $authUser = DB::table('auth.users')->where('id', $pegawai->id)->first();
-        if (! $authUser) {
-            $authUser = DB::table('auth.users')->where('email', "{$nik}@tirtadarmaayu.local")->first();
-        }
-        if ($authUser && ! empty($authUser->encrypted_password)) {
-            if (password_verify($request->old_password, $authUser->encrypted_password)) {
+        $pegawai = $authUser;
+
+        // Verifikasi password lama jika disertakan
+        if (! empty($oldPassword)) {
+            $passwordValid = false;
+            if (! empty($pegawai->password)) {
+                if (password_verify($oldPassword, $pegawai->password)) {
+                    $passwordValid = true;
+                }
+            }
+            if (! $passwordValid && ($oldPassword === (string) $pegawai->nik || $oldPassword === 'password')) {
                 $passwordValid = true;
             }
-        }
 
-        $expectedPass = $this->defaultPasswords[$nik] ?? $nik;
-        if (! $passwordValid && ($request->old_password === $nik || $request->old_password === $expectedPass || $request->old_password === 'password')) {
-            $passwordValid = true;
-        }
-
-        if (! $passwordValid) {
-            return response()->json(['success' => false, 'message' => 'Password lama salah.'], 400);
-        }
-
-        // Update password di auth.users Supabase
-        $hashed = bcrypt($request->new_password);
-        try {
-            if ($authUser) {
-                DB::table('auth.users')->where('id', $authUser->id)->update([
-                    'encrypted_password' => $hashed,
-                    'updated_at' => now(),
-                ]);
-            } else {
-                DB::table('auth.users')->insert([
-                    'id' => $pegawai->id,
-                    'email' => $pegawai->email ?: "{$nik}@tirtadarmaayu.local",
-                    'encrypted_password' => $hashed,
-                    'email_confirmed_at' => now(),
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                    'aud' => 'authenticated',
-                    'role' => 'authenticated',
-                ]);
+            if (! $passwordValid) {
+                return response()->json(['success' => false, 'message' => 'Password lama salah.'], 400);
             }
+        }
 
-            DB::table('pegawai')->where('id', $pegawai->id)->update(['must_change_password' => false]);
+        // Update password baru langsung di tabel pegawai lokal
+        $hashed = bcrypt($newPassword);
+        try {
+            DB::table('pegawai')->where('id', $pegawai->id)->update([
+                'password' => $hashed,
+                'must_change_password' => false,
+            ]);
         } catch (\Throwable $e) {
             Log::warning('ApiPegawaiController gantiPassword error: ' . $e->getMessage());
         }
@@ -287,12 +341,8 @@ class ApiPegawaiController extends Controller
     public function profile(Request $request)
     {
         $pegawai = $this->getPegawaiByRequest($request);
-
-        if (! $pegawai) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Data pegawai tidak ditemukan.',
-            ], 404);
+        if ($resp = $this->checkPegawaiAccess($pegawai)) {
+            return $resp;
         }
 
         $keluarga = DB::table('keluarga')->where('pegawai_id', $pegawai->id)->get();
@@ -332,13 +382,17 @@ class ApiPegawaiController extends Controller
     public function slipGaji(Request $request)
     {
         $pegawai = $this->getPegawaiByRequest($request);
-
-        if (! $pegawai) {
-            return response()->json(['success' => false, 'message' => 'Pegawai tidak ditemukan.'], 404);
+        if ($resp = $this->checkPegawaiAccess($pegawai)) {
+            return $resp;
         }
 
-        $payroll = DB::table('payroll')->where('pegawai_id', $pegawai->id)->orderByDesc('created_at')->first();
-        if ($payroll) {
+        $payrolls = DB::table('payroll')
+            ->where('pegawai_id', $pegawai->id)
+            ->orderByDesc('tahun')
+            ->orderByDesc('bulan')
+            ->get();
+
+        foreach ($payrolls as $payroll) {
             $prefix = sprintf('%04d-%02d', (int) ($payroll->tahun ?? now()->year), (int) ($payroll->bulan ?? now()->month));
             $monthPadded = str_pad((int) ($payroll->bulan ?? now()->month), 2, '0', STR_PAD_LEFT);
             try {
@@ -363,14 +417,17 @@ class ApiPegawaiController extends Controller
             } catch (\Throwable $e) {}
         }
 
+        $latest = $payrolls->first();
+
         return response()->json([
             'success' => true,
-            'message' => $payroll ? 'Data slip gaji berhasil diambil' : 'Belum ada slip gaji yang diterbitkan.',
+            'message' => $latest ? 'Data slip gaji berhasil diambil' : 'Belum ada slip gaji yang diterbitkan.',
             'data' => [
                 'nik' => $pegawai->nik,
                 'nama' => $pegawai->name,
                 'jabatan' => $pegawai->jabatan,
-                'payroll' => $payroll,
+                'payroll' => $latest,
+                'history' => $payrolls,
             ],
         ]);
     }
@@ -381,19 +438,25 @@ class ApiPegawaiController extends Controller
     public function slipThr(Request $request)
     {
         $pegawai = $this->getPegawaiByRequest($request);
-        if (! $pegawai) {
-            return response()->json(['success' => false, 'message' => 'Pegawai tidak ditemukan.'], 404);
+        if ($resp = $this->checkPegawaiAccess($pegawai)) {
+            return $resp;
         }
 
-        $thr = DB::table('thr')->where('pegawai_id', $pegawai->id)->orderByDesc('created_at')->first();
+        $thrs = DB::table('thr')
+            ->where('pegawai_id', $pegawai->id)
+            ->orderByDesc('tahun')
+            ->get();
+
+        $latest = $thrs->first();
 
         return response()->json([
             'success' => true,
-            'message' => $thr ? 'Data slip THR berhasil diambil' : 'Belum ada slip THR yang diterbitkan.',
+            'message' => $latest ? 'Data slip THR berhasil diambil' : 'Belum ada slip THR yang diterbitkan.',
             'data' => [
                 'nik' => $pegawai->nik,
                 'nama' => $pegawai->name,
-                'thr' => $thr,
+                'thr' => $latest,
+                'history' => $thrs,
             ],
         ]);
     }
@@ -404,8 +467,8 @@ class ApiPegawaiController extends Controller
     public function tunjanganPendidikan(Request $request)
     {
         $pegawai = $this->getPegawaiByRequest($request);
-        if (! $pegawai) {
-            return response()->json(['success' => false, 'message' => 'Pegawai tidak ditemukan.'], 404);
+        if ($resp = $this->checkPegawaiAccess($pegawai)) {
+            return $resp;
         }
 
         $items = DB::table('tunjangan_pendidikan')
@@ -472,8 +535,8 @@ class ApiPegawaiController extends Controller
     public function slipGaji13(Request $request)
     {
         $pegawai = $this->getPegawaiByRequest($request);
-        if (! $pegawai) {
-            return response()->json(['success' => false, 'message' => 'Pegawai tidak ditemukan.'], 404);
+        if ($resp = $this->checkPegawaiAccess($pegawai)) {
+            return $resp;
         }
 
         $gaji13 = DB::table('gaji_13')->where('pegawai_id', $pegawai->id)->orderByDesc('tahun')->first();
@@ -507,8 +570,8 @@ class ApiPegawaiController extends Controller
     public function insentif(Request $request)
     {
         $pegawai = $this->getPegawaiByRequest($request);
-        if (! $pegawai) {
-            return response()->json(['success' => false, 'message' => 'Pegawai tidak ditemukan.'], 404);
+        if ($resp = $this->checkPegawaiAccess($pegawai)) {
+            return $resp;
         }
 
         $sumber = $request->get('sumber', 'all');
@@ -761,8 +824,8 @@ class ApiPegawaiController extends Controller
     public function absensi(Request $request)
     {
         $pegawai = $this->getPegawaiByRequest($request);
-        if (! $pegawai) {
-            return response()->json(['success' => false, 'message' => 'Pegawai tidak ditemukan.'], 404);
+        if ($resp = $this->checkPegawaiAccess($pegawai)) {
+            return $resp;
         }
 
         $data = DB::table('absensi_harian')
@@ -771,9 +834,21 @@ class ApiPegawaiController extends Controller
             ->limit(30)
             ->get();
 
+        $now = now();
+        $bulanLabel = $now->translatedFormat('F Y');
+        $hadir = $data->where('status', 'HADIR')->count();
+        $telat = $data->where('status', 'TELAT')->count();
+        $izin = $data->whereIn('status', ['IZIN', 'SAKIT', 'CUTI'])->count();
+
         return response()->json([
             'success' => true,
             'message' => 'Data absensi berhasil diambil',
+            'summary' => [
+                'bulan_label' => $bulanLabel,
+                'hadir' => $hadir,
+                'telat' => $telat,
+                'izin' => $izin,
+            ],
             'data' => $data,
         ]);
     }
@@ -783,24 +858,38 @@ class ApiPegawaiController extends Controller
      */
     public function checkinAbsensi(Request $request)
     {
-        $request->validate([
-            'nik' => 'required|string',
-            'latitude' => 'nullable|numeric',
-            'longitude' => 'nullable|numeric',
-        ]);
-
-        $pegawai = DB::table('pegawai')->where('nik', $request->nik)->first();
-        if (! $pegawai) {
-            return response()->json(['success' => false, 'message' => 'Pegawai tidak ditemukan.'], 404);
+        $authUser = $request->attributes->get('auth_user');
+        if (! $authUser) {
+            return response()->json(['success' => false, 'message' => 'Autentikasi gagal: Sesi tidak valid.'], 401);
         }
 
+        $request->validate([
+            'nik' => 'nullable|string',
+            'latitude' => 'nullable|numeric',
+            'longitude' => 'nullable|numeric',
+            'foto_url' => 'nullable|string',
+            'keterangan' => 'nullable|string',
+        ]);
+
+        $requestedNik = $request->input('nik');
+        if (! empty($requestedNik) && (string) $requestedNik !== (string) $authUser->nik) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Anda hanya dapat melakukan absensi untuk diri Anda sendiri.',
+            ], 403);
+        }
+
+        $pegawai = $authUser;
+
         $now = now();
+        $status = $now->hour >= 8 ? 'telat' : 'hadir';
         $inserted = DB::table('absensi_harian')->insertGetId([
             'pegawai_id' => $pegawai->id,
             'tanggal' => $now->toDateString(),
             'jam_masuk' => $now->toDateTimeString(),
-            'status' => 'HADIR',
-            'keterangan' => 'Absen Mobile App',
+            'status' => $status,
+            'keterangan' => $request->keterangan ?? 'Absen Mobile App',
+            'foto_url' => $request->foto_url,
             'lat' => $request->latitude,
             'lng' => $request->longitude,
             'created_at' => $now,
@@ -813,7 +902,45 @@ class ApiPegawaiController extends Controller
                 'id' => $inserted,
                 'tanggal' => $now->toDateString(),
                 'jam_masuk' => $now->toTimeString(),
-                'status' => 'HADIR',
+                'status' => $status,
+            ]
+        ]);
+    }
+
+    /**
+     * Clock-Out Absensi Mobile
+     */
+    public function checkoutAbsensi(Request $request)
+    {
+        $authUser = $request->attributes->get('auth_user');
+        if (! $authUser) {
+            return response()->json(['success' => false, 'message' => 'Autentikasi gagal: Sesi tidak valid.'], 401);
+        }
+
+        $pegawai = $authUser;
+        $now = now();
+        $today = $now->toDateString();
+
+        $absensi = DB::table('absensi_harian')
+            ->where('pegawai_id', $pegawai->id)
+            ->where('tanggal', $today)
+            ->orderByDesc('id')
+            ->first();
+
+        if (! $absensi) {
+            return response()->json(['success' => false, 'message' => 'Belum ada data check-in hari ini.'], 400);
+        }
+
+        DB::table('absensi_harian')->where('id', $absensi->id)->update([
+            'jam_pulang' => $now->toDateTimeString(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Berhasil melakukan absensi pulang (check-out).',
+            'data' => [
+                'id' => $absensi->id,
+                'jam_pulang' => $now->toTimeString(),
             ]
         ]);
     }
@@ -824,8 +951,8 @@ class ApiPegawaiController extends Controller
     public function sanksi(Request $request)
     {
         $pegawai = $this->getPegawaiByRequest($request);
-        if (! $pegawai) {
-            return response()->json(['success' => false, 'message' => 'Pegawai tidak ditemukan.'], 404);
+        if ($resp = $this->checkPegawaiAccess($pegawai)) {
+            return $resp;
         }
 
         $data = DB::table('sanksi')
@@ -846,8 +973,8 @@ class ApiPegawaiController extends Controller
     public function prestasi(Request $request)
     {
         $pegawai = $this->getPegawaiByRequest($request);
-        if (! $pegawai) {
-            return response()->json(['success' => false, 'message' => 'Pegawai tidak ditemukan.'], 404);
+        if ($resp = $this->checkPegawaiAccess($pegawai)) {
+            return $resp;
         }
 
         $data = DB::table('prestasi')
@@ -868,8 +995,8 @@ class ApiPegawaiController extends Controller
     public function getCuti(Request $request)
     {
         $pegawai = $this->getPegawaiByRequest($request);
-        if (! $pegawai) {
-            return response()->json(['success' => false, 'message' => 'Pegawai tidak ditemukan.'], 404);
+        if ($resp = $this->checkPegawaiAccess($pegawai)) {
+            return $resp;
         }
 
         $data = DB::table('pengajuan_cuti')
@@ -889,6 +1016,11 @@ class ApiPegawaiController extends Controller
      */
     public function storeCuti(Request $request)
     {
+        $authUser = $request->attributes->get('auth_user');
+        if (! $authUser) {
+            return response()->json(['success' => false, 'message' => 'Autentikasi gagal: Sesi tidak valid.'], 401);
+        }
+
         $request->validate([
             'nik' => 'required|string',
             'jenis_cuti' => 'required|string',
@@ -897,7 +1029,21 @@ class ApiPegawaiController extends Controller
             'alasan' => 'required|string',
         ]);
 
-        $pegawai = DB::table('pegawai')->where('nik', $request->nik)->first();
+        $userLevel = (string) ($authUser->userlevel ?? $authUser->role ?? '5');
+        $dbRole = strtolower($authUser->role ?? '');
+        $isPrivileged = in_array($userLevel, ['1', '2', '7']) || in_array($dbRole, ['sdm', 'admin']);
+
+        if (! $isPrivileged && (string) $request->nik !== (string) $authUser->nik) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Akses ditolak: Anda tidak memiliki wewenang mengajukan cuti untuk pegawai lain.',
+            ], 403);
+        }
+
+        $pegawai = ($isPrivileged && (string) $request->nik !== (string) $authUser->nik)
+            ? DB::table('pegawai')->where('nik', $request->nik)->first()
+            : $authUser;
+
         if (! $pegawai) {
             return response()->json(['success' => false, 'message' => 'Pegawai tidak ditemukan.'], 404);
         }
@@ -929,8 +1075,8 @@ class ApiPegawaiController extends Controller
     {
         $start = microtime(true);
         $pegawai = $this->getPegawaiByRequest($request);
-        if (! $pegawai) {
-            return response()->json(['success' => false, 'message' => 'Pegawai tidak ditemukan.'], 404);
+        if ($resp = $this->checkPegawaiAccess($pegawai)) {
+            return $resp;
         }
 
         $tPeg = round((microtime(true) - $start) * 1000, 2);
@@ -1065,6 +1211,11 @@ class ApiPegawaiController extends Controller
      */
     public function storeLembur(Request $request)
     {
+        $authUser = $request->attributes->get('auth_user');
+        if (! $authUser) {
+            return response()->json(['success' => false, 'message' => 'Autentikasi gagal: Sesi tidak valid.'], 401);
+        }
+
         $request->validate([
             'nik' => 'required|string',
             'tanggal' => 'required|date',
@@ -1073,7 +1224,21 @@ class ApiPegawaiController extends Controller
             'kegiatan' => 'required|string',
         ]);
 
-        $pegawai = DB::table('pegawai')->where('nik', $request->nik)->first();
+        $userLevel = (string) ($authUser->userlevel ?? $authUser->role ?? '5');
+        $dbRole = strtolower($authUser->role ?? '');
+        $isPrivileged = in_array($userLevel, ['1', '2', '7']) || in_array($dbRole, ['sdm', 'admin']);
+
+        if (! $isPrivileged && (string) $request->nik !== (string) $authUser->nik) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Akses ditolak: Anda tidak memiliki wewenang mengajukan lembur untuk pegawai lain.',
+            ], 403);
+        }
+
+        $pegawai = ($isPrivileged && (string) $request->nik !== (string) $authUser->nik)
+            ? DB::table('pegawai')->where('nik', $request->nik)->first()
+            : $authUser;
+
         if (! $pegawai) {
             return response()->json(['success' => false, 'message' => 'Pegawai tidak ditemukan.'], 404);
         }
@@ -1116,8 +1281,8 @@ class ApiPegawaiController extends Controller
     public function pengaduan(Request $request)
     {
         $pegawai = $this->getPegawaiByRequest($request);
-        if (! $pegawai) {
-            return response()->json(['success' => false, 'message' => 'Pegawai tidak ditemukan.'], 404);
+        if ($resp = $this->checkPegawaiAccess($pegawai)) {
+            return $resp;
         }
 
         $data = DB::table('pengaduan_pegawai')
@@ -1135,13 +1300,32 @@ class ApiPegawaiController extends Controller
 
     public function storePengaduan(Request $request)
     {
+        $authUser = $request->attributes->get('auth_user');
+        if (! $authUser) {
+            return response()->json(['success' => false, 'message' => 'Autentikasi gagal: Sesi tidak valid.'], 401);
+        }
+
         $request->validate([
             'nik' => 'required|string',
             'subjek' => 'required|string',
             'pesan' => 'required|string',
         ]);
 
-        $pegawai = DB::table('pegawai')->where('nik', $request->nik)->first();
+        $userLevel = (string) ($authUser->userlevel ?? $authUser->role ?? '5');
+        $dbRole = strtolower($authUser->role ?? '');
+        $isPrivileged = in_array($userLevel, ['1', '2', '7']) || in_array($dbRole, ['sdm', 'admin']);
+
+        if (! $isPrivileged && (string) $request->nik !== (string) $authUser->nik) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Akses ditolak: Anda tidak memiliki wewenang mengirim pengaduan atas nama pegawai lain.',
+            ], 403);
+        }
+
+        $pegawai = ($isPrivileged && (string) $request->nik !== (string) $authUser->nik)
+            ? DB::table('pegawai')->where('nik', $request->nik)->first()
+            : $authUser;
+
         if (! $pegawai) {
             return response()->json(['success' => false, 'message' => 'Pegawai tidak ditemukan.'], 404);
         }
@@ -1179,8 +1363,8 @@ class ApiPegawaiController extends Controller
     public function dokumenResmi(Request $request)
     {
         $pegawai = $this->getPegawaiByRequest($request);
-        if (! $pegawai) {
-            return response()->json(['success' => false, 'message' => 'Pegawai tidak ditemukan.'], 404);
+        if ($resp = $this->checkPegawaiAccess($pegawai)) {
+            return $resp;
         }
 
         try {
@@ -1259,10 +1443,34 @@ class ApiPegawaiController extends Controller
     /**
      * Download berkas dokumen resmi fisik langsung via API
      */
-    public function downloadDokumen($id)
+    public function downloadDokumen(Request $request, $id)
     {
+        $authUser = $request->attributes->get('auth_user');
+        if (! $authUser) {
+            return response()->json(['success' => false, 'message' => 'Autentikasi gagal: Sesi tidak valid.'], 401);
+        }
+
         $doc = DB::table('dokumen_pegawai')->where('id', $id)->first();
-        if (! $doc || empty($doc->file_url) || $doc->file_url === '#') {
+        if (! $doc) {
+            return response()->json(['success' => false, 'message' => 'Dokumen tidak ditemukan.'], 404);
+        }
+
+        // Verifikasi kepemilikan dokumen (IDOR prevention)
+        if (! empty($doc->pegawai_id)) {
+            $isOwner = ((string) $doc->pegawai_id === (string) $authUser->id) || ((string) $doc->pegawai_id === (string) $authUser->nik);
+            $userLevel = (string) ($authUser->userlevel ?? $authUser->role ?? '5');
+            $dbRole = strtolower($authUser->role ?? '');
+            $isPrivileged = in_array($userLevel, ['1', '2', '7']) || in_array($dbRole, ['sdm', 'admin', 'direktur', 'kspi', 'kadiv']);
+
+            if (! $isOwner && ! $isPrivileged) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Akses ditolak: Anda tidak memiliki wewenang mengunduh dokumen pegawai lain.',
+                ], 403);
+            }
+        }
+
+        if (empty($doc->file_url) || $doc->file_url === '#') {
             return response()->json(['success' => false, 'message' => 'Berkas fisik dokumen belum diunggah oleh SDM.'], 404);
         }
 
@@ -1295,7 +1503,7 @@ class ApiPegawaiController extends Controller
      */
     public function pengumuman(Request $request)
     {
-        $pegawai = $this->getPegawaiByRequest($request);
+        $pegawai = $request->attributes->get('auth_user');
 
         try {
             $list = DB::table('pengumuman')
@@ -1355,8 +1563,8 @@ class ApiPegawaiController extends Controller
     public function markPengumumanRead(Request $request, $id)
     {
         $pegawai = $this->getPegawaiByRequest($request);
-        if (! $pegawai) {
-            return response()->json(['success' => false, 'message' => 'Pegawai tidak ditemukan.'], 404);
+        if ($resp = $this->checkPegawaiAccess($pegawai)) {
+            return $resp;
         }
 
         try {

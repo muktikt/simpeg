@@ -272,6 +272,11 @@ class DokumenSuratController extends Controller
      */
     public function download(Request $request, $id = null)
     {
+        $userSession = session('simpeg_user');
+        $userlevel = (string) ($userSession['userlevel'] ?? '5');
+        $role = strtolower($userSession['role'] ?? '');
+        $isPrivileged = in_array($userlevel, ['1', '2', '7']) || in_array($role, ['sdm', 'admin', 'direktur', 'kspi', 'kadiv']);
+
         $docId = $id ?: $request->get('id');
         $pegawaiId = $request->get('pegawai_id');
         $jenis = strtolower($request->get('jenis', ''));
@@ -293,6 +298,10 @@ class DokumenSuratController extends Controller
                     || (string) ($p['nik'] ?? '') === (string) $pegawaiId;
             });
 
+            if (! $isPrivileged && $targetPegawai && ! empty($targetPegawai['nik']) && (string) $targetPegawai['nik'] !== (string) ($userSession['nik'] ?? '')) {
+                abort(403, 'Akses ditolak: Anda tidak memiliki wewenang mengakses dokumen pegawai lain.');
+            }
+
             $dbId = $targetPegawai['db_id'] ?? null;
             $intId = (string) ($targetPegawai['id'] ?? $pegawaiId);
             $nik = (string) ($targetPegawai['nik'] ?? '');
@@ -311,6 +320,16 @@ class DokumenSuratController extends Controller
                 })
                 ->whereIn(DB::raw('LOWER(kategori)'), $categories)
                 ->first();
+        }
+
+        // Cek otorisasi dokumen jika terkait pegawai tertentu
+        if ($doc && ! empty($doc->pegawai_id) && ! $isPrivileged) {
+            $isOwner = ((string) $doc->pegawai_id === (string) ($userSession['id'] ?? ''))
+                || ((string) $doc->pegawai_id === (string) ($userSession['db_id'] ?? ''))
+                || ((string) $doc->pegawai_id === (string) ($userSession['nik'] ?? ''));
+            if (! $isOwner) {
+                abort(403, 'Akses ditolak: Anda tidak memiliki wewenang mengunduh dokumen pegawai lain.');
+            }
         }
 
         if ($doc && ! empty($doc->file_url) && $doc->file_url !== '#') {
@@ -345,6 +364,11 @@ class DokumenSuratController extends Controller
      */
     public function cetak(Request $request, $id = null)
     {
+        $userSession = session('simpeg_user');
+        $userlevel = (string) ($userSession['userlevel'] ?? '5');
+        $role = strtolower($userSession['role'] ?? '');
+        $isPrivileged = in_array($userlevel, ['1', '2', '7']) || in_array($role, ['sdm', 'admin', 'direktur', 'kspi', 'kadiv']);
+
         $pegawaiId = $request->get('pegawai_id');
         $jenis = strtolower($request->get('jenis', 'sk'));
         $docId = $id ?: $request->get('id');
@@ -374,16 +398,26 @@ class DokumenSuratController extends Controller
             });
         }
 
+        // Verifikasi hak akses pencetakan
+        if (! $isPrivileged && $targetPegawai && ! empty($targetPegawai['nik']) && (string) $targetPegawai['nik'] !== (string) ($userSession['nik'] ?? '')) {
+            abort(403, 'Akses ditolak: Anda tidak memiliki wewenang mencetak dokumen pegawai lain.');
+        }
+
         if (! $targetPegawai) {
-            $first = collect($allPegawai)->first();
-            $targetPegawai = $first ?: [
-                'id' => 1,
-                'nik' => '1711001',
-                'nama' => 'Pegawai PDAM',
-                'jabatan' => 'Staf Pelaksana',
-                'unit_kerja' => 'Kantor Pusat',
-                'status_peg' => 'Pegawai Tetap',
-            ];
+            if (! $isPrivileged) {
+                $targetPegawai = collect($allPegawai)->firstWhere('nik', $userSession['nik'] ?? '');
+                abort_if(! $targetPegawai, 404, 'Data pegawai Anda tidak ditemukan.');
+            } else {
+                $first = collect($allPegawai)->first();
+                $targetPegawai = $first ?: [
+                    'id' => 1,
+                    'nik' => '1711001',
+                    'nama' => 'Pegawai PDAM',
+                    'jabatan' => 'Staf Pelaksana',
+                    'unit_kerja' => 'Kantor Pusat',
+                    'status_peg' => 'Pegawai Tetap',
+                ];
+            }
         }
 
         $isDiklat = ($doc && in_array(strtolower($doc->kategori ?? ''), ['diklat', 'surat_diklat'])) || in_array($jenis, ['diklat', 'surat_diklat']);

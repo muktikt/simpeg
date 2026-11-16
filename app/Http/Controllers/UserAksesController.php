@@ -6,22 +6,6 @@ use Illuminate\Http\Request;
 
 class UserAksesController extends Controller
 {
-    protected array $defaultPasswords = [
-        '1711001' => 'dirut123',
-        '1711002' => 'dirum123',
-        '1711003' => 'dirtek123',
-        '1711254' => 'sdm123',
-        '1711157' => 'sdm123',
-        '1711444' => 'sdm123',
-        '1711590' => 'sdm123',
-        '1711567' => 'sdm123',
-        '1711296' => 'keuangan123',
-        '1711145' => 'keuangan123',
-        '1711161' => 'kspi123',
-        '1711571' => 'kadivadmin123',
-        '1711251' => 'kadivteknik123',
-    ];
-
     protected function all(): array
     {
         try {
@@ -45,7 +29,7 @@ class UserAksesController extends Controller
                         'id' => $index++,
                         'db_id' => $p->id,
                         'username' => (string) $p->nik,
-                        'password' => $this->defaultPasswords[$p->nik] ?? 'password',
+                        'password' => '••••••••',
                         'nama' => $p->name ?? 'Pegawai',
                         'userlevel' => $userlevel,
                     ];

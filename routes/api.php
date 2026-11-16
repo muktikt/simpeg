@@ -10,45 +10,51 @@ use App\Http\Controllers\Api\ApiPegawaiController;
 */
 
 Route::prefix('v1')->group(function () {
-    // Auth API
+    // 1. Auth API Publik
     Route::post('/login', [ApiPegawaiController::class, 'login']);
-    Route::post('/ganti-password', [ApiPegawaiController::class, 'gantiPassword']);
 
-    // Data Pegawai & Profil
-    Route::get('/profile', [ApiPegawaiController::class, 'profile']);
-    Route::get('/pegawai', [ApiPegawaiController::class, 'listPegawai'])->middleware('api.key');
+    // 2. Seluruh Endpoint Operasional Wajib Terautentikasi Token Pegawai
+    Route::middleware('api.key')->group(function () {
+        // Ganti Password (Wajib Terautentikasi)
+        Route::post('/ganti-password', [ApiPegawaiController::class, 'gantiPassword']);
 
-    // Keuangan & Payroll
-    Route::get('/payroll/slip-gaji', [ApiPegawaiController::class, 'slipGaji']);
-    Route::get('/payroll/thr', [ApiPegawaiController::class, 'slipThr']);
-    Route::get('/payroll/gaji-13', [ApiPegawaiController::class, 'slipGaji13']);
-    Route::get('/payroll/tunjangan-pendidikan', [ApiPegawaiController::class, 'tunjanganPendidikan']);
-    Route::get('/payroll/insentif', [ApiPegawaiController::class, 'insentif']);
+        // Data Pegawai & Profil
+        Route::get('/profile', [ApiPegawaiController::class, 'profile']);
+        Route::get('/pegawai', [ApiPegawaiController::class, 'listPegawai']);
 
-    // Absensi Kehadiran
-    Route::get('/absensi', [ApiPegawaiController::class, 'absensi']);
-    Route::post('/absensi/checkin', [ApiPegawaiController::class, 'checkinAbsensi']);
+        // Keuangan & Payroll
+        Route::get('/payroll/slip-gaji', [ApiPegawaiController::class, 'slipGaji']);
+        Route::get('/payroll/thr', [ApiPegawaiController::class, 'slipThr']);
+        Route::get('/payroll/gaji-13', [ApiPegawaiController::class, 'slipGaji13']);
+        Route::get('/payroll/tunjangan-pendidikan', [ApiPegawaiController::class, 'tunjanganPendidikan']);
+        Route::get('/payroll/insentif', [ApiPegawaiController::class, 'insentif']);
 
-    // Sanksi & Prestasi
-    Route::get('/sanksi', [ApiPegawaiController::class, 'sanksi']);
-    Route::get('/prestasi', [ApiPegawaiController::class, 'prestasi']);
+        // Absensi Kehadiran
+        Route::get('/absensi', [ApiPegawaiController::class, 'absensi']);
+        Route::post('/absensi/checkin', [ApiPegawaiController::class, 'checkinAbsensi']);
+        Route::post('/absensi/checkout', [ApiPegawaiController::class, 'checkoutAbsensi']);
 
-    // Pengajuan Cuti & Lembur
-    Route::get('/cuti', [ApiPegawaiController::class, 'getCuti']);
-    Route::post('/cuti', [ApiPegawaiController::class, 'storeCuti']);
-    Route::get('/lembur', [ApiPegawaiController::class, 'getLembur']);
-    Route::get('/payroll/lembur', [ApiPegawaiController::class, 'getLembur']);
-    Route::post('/lembur', [ApiPegawaiController::class, 'storeLembur']);
+        // Sanksi & Prestasi
+        Route::get('/sanksi', [ApiPegawaiController::class, 'sanksi']);
+        Route::get('/prestasi', [ApiPegawaiController::class, 'prestasi']);
 
-    // Pengaduan Pegawai
-    Route::get('/pengaduan', [ApiPegawaiController::class, 'pengaduan']);
-    Route::post('/pengaduan', [ApiPegawaiController::class, 'storePengaduan']);
+        // Pengajuan Cuti & Lembur
+        Route::get('/cuti', [ApiPegawaiController::class, 'getCuti']);
+        Route::post('/cuti', [ApiPegawaiController::class, 'storeCuti']);
+        Route::get('/lembur', [ApiPegawaiController::class, 'getLembur']);
+        Route::get('/payroll/lembur', [ApiPegawaiController::class, 'getLembur']);
+        Route::post('/lembur', [ApiPegawaiController::class, 'storeLembur']);
 
-    // Dokumen Resmi Kepegawaian (SK & Diklat dari SDM)
-    Route::get('/dokumen', [ApiPegawaiController::class, 'dokumenResmi']);
-    Route::get('/dokumen/{id}/download', [ApiPegawaiController::class, 'downloadDokumen']);
+        // Pengaduan Pegawai
+        Route::get('/pengaduan', [ApiPegawaiController::class, 'pengaduan']);
+        Route::post('/pengaduan', [ApiPegawaiController::class, 'storePengaduan']);
 
-    // Pengumuman Perusahaan
-    Route::get('/pengumuman', [ApiPegawaiController::class, 'pengumuman']);
-    Route::post('/pengumuman/{id}/baca', [ApiPegawaiController::class, 'markPengumumanRead']);
+        // Dokumen Resmi Kepegawaian (SK & Diklat dari SDM)
+        Route::get('/dokumen', [ApiPegawaiController::class, 'dokumenResmi']);
+        Route::get('/dokumen/{id}/download', [ApiPegawaiController::class, 'downloadDokumen']);
+
+        // Pengumuman Perusahaan
+        Route::get('/pengumuman', [ApiPegawaiController::class, 'pengumuman']);
+        Route::post('/pengumuman/{id}/baca', [ApiPegawaiController::class, 'markPengumumanRead']);
+    });
 });

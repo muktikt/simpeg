@@ -552,30 +552,18 @@ class ProfileController extends Controller
         $nik = (string) ($userLogin['nik'] ?? '');
         $userId = $userLogin['id'] ?? null;
 
-        // 1. Verifikasi Password Lama
+        // 1. Verifikasi Password Lama terhadap database pegawai lokal PostgreSQL
         $passwordValid = false;
-        $authUser = null;
         $pegawai = null;
 
         try {
             $pegawai = \Illuminate\Support\Facades\DB::table('pegawai')->where('nik', $nik)->first();
-            $targetId = $pegawai ? $pegawai->id : $userId;
-
-            if ($targetId) {
-                $authUser = \Illuminate\Support\Facades\DB::table('auth.users')->where('id', $targetId)->first();
-            }
-            if (! $authUser) {
-                $authUser = \Illuminate\Support\Facades\DB::table('auth.users')->where('email', "{$nik}@tirtadarmaayu.local")->first();
-            }
-            if (! $authUser && ! empty($pegawai->email)) {
-                $authUser = \Illuminate\Support\Facades\DB::table('auth.users')->where('email', $pegawai->email)->first();
-            }
-            if (! $authUser) {
-                $authUser = \Illuminate\Support\Facades\DB::table('auth.users')->where('email', "{$nik}@gmail.com")->first();
-            }
-
-            if ($authUser && ! empty($authUser->encrypted_password)) {
-                if (password_verify($validated['current_password'], $authUser->encrypted_password)) {
+            if ($pegawai) {
+                if (! empty($pegawai->password)) {
+                    if (password_verify($validated['current_password'], $pegawai->password)) {
+                        $passwordValid = true;
+                    }
+                } elseif ($validated['current_password'] === (string) $pegawai->nik || $validated['current_password'] === 'password') {
                     $passwordValid = true;
                 }
             }
@@ -583,57 +571,23 @@ class ProfileController extends Controller
             \Illuminate\Support\Facades\Log::warning('Verify current password failed: ' . $e->getMessage());
         }
 
-        // Fallback default passwords
-        $defaultPasswords = [
-            '1711254' => '1711254',
-            '1711296' => '1711296',
-            '1711001' => '1711001',
-            '1711002' => '1711002',
-        ];
-        $expectedPass = $defaultPasswords[$nik] ?? $nik;
-        if (! $passwordValid && (
-            $validated['current_password'] === ($userLogin['password'] ?? '') ||
-            $validated['current_password'] === $nik ||
-            $validated['current_password'] === $expectedPass ||
-            $validated['current_password'] === 'password'
-        )) {
-            $passwordValid = true;
-        }
-
         if (! $passwordValid) {
-            return back()->withErrors(['current_password' => 'Password lama yang Anda masukkan salah.']);
+            return back()->withErrors(['current_password' => 'Password lama yang Anda masukkan salah atau akun belum dikonfigurasi password.']);
         }
 
-        // 2. Simpan Password Baru ke Database auth.users Supabase
+        // 2. Simpan Password Baru ke Database tabel pegawai lokal
         $hashed = bcrypt($validated['new_password']);
         try {
-            if ($authUser) {
-                \Illuminate\Support\Facades\DB::table('auth.users')
-                    ->where('id', $authUser->id)
-                    ->update([
-                        'encrypted_password' => $hashed,
-                        'updated_at' => now(),
-                    ]);
-            } elseif ($pegawai) {
-                \Illuminate\Support\Facades\DB::table('auth.users')->insert([
-                    'id' => $pegawai->id,
-                    'email' => $pegawai->email ?: "{$nik}@tirtadarmaayu.local",
-                    'encrypted_password' => $hashed,
-                    'email_confirmed_at' => now(),
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                    'aud' => 'authenticated',
-                    'role' => 'authenticated',
-                ]);
-            }
-
             if ($pegawai) {
                 \Illuminate\Support\Facades\DB::table('pegawai')
                     ->where('id', $pegawai->id)
-                    ->update(['must_change_password' => false]);
+                    ->update([
+                        'password' => $hashed,
+                        'must_change_password' => false,
+                    ]);
             }
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::warning('Save new password to auth.users failed: ' . $e->getMessage());
+            \Illuminate\Support\Facades\Log::warning('Save new password to pegawai failed: ' . $e->getMessage());
         }
 
         // 3. Update session login yang sedang aktif

@@ -8,22 +8,6 @@ use Illuminate\Support\Facades\DB;
 
 class LoginController extends Controller
 {
-    protected array $defaultPasswords = [
-        '1711001' => 'dirut123',
-        '1711002' => 'dirum123',
-        '1711003' => 'dirtek123',
-        '1711254' => 'sdm123',
-        '1711157' => 'sdm123',
-        '1711444' => 'sdm123',
-        '1711590' => 'sdm123',
-        '1711567' => 'sdm123',
-        '1711296' => 'keuangan123',
-        '1711145' => 'keuangan123',
-        '1711161' => 'kspi123',
-        '1711571' => 'kadivadmin123',
-        '1711251' => 'kadivteknik123',
-    ];
-
     /**
      * Pegawai biasa (userlevel 5) diarahkan ke profil diri sendiri,
      * role struktural (Admin SDM, Keuangan, Direksi, KSPI, Kadiv) ke dashboard.
@@ -69,37 +53,26 @@ class LoginController extends Controller
                 ->onlyInput('nik');
         }
 
-        // 2. Verifikasi Password langsung ke hash auth.users Supabase atau default NIK
+        // 2. Verifikasi Password terhadap kolom password di tabel pegawai lokal PostgreSQL
         $passwordValid = false;
-        try {
-            $authUser = DB::table('auth.users')->where('id', $pegawai->id)->first();
-            if (! $authUser) {
-                $authUser = DB::table('auth.users')->where('email', "{$nik}@tirtadarmaayu.local")->first();
+        if (! empty($pegawai->password)) {
+            if (password_verify($request->password, $pegawai->password)) {
+                $passwordValid = true;
             }
-            if (! $authUser && ! empty($pegawai->email)) {
-                $authUser = DB::table('auth.users')->where('email', $pegawai->email)->first();
-            }
-            if (! $authUser) {
-                $authUser = DB::table('auth.users')->where('email', "{$nik}@gmail.com")->first();
-            }
-
-            if ($authUser && ! empty($authUser->encrypted_password)) {
-                if (password_verify($request->password, $authUser->encrypted_password)) {
-                    $passwordValid = true;
-                }
-            }
-        } catch (\Throwable $e) {
-            // Fallback to static verify
         }
-
-        $expectedPass = $this->defaultPasswords[$nik] ?? $nik;
-        if (! $passwordValid && ($request->password === $nik || $request->password === $expectedPass || $request->password === 'password')) {
+        // Fallback pra-produksi: jika password cocok langsung dengan NIK atau default 'password'
+        if (! $passwordValid && ($request->password === (string) $pegawai->nik || $request->password === 'password')) {
             $passwordValid = true;
+            try {
+                DB::table('pegawai')->where('id', $pegawai->id)->update([
+                    'password' => password_hash($request->password, PASSWORD_BCRYPT),
+                ]);
+            } catch (\Throwable $e) {}
         }
 
         if (! $passwordValid) {
             return back()
-                ->withErrors(['nik' => 'Kata sandi yang Anda masukkan salah.'])
+                ->withErrors(['nik' => 'Kata sandi salah atau akun belum dikonfigurasi password.'])
                 ->onlyInput('nik');
         }
 
@@ -175,7 +148,6 @@ class LoginController extends Controller
         $user = [
             'id' => $pegawai->id,
             'nik' => $pegawai->nik,
-            'password' => $expectedPass,
             'nama_peg' => $pegawai->name,
             'jabatan' => $pegawai->jabatan,
             'userlevel' => $userLevel,
