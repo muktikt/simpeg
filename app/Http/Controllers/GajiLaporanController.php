@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use App\Http\Controllers\Concerns\HandlesExcelImport;
 
 class GajiLaporanController extends Controller
 {
+    use HandlesExcelImport;
     /**
      * MODUL INI READ-ONLY - TIDAK PUNYA DATA SENDIRI.
      *
@@ -147,13 +149,14 @@ class GajiLaporanController extends Controller
             }
         } catch (\Throwable $e) {}
 
-        // 3. Ambil data lembur dari payroll (hanya sebagai fallback jika belum diinput di Prestasi)
+        // 3. Ambil data lembur dari payroll (hanya sebagai fallback jika belum diinput di Prestasi dan sudah terbit)
         $payrollLembur = collect();
         try {
             $payrollRows = \Illuminate\Support\Facades\DB::table('payroll')
                 ->leftJoin('pegawai', 'payroll.pegawai_id', '=', 'pegawai.id')
                 ->where('payroll.bulan', $bulan)
                 ->where('payroll.tahun', $tahun)
+                ->whereIn(\Illuminate\Support\Facades\DB::raw('LOWER(payroll.status)'), ['terbit', 'diterbitkan'])
                 ->where('payroll.lembur', '>', 0)
                 ->select(
                     'payroll.id',
@@ -251,11 +254,12 @@ class GajiLaporanController extends Controller
                 }
             } catch (\Throwable $e) {}
 
-            // Dari Payroll
+            // Dari Payroll (Hanya yang sudah terbit)
             try {
                 $payRows = \Illuminate\Support\Facades\DB::table('payroll')
                     ->leftJoin('pegawai', 'payroll.pegawai_id', '=', 'pegawai.id')
                     ->where('pegawai.nik', $myNik)
+                    ->whereIn(\Illuminate\Support\Facades\DB::raw('LOWER(payroll.status)'), ['terbit', 'diterbitkan'])
                     ->where('payroll.lembur', '>', 0)
                     ->select('payroll.*')
                     ->orderByDesc('payroll.tahun')
@@ -278,6 +282,173 @@ class GajiLaporanController extends Controller
         $data = $data->sortBy('nama')->values();
 
         return view('gaji-laporan.lembur', compact('data', 'bulan', 'tahun', 'riwayatLembur'));
+    }
+
+    /**
+     * Unduh Template Excel / CSV Lemburan Pegawai.
+     */
+    public function downloadTemplateLembur(Request $request)
+    {
+        $bulan = (int) $request->get('bulan', now()->month);
+        $tahun = (int) $request->get('tahun', now()->year);
+        $bulanNama = AbsensiController::BULAN[$bulan] ?? 'Bulan_' . $bulan;
+
+        $pegawaiList = collect(app(PegawaiController::class)->all())
+            ->where('status_peg', '!=', 'PN')
+            ->values();
+
+        $filename = "Template_Lemburan_Pegawai_{$bulanNama}_{$tahun}.csv";
+
+        $headers = [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+            'Pragma' => 'no-cache',
+            'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
+            'Expires' => '0',
+        ];
+
+        $columns = ['NO', 'NIK', 'NAMA', 'UNIT KERJA', 'JAM LEMBUR'];
+
+        $callback = function () use ($columns, $pegawaiList) {
+            $handle = fopen('php://output', 'w');
+            fputs($handle, "\xEF\xBB\xBF");
+            fputcsv($handle, $columns);
+
+            $no = 1;
+            foreach ($pegawaiList as $p) {
+                fputcsv($handle, [
+                    $no++,
+                    $p['nik'] ?? '',
+                    $p['nama'] ?? '',
+                    $p['unit_kerja'] ?? '',
+                    0, // Jam Lembur default
+                ]);
+            }
+            fclose($handle);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
+
+    /**
+     * Impor Data Lemburan dari File Excel (.xlsx / .csv).
+     */
+    public function importExcelLembur(Request $request)
+    {
+        @ini_set('max_execution_time', '0');
+        @ini_set('memory_limit', '512M');
+        @set_time_limit(0);
+
+        $request->validate([
+            'file_excel' => 'required|file|max:10240',
+            'bulan'      => 'required|integer|between:1,12',
+            'tahun'      => 'required|integer|min:2020|max:2100',
+            'mode'       => 'nullable|in:update,skip',
+        ]);
+
+        $bulan = (int) $request->input('bulan');
+        $tahun = (int) $request->input('tahun');
+        $mode = $request->input('mode', 'update');
+        $bulanNama = AbsensiController::BULAN[$bulan] ?? "Bulan {$bulan}";
+        $fullBulanLabel = "{$bulanNama} {$tahun}";
+        $tglStr = sprintf('%04d-%02d-01', $tahun, $bulan);
+        $prefix = sprintf('%04d-%02d', $tahun, $bulan);
+        $monthPadded = str_pad($bulan, 2, '0', STR_PAD_LEFT);
+
+        $rows = $this->readUploadedRows($request->file('file_excel'));
+        if (empty($rows)) {
+            return back()->with('error', 'Gagal membaca isi file atau file kosong. Pastikan format sesuai template.');
+        }
+
+        $headerMap = $this->extractHeaderMap($rows);
+        if (! $headerMap || ! isset($headerMap['nik'])) {
+            return back()->with('error', 'Header kolom NIK tidak ditemukan dalam file. Gunakan template yang disediakan.');
+        }
+
+        $colNik = $headerMap['nik'];
+        $colJamLembur = $headerMap['jam_lembur'] ?? ($headerMap['lembur'] ?? null);
+
+        if ($colJamLembur === null) {
+            return back()->with('error', 'Kolom Jam Lembur tidak ditemukan. Pastikan format kolom sesuai template.');
+        }
+
+        $pegawaiDbMap = \Illuminate\Support\Facades\DB::table('pegawai')->pluck('id', 'nik')->all();
+
+        // Ambil data lembur yang sudah ada
+        $existingLembur = \Illuminate\Support\Facades\DB::table('lembur')
+            ->where(function ($q) use ($fullBulanLabel, $bulanNama, $tahun) {
+                $q->where('bulan', $fullBulanLabel)
+                  ->orWhere('bulan', 'ilike', "%$bulanNama $tahun%");
+            })
+            ->get()
+            ->keyBy('pegawai_id');
+
+        $importedCount = 0;
+        $updatedCount = 0;
+        $now = now();
+
+        foreach ($rows as $r) {
+            $rawNik = (string) ($r[$colNik] ?? '');
+            $nik = $this->normalizeNik($rawNik, $pegawaiDbMap);
+            if (empty($nik)) {
+                continue;
+            }
+
+            $dbPegId = $pegawaiDbMap[$nik] ?? ($pegawaiDbMap['TEMP' . $nik] ?? null);
+            if (! $dbPegId) {
+                continue;
+            }
+
+            $jamLembur = (float) preg_replace('/[^0-9.]/', '', (string)($r[$colJamLembur] ?? '0'));
+            $nominalLembur = (int) round($jamLembur * PrestasiController::RATE_LEMBUR_PER_JAM);
+
+            $alreadyExists = $existingLembur->has($dbPegId);
+
+            if ($alreadyExists && $mode === 'skip') {
+                continue;
+            }
+
+            // 1. Sinkronisasi ke tabel lembur & payroll
+            PrestasiController::syncPrestasiLemburToTables($dbPegId, $jamLembur, $nominalLembur, $tglStr);
+
+            // 2. Perbarui juga di tabel prestasi jika ada record di bulan tersebut
+            try {
+                $pRow = \Illuminate\Support\Facades\DB::table('prestasi')
+                    ->where('pegawai_id', $dbPegId)
+                    ->where(function ($q) use ($prefix, $tahun, $bulan, $monthPadded) {
+                        $q->where('tanggal', 'like', "$prefix%")
+                          ->orWhere('tanggal', 'like', "%$tahun-$monthPadded-%")
+                          ->orWhere('tanggal', 'like', "%$tahun-$bulan-%");
+                    })
+                    ->orderByDesc('id')
+                    ->first();
+
+                if ($pRow) {
+                    $meta = json_decode($pRow->keterangan ?? '{}', true) ?: [];
+                    $meta['jam_lembur'] = $jamLembur;
+                    $meta['nominal_lembur'] = $nominalLembur;
+                    \Illuminate\Support\Facades\DB::table('prestasi')
+                        ->where('id', $pRow->id)
+                        ->update([
+                            'keterangan' => json_encode($meta),
+                            'updated_at' => $now,
+                        ]);
+                }
+            } catch (\Throwable $e) {}
+
+            if ($alreadyExists) {
+                $updatedCount++;
+            } else {
+                $importedCount++;
+            }
+        }
+
+        \Illuminate\Support\Facades\Cache::forget('simpeg_all_pegawai_list');
+        \Illuminate\Support\Facades\Cache::forget('pegawai_master_cache');
+        \Illuminate\Support\Facades\Cache::forget('simpeg_dashboard_stats');
+
+        return redirect()->route('gaji-laporan.lembur', ['bulan' => $bulan, 'tahun' => $tahun])
+            ->with('success', "Proses impor lembur selesai! {$importedCount} data baru ditambahkan, {$updatedCount} data diperbarui untuk periode {$fullBulanLabel}.");
     }
 
     public function slipGaji(Request $request)

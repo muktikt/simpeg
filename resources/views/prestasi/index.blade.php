@@ -16,10 +16,20 @@
         <input type="text" class="table-search-input" placeholder="Cari NIK, nama pegawai, karya...">
     </div>
     @if ($bisaKelola)
-        <a href="{{ route('prestasi.create') }}" class="btn btn-primary">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
-            Tambah Prestasi
-        </a>
+        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+            <a href="{{ route('prestasi.template') }}" class="btn btn-outline" style="border-color:#10B981; color:#059669; font-weight:600;" title="Unduh template Excel dengan daftar pegawai aktif">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Unduh Template
+            </a>
+            <button type="button" class="btn" style="background:#059669; color:#fff; font-weight:600;" onclick="openImportModal('modal-import-prestasi')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                Unggah Excel
+            </button>
+            <a href="{{ route('prestasi.create') }}" class="btn btn-primary">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+                Tambah Prestasi
+            </a>
+        </div>
     @endif
 </div>
 
@@ -90,4 +100,81 @@
         </tbody>
     </table>
 </div>
+
+{{-- Modal Unggah File Excel Prestasi --}}
+<div id="modal-import-prestasi" class="pk-modal-overlay" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.6); backdrop-filter:blur(4px); z-index:99999; align-items:center; justify-content:center; padding:20px;">
+    <div style="background:#ffffff; width:100%; max-width:540px; border-radius:18px; box-shadow:0 20px 40px rgba(0,0,0,0.25); overflow:hidden;">
+        <div style="padding:18px 24px; background:#F8FAFC; border-bottom:1px solid #E2E8F0; display:flex; justify-content:space-between; align-items:center;">
+            <div style="font-size:16px; font-weight:700; color:#0F2A3D;">Unggah File Excel Prestasi & Lembur Pegawai</div>
+            <button type="button" onclick="closeImportModal('modal-import-prestasi')" style="background:none; border:none; font-size:20px; color:#64748B; cursor:pointer;">&times;</button>
+        </div>
+        <form action="{{ route('prestasi.import') }}" method="POST" enctype="multipart/form-data" style="padding:24px;">
+            @csrf
+            <div style="margin-bottom:18px;">
+                <label style="display:block; font-size:13px; font-weight:600; color:#334155; margin-bottom:6px;">Target Periode Bulan & Tahun:</label>
+                <div style="display:flex; gap:10px;">
+                    <select name="bulan" class="form-control" style="flex:1; padding:8px 12px; border-radius:8px; border:1px solid #CBD5E1; font-size:13px;">
+                        @foreach (\App\Http\Controllers\AbsensiController::BULAN as $val => $label)
+                            <option value="{{ $val }}" @selected(now()->month === $val)>{{ $label }}</option>
+                        @endforeach
+                    </select>
+                    <select name="tahun" class="form-control" style="width:110px; padding:8px 12px; border-radius:8px; border:1px solid #CBD5E1; font-size:13px;">
+                        @for ($y = now()->year; $y >= now()->year - 3; $y--)
+                            <option value="{{ $y }}" @selected(now()->year === $y)>{{ $y }}</option>
+                        @endfor
+                    </select>
+                </div>
+            </div>
+
+            <div style="margin-bottom:18px;">
+                <label style="display:block; font-size:13px; font-weight:600; color:#334155; margin-bottom:6px;">Mode Pengunggahan:</label>
+                <div style="display:flex; gap:12px;">
+                    <label style="display:flex; align-items:center; gap:6px; font-size:13px; cursor:pointer;">
+                        <input type="radio" name="mode" value="update" checked>
+                        <span>Perbarui jika sudah ada</span>
+                    </label>
+                    <label style="display:flex; align-items:center; gap:6px; font-size:13px; cursor:pointer;">
+                        <input type="radio" name="mode" value="skip">
+                        <span>Lewati jika sudah ada</span>
+                    </label>
+                </div>
+            </div>
+
+            <div style="margin-bottom:20px;">
+                <label style="display:block; font-size:13px; font-weight:600; color:#334155; margin-bottom:6px;">Pilih File Excel (.xlsx / .csv):</label>
+                <input type="file" name="file_excel" accept=".xlsx,.csv,.txt" required style="display:block; width:100%; padding:10px; border:2px dashed #CBD5E1; border-radius:10px; background:#F8FAFC; font-size:13px;">
+                <p style="font-size:11.5px; color:#64748B; margin-top:6px;">Format kolom: NIK, Nama, Tanggal, Karya, Absensi, Jam Lembur, Alpha, Izin, Sakit, Dinas Luar, Cuti.</p>
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; gap:10px; padding-top:16px; border-top:1px solid #E2E8F0;">
+                <button type="button" class="btn btn-outline" onclick="closeImportModal('modal-import-prestasi')">Batal</button>
+                <button type="submit" class="btn" style="background:#059669; color:#fff; font-weight:600;">Impor Data Sekarang</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+window.openImportModal = function(id) {
+    var modal = document.getElementById(id);
+    if (modal) {
+        if (modal.parentElement !== document.body) {
+            document.body.appendChild(modal);
+        }
+        modal.style.display = 'flex';
+    }
+};
+window.closeImportModal = function(id) {
+    var modal = document.getElementById(id);
+    if (modal) modal.style.display = 'none';
+};
+document.addEventListener('DOMContentLoaded', function() {
+    var modal = document.getElementById('modal-import-prestasi');
+    if (modal) {
+        modal.addEventListener('click', function(e) {
+            if (e.target === this) closeImportModal('modal-import-prestasi');
+        });
+    }
+});
+</script>
 @endsection

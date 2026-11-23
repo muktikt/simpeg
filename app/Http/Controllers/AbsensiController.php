@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use App\Http\Controllers\Concerns\HandlesExcelImport;
 
 class AbsensiController extends Controller
 {
+    use HandlesExcelImport;
     /**
      * Data presensi terintegrasi langsung dengan database Supabase (tabel attendance).
      * Data pegawai ditarik dari PegawaiController yang membaca tabel pegawai.
@@ -265,6 +267,159 @@ class AbsensiController extends Controller
             'bulanList' => self::BULAN,
             'rekap' => $rekap,
         ]);
+    }
+
+    /**
+     * Unduh Template Excel / CSV Absensi Pegawai.
+     */
+    public function downloadTemplate(Request $request)
+    {
+        $bulan = (int) $request->get('bulan', now()->month);
+        $tahun = (int) $request->get('tahun', now()->year);
+        $hariKerjaDefault = (int) cache()->get('simpeg_hari_kerja', 25);
+        $bulanNama = self::BULAN[$bulan] ?? 'Bulan_' . $bulan;
+
+        $pegawaiList = $this->pegawaiList();
+        $filename = "Template_Absensi_Pegawai_{$bulanNama}_{$tahun}.csv";
+
+        $headers = [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+            'Pragma' => 'no-cache',
+            'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
+            'Expires' => '0',
+        ];
+
+        $columns = ['NO', 'NIK', 'NAMA', 'HARI KERJA', 'HADIR', 'SAKIT', 'IZIN', 'ALPHA', 'KETERANGAN'];
+
+        $callback = function () use ($columns, $pegawaiList, $hariKerjaDefault) {
+            $handle = fopen('php://output', 'w');
+            fputs($handle, "\xEF\xBB\xBF"); // UTF-8 BOM
+            fputcsv($handle, $columns);
+
+            $no = 1;
+            foreach ($pegawaiList as $p) {
+                fputcsv($handle, [
+                    $no++,
+                    $p['nik'] ?? '',
+                    $p['nama'] ?? '',
+                    $hariKerjaDefault,
+                    $hariKerjaDefault, // Default hadir = hari kerja
+                    0, // Sakit
+                    0, // Izin
+                    0, // Alpha
+                    '-', // Keterangan
+                ]);
+            }
+            fclose($handle);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
+
+    /**
+     * Impor Data Absensi dari File Excel (.xlsx / .csv).
+     */
+    public function importExcel(Request $request)
+    {
+        @ini_set('max_execution_time', '0');
+        @ini_set('memory_limit', '512M');
+        @set_time_limit(0);
+
+        $request->validate([
+            'file_excel' => 'required|file|max:10240',
+            'bulan'      => 'required|integer|between:1,12',
+            'tahun'      => 'required|integer|min:2020|max:2100',
+            'mode'       => 'nullable|in:update,skip',
+        ]);
+
+        $bulan = (int) $request->input('bulan');
+        $tahun = (int) $request->input('tahun');
+        $mode = $request->input('mode', 'update');
+        $bulanLabel = self::BULAN[$bulan] ?? "Bulan {$bulan}";
+        $fullBulanLabel = "{$bulanLabel} {$tahun}";
+
+        $rows = $this->readUploadedRows($request->file('file_excel'));
+        if (empty($rows)) {
+            return back()->with('error', 'Gagal membaca isi file atau file kosong. Pastikan format sesuai template.');
+        }
+
+        $headerMap = $this->extractHeaderMap($rows);
+        if (! $headerMap || ! isset($headerMap['nik'])) {
+            return back()->with('error', 'Header kolom NIK tidak ditemukan dalam file. Gunakan template yang disediakan.');
+        }
+
+        // Cari indeks kolom pendukung
+        $colNik = $headerMap['nik'];
+        $colHadir = $headerMap['hadir'] ?? null;
+        $colSakit = $headerMap['sakit'] ?? null;
+        $colIzin = $headerMap['izin'] ?? null;
+        $colAlpha = $headerMap['alpha'] ?? null;
+
+        // Ambil mapping NIK -> UUID pegawai
+        $pegawaiDbMap = \Illuminate\Support\Facades\DB::table('pegawai')->pluck('id', 'nik')->all();
+
+        // Ambil data attendance yang sudah ada di bulan & tahun ini
+        $existingRows = \Illuminate\Support\Facades\DB::table('attendance')
+            ->where('bulan', $bulan)
+            ->where('tahun', $tahun)
+            ->get()
+            ->keyBy('pegawai_id');
+
+        $importedCount = 0;
+        $updatedCount = 0;
+        $now = now();
+
+        foreach ($rows as $r) {
+            $rawNik = (string) ($r[$colNik] ?? '');
+            $nik = $this->normalizeNik($rawNik, $pegawaiDbMap);
+            if (empty($nik)) {
+                continue;
+            }
+
+            $dbPegId = $pegawaiDbMap[$nik] ?? ($pegawaiDbMap['TEMP' . $nik] ?? null);
+            if (! $dbPegId) {
+                continue;
+            }
+
+            $hadir = $colHadir !== null ? (int) preg_replace('/[^0-9]/', '', (string)($r[$colHadir] ?? '0')) : 0;
+            $sakit = $colSakit !== null ? (int) preg_replace('/[^0-9]/', '', (string)($r[$colSakit] ?? '0')) : 0;
+            $izin = $colIzin !== null ? (int) preg_replace('/[^0-9]/', '', (string)($r[$colIzin] ?? '0')) : 0;
+            $alpha = $colAlpha !== null ? (int) preg_replace('/[^0-9]/', '', (string)($r[$colAlpha] ?? '0')) : 0;
+
+            if ($existingRows->has($dbPegId)) {
+                if ($mode === 'update') {
+                    $existing = $existingRows->get($dbPegId);
+                    \Illuminate\Support\Facades\DB::table('attendance')
+                        ->where('id', $existing->id)
+                        ->update([
+                            'tahun'       => $tahun,
+                            'bulan'       => $bulan,
+                            'bulan_label' => $fullBulanLabel,
+                            'hadir'       => $hadir,
+                            'telat'       => $alpha,
+                            'izin'        => $izin + $sakit,
+                            'updated_at'  => $now,
+                        ]);
+                    $updatedCount++;
+                }
+            } else {
+                \Illuminate\Support\Facades\DB::table('attendance')->insert([
+                    'pegawai_id'  => $dbPegId,
+                    'tahun'       => $tahun,
+                    'bulan'       => $bulan,
+                    'bulan_label' => $fullBulanLabel,
+                    'hadir'       => $hadir,
+                    'telat'       => $alpha,
+                    'izin'        => $izin + $sakit,
+                    'created_at'  => $now,
+                ]);
+                $importedCount++;
+            }
+        }
+
+        return redirect()->route('absensi.index', ['bulan' => $bulan, 'tahun' => $tahun])
+            ->with('success', "Proses impor selesai! {$importedCount} data baru ditambahkan, {$updatedCount} data diperbarui untuk periode {$fullBulanLabel}.");
     }
 
     protected function validateData(Request $request): array

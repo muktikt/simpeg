@@ -88,13 +88,18 @@
 
     <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
         @if ($gaji->contains('bisa_approve', true))
-            <form action="{{ route('gaji-proses.terbitkan-semua') }}" method="POST" onsubmit="return confirmSubmit(event, 'Apakah Anda yakin ingin Menerbitkan / Menyetujui Semua Gaji periode ini ke tahap berikutnya?', 'Konfirmasi Persetujuan Massal', 'info', 'Ya, Terbitkan Semua');" style="margin:0;">
+            @php
+                $userNik = (string) session('simpeg_user.nik', '');
+                $isDirut = ($userNik === (string) config('simpeg_approval.dirut', '1711001'));
+                $btnMassText = $isDirut ? 'TERBITKAN FINAL SEMUA' : 'SETUJUI SEMUA (KE ' . ($userNik === (string) config('simpeg_approval.dirum', '1711002') ? 'DIRUT' : 'DIRUM') . ')';
+            @endphp
+            <form action="{{ route('gaji-proses.terbitkan-semua') }}" method="POST" onsubmit="return confirmSubmit(event, 'Apakah Anda yakin ingin menyetujui semua gaji periode ini ke tahap berikutnya?', 'Konfirmasi Persetujuan', 'info', 'Ya, Setujui Semua');" style="margin:0;">
                 @csrf
                 <input type="hidden" name="bulan" value="{{ $bulan }}">
                 <input type="hidden" name="tahun" value="{{ $tahun }}">
                 <button type="submit" class="btn btn-success" style="padding:9px 18px; font-weight:700; font-size:13px; box-shadow:0 4px 12px rgba(39, 174, 96, 0.25);">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="margin-right:6px;"><path d="M20 6L9 17l-5-5"/></svg>
-                    TERBITKAN SEMUA
+                    {{ $btnMassText }}
                 </button>
             </form>
         @endif

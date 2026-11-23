@@ -1352,7 +1352,19 @@ class GajiProsesController extends Controller
         $localData[] = $validated;
         $this->save($localData);
 
-        return redirect()->route('gaji-proses.index', ['bulan' => $validated['bulan'], 'tahun' => $validated['tahun']])
+        // Hapus cache statistik dashboard agar selalu akurat & sinkron
+        \Illuminate\Support\Facades\Cache::forget('simpeg_dashboard_exec_stats');
+        \Illuminate\Support\Facades\Cache::forget('simpeg_dashboard_stats');
+
+        $redirectParams = [
+            'bulan' => $validated['bulan'],
+            'tahun' => $validated['tahun'],
+        ];
+        if (!empty($validated['kategori'])) {
+            $redirectParams['kategori'] = $validated['kategori'];
+        }
+
+        return redirect()->route('gaji-proses.index', $redirectParams)
             ->with('success', 'Proses gaji untuk '.$validated['nama'].' berhasil disimpan dan masuk ke antrean approval.');
     }
 
@@ -1360,6 +1372,13 @@ class GajiProsesController extends Controller
     {
         $gaji = $this->findItem($id);
         abort_if(! $gaji, 404);
+
+        $userLevel = (string) session('simpeg_user.userlevel', '');
+        $userNik = (string) session('simpeg_user.nik', '');
+        if ($userLevel === '5') {
+            abort_if(($gaji['nik'] ?? '') !== $userNik, 403, 'Anda tidak berhak melihat slip gaji pegawai lain.');
+            abort_unless(in_array(strtolower($gaji['status'] ?? ''), ['terbit', 'diterbitkan', 'y', 'final']), 403, 'Slip gaji periode ini belum diterbitkan dan masih dalam proses persetujuan.');
+        }
 
         $gaji['bisa_approve'] = $this->canUserApprove($gaji['status'] ?? 'draft');
 
@@ -1546,6 +1565,10 @@ class GajiProsesController extends Controller
             $this->save($updated);
         }
 
+        // Hapus cache statistik dashboard agar langsung update saat disetujui / terbit
+        \Illuminate\Support\Facades\Cache::forget('simpeg_dashboard_exec_stats');
+        \Illuminate\Support\Facades\Cache::forget('simpeg_dashboard_stats');
+
         return $nextStatus;
     }
 
@@ -1609,7 +1632,12 @@ class GajiProsesController extends Controller
             $this->save($filtered);
         }
 
-        $params = array_filter(['bulan' => $bulan, 'tahun' => $tahun]);
+        // Hapus cache statistik dashboard
+        \Illuminate\Support\Facades\Cache::forget('simpeg_dashboard_exec_stats');
+        \Illuminate\Support\Facades\Cache::forget('simpeg_dashboard_stats');
+
+        $kategori = $request->input('kategori', $row['kategori'] ?? null);
+        $params = array_filter(['bulan' => $bulan, 'tahun' => $tahun, 'kategori' => $kategori]);
 
         return redirect()->route('gaji-proses.index', $params)->with('success', 'Draft proses gaji berhasil dihapus.');
     }

@@ -427,6 +427,15 @@ class InsentifController extends Controller
             abort(404, 'Data slip insentif tidak ditemukan.');
         }
 
+        $userLogin = session('simpeg_user') ?? [];
+        $isPegawai = ((string) ($userLogin['userlevel'] ?? '') === '5') || request('my');
+        if ($isPegawai && ! empty($userLogin['nik']) && (string) ($payroll->p_nik ?? '') !== (string) $userLogin['nik']) {
+            abort(403, 'Anda tidak berhak melihat data pegawai lain.');
+        }
+        if ($isPegawai && ! in_array(strtolower($payroll->status ?? ''), ['terbit', 'diterbitkan', 'y', 'final'])) {
+            abort(403, 'Slip insentif untuk periode ini belum diterbitkan.');
+        }
+
         $item = $this->formatRowToInsentif($payroll, (int) $payroll->bulan, (int) $payroll->tahun);
         $userLogin = session('simpeg_user') ?? [];
 

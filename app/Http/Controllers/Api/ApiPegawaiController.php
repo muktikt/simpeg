@@ -337,7 +337,12 @@ class ApiPegawaiController extends Controller
             return response()->json(['success' => false, 'message' => 'Pegawai tidak ditemukan.'], 404);
         }
 
-        $payroll = DB::table('payroll')->where('pegawai_id', $pegawai->id)->orderByDesc('created_at')->first();
+        $payroll = DB::table('payroll')
+            ->where('pegawai_id', $pegawai->id)
+            ->whereIn(DB::raw('LOWER(status)'), ['terbit', 'diterbitkan'])
+            ->orderByDesc('tahun')
+            ->orderByDesc('bulan')
+            ->first();
         if ($payroll) {
             $prefix = sprintf('%04d-%02d', (int) ($payroll->tahun ?? now()->year), (int) ($payroll->bulan ?? now()->month));
             $monthPadded = str_pad((int) ($payroll->bulan ?? now()->month), 2, '0', STR_PAD_LEFT);
@@ -1013,6 +1018,7 @@ class ApiPegawaiController extends Controller
             try {
                 $payrollRows = DB::table('payroll')
                     ->where('pegawai_id', $pegawai->id)
+                    ->whereIn(DB::raw('LOWER(status)'), ['terbit', 'diterbitkan'])
                     ->where('lembur', '>', 0)
                     ->orderByDesc('tahun')
                     ->orderByDesc('bulan')

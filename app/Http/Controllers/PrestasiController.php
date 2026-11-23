@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use App\Http\Controllers\Concerns\HandlesExcelImport;
 
 class PrestasiController extends Controller
 {
+    use HandlesExcelImport;
     /**
      * Modul Set Prestasi Kerja Bulanan & Sinkronisasi Lembur.
      * Terhubung langsung dengan tabel prestasi dan lembur di database Supabase PostgreSQL.
@@ -395,6 +397,215 @@ class PrestasiController extends Controller
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::warning('Sync prestasi lembur failed: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Unduh Template Excel / CSV Prestasi Pegawai.
+     */
+    public function downloadTemplate(Request $request)
+    {
+        $bulan = (int) $request->get('bulan', now()->month);
+        $tahun = (int) $request->get('tahun', now()->year);
+        $bulanNama = AbsensiController::BULAN[$bulan] ?? 'Bulan_' . $bulan;
+        $tglDefault = sprintf('%04d-%02d-01', $tahun, $bulan);
+
+        $pegawaiList = $this->pegawaiList();
+        $filename = "Template_Prestasi_Pegawai_{$bulanNama}_{$tahun}.csv";
+
+        $headers = [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+            'Pragma' => 'no-cache',
+            'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
+            'Expires' => '0',
+        ];
+
+        $columns = [
+            'NO', 'NIK', 'NAMA', 'TANGGAL', 'KARYA', 'ABSENSI', 'JAM LEMBUR',
+            'ALPHA', 'IZIN KET', 'IZIN NON KET', 'SAKIT KET', 'SAKIT NON KET',
+            'DINAS LUAR', 'CUTI', 'KETERANGAN CUTI'
+        ];
+
+        $callback = function () use ($columns, $pegawaiList, $tglDefault) {
+            $handle = fopen('php://output', 'w');
+            fputs($handle, "\xEF\xBB\xBF");
+            fputcsv($handle, $columns);
+
+            $no = 1;
+            foreach ($pegawaiList as $p) {
+                fputcsv($handle, [
+                    $no++,
+                    $p['nik'] ?? '',
+                    $p['nama'] ?? '',
+                    $tglDefault,
+                    40,  // Karya %
+                    60,  // Absensi %
+                    0,   // Jam Lembur
+                    0,   // Alpha
+                    0,   // Izin Ket
+                    0,   // Izin Non Ket
+                    0,   // Sakit Ket
+                    0,   // Sakit Non Ket
+                    0,   // Dinas Luar
+                    0,   // Cuti
+                    '-', // Keterangan Cuti
+                ]);
+            }
+            fclose($handle);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
+
+    /**
+     * Impor Data Prestasi dari File Excel (.xlsx / .csv).
+     */
+    public function importExcel(Request $request)
+    {
+        @ini_set('max_execution_time', '0');
+        @ini_set('memory_limit', '512M');
+        @set_time_limit(0);
+
+        $request->validate([
+            'file_excel' => 'required|file|max:10240',
+            'bulan'      => 'required|integer|between:1,12',
+            'tahun'      => 'required|integer|min:2020|max:2100',
+            'mode'       => 'nullable|in:update,skip',
+        ]);
+
+        $bulan = (int) $request->input('bulan');
+        $tahun = (int) $request->input('tahun');
+        $mode = $request->input('mode', 'update');
+        $prefix = sprintf('%04d-%02d', $tahun, $bulan);
+        $monthPadded = str_pad($bulan, 2, '0', STR_PAD_LEFT);
+        $bulanNama = AbsensiController::BULAN[$bulan] ?? "Bulan {$bulan}";
+        $fullBulanLabel = "{$bulanNama} {$tahun}";
+
+        $rows = $this->readUploadedRows($request->file('file_excel'));
+        if (empty($rows)) {
+            return back()->with('error', 'Gagal membaca isi file atau file kosong. Pastikan format sesuai template.');
+        }
+
+        $headerMap = $this->extractHeaderMap($rows);
+        if (! $headerMap || ! isset($headerMap['nik'])) {
+            return back()->with('error', 'Header kolom NIK tidak ditemukan dalam file. Gunakan template yang disediakan.');
+        }
+
+        $colNik = $headerMap['nik'];
+        $colTanggal = $headerMap['tanggal'] ?? null;
+        $colKarya = $headerMap['karya'] ?? null;
+        $colAbsensi = $headerMap['absensi'] ?? null;
+        $colJamLembur = $headerMap['jam_lembur'] ?? ($headerMap['lembur'] ?? null);
+        $colAlpha = $headerMap['alpha'] ?? null;
+        $colIzinKet = $headerMap['izin_ket'] ?? null;
+        $colIzinNonKet = $headerMap['izin_non_ket'] ?? null;
+        $colSakitKet = $headerMap['sakit_ket'] ?? null;
+        $colSakitNonKet = $headerMap['sakit_non_ket'] ?? null;
+        $colDinasLuar = $headerMap['dinas_luar'] ?? null;
+        $colCuti = $headerMap['cuti'] ?? null;
+        $colKetCuti = $headerMap['keterangan_cuti'] ?? ($headerMap['alasan_cuti'] ?? null);
+
+        $pegawaiDbMap = \Illuminate\Support\Facades\DB::table('pegawai')->pluck('id', 'nik')->all();
+
+        // Ambil data prestasi yang sudah ada di bulan & tahun ini
+        $existingRows = \Illuminate\Support\Facades\DB::table('prestasi')
+            ->where(function ($q) use ($prefix, $tahun, $bulan, $monthPadded) {
+                $q->where('tanggal', 'like', "$prefix%")
+                  ->orWhere('tanggal', 'like', "%$tahun-$monthPadded-%")
+                  ->orWhere('tanggal', 'like', "%$tahun-$bulan-%");
+            })
+            ->get()
+            ->keyBy('pegawai_id');
+
+        $importedCount = 0;
+        $updatedCount = 0;
+        $now = now();
+
+        foreach ($rows as $r) {
+            $rawNik = (string) ($r[$colNik] ?? '');
+            $nik = $this->normalizeNik($rawNik, $pegawaiDbMap);
+            if (empty($nik)) {
+                continue;
+            }
+
+            $dbPegId = $pegawaiDbMap[$nik] ?? ($pegawaiDbMap['TEMP' . $nik] ?? null);
+            if (! $dbPegId) {
+                continue;
+            }
+
+            $tglVal = $colTanggal !== null ? trim((string)($r[$colTanggal] ?? '')) : '';
+            if (empty($tglVal) || !strtotime($tglVal)) {
+                $tglVal = sprintf('%04d-%02d-01', $tahun, $bulan);
+            } else {
+                $tglVal = date('Y-m-d', strtotime($tglVal));
+            }
+
+            $karya = $colKarya !== null ? trim((string)($r[$colKarya] ?? '40')) : '40';
+            $absensi = $colAbsensi !== null ? trim((string)($r[$colAbsensi] ?? '60')) : '60';
+            $jamLembur = $colJamLembur !== null ? (float) preg_replace('/[^0-9.]/', '', (string)($r[$colJamLembur] ?? '0')) : 0.0;
+            $nominalLembur = (int) round($jamLembur * self::RATE_LEMBUR_PER_JAM);
+
+            $alpha = $colAlpha !== null ? (int) preg_replace('/[^0-9]/', '', (string)($r[$colAlpha] ?? '0')) : 0;
+            $izinKet = $colIzinKet !== null ? (int) preg_replace('/[^0-9]/', '', (string)($r[$colIzinKet] ?? '0')) : 0;
+            $izinNonKet = $colIzinNonKet !== null ? (int) preg_replace('/[^0-9]/', '', (string)($r[$colIzinNonKet] ?? '0')) : 0;
+            $sakitKet = $colSakitKet !== null ? (int) preg_replace('/[^0-9]/', '', (string)($r[$colSakitKet] ?? '0')) : 0;
+            $sakitNonKet = $colSakitNonKet !== null ? (int) preg_replace('/[^0-9]/', '', (string)($r[$colSakitNonKet] ?? '0')) : 0;
+            $dinasLuar = $colDinasLuar !== null ? (int) preg_replace('/[^0-9]/', '', (string)($r[$colDinasLuar] ?? '0')) : 0;
+            $cuti = $colCuti !== null ? (int) preg_replace('/[^0-9]/', '', (string)($r[$colCuti] ?? '0')) : 0;
+            $alasanCuti = $colKetCuti !== null ? trim((string)($r[$colKetCuti] ?? '-')) : '-';
+
+            $meta = [
+                'desc' => "Karya: {$karya}, Absensi: {$absensi}" . ($jamLembur > 0 ? ", Lembur: {$jamLembur} jam (Rp " . number_format($nominalLembur, 0, ',', '.') . ")" : ''),
+                'karya' => $karya,
+                'absensi' => $absensi,
+                'jam_lembur' => $jamLembur,
+                'nominal_lembur' => $nominalLembur,
+                'alpha' => $alpha,
+                'izin_ket' => $izinKet,
+                'izin_non_ket' => $izinNonKet,
+                'sakit_ket' => $sakitKet,
+                'sakit_non_ket' => $sakitNonKet,
+                'dinas_luar' => $dinasLuar,
+                'cuti' => $cuti,
+                'alasan_cuti' => $alasanCuti,
+            ];
+
+            if ($existingRows->has($dbPegId)) {
+                if ($mode === 'update') {
+                    $existing = $existingRows->get($dbPegId);
+                    \Illuminate\Support\Facades\DB::table('prestasi')
+                        ->where('id', $existing->id)
+                        ->update([
+                            'judul'      => $karya,
+                            'tanggal'    => $tglVal,
+                            'keterangan' => json_encode($meta),
+                            'tingkat'    => $absensi,
+                            'updated_at' => $now,
+                        ]);
+                    $updatedCount++;
+                }
+            } else {
+                \Illuminate\Support\Facades\DB::table('prestasi')->insert([
+                    'pegawai_id' => $dbPegId,
+                    'judul'      => $karya,
+                    'tanggal'    => $tglVal,
+                    'keterangan' => json_encode($meta),
+                    'tingkat'    => $absensi,
+                    'created_at' => $now,
+                ]);
+                $importedCount++;
+            }
+
+            // Sinkronisasi otomatis lembur ke tabel lembur & payroll
+            static::syncPrestasiLemburToTables($dbPegId, $jamLembur, $nominalLembur, $tglVal);
+        }
+
+        \Illuminate\Support\Facades\Cache::forget('simpeg_all_pegawai_list');
+        \Illuminate\Support\Facades\Cache::forget('pegawai_master_cache');
+        \Illuminate\Support\Facades\Cache::forget('simpeg_dashboard_stats');
+
+        return redirect()->route('prestasi.index')
+            ->with('success', "Proses impor selesai! {$importedCount} data prestasi baru ditambahkan, {$updatedCount} diperbarui untuk periode {$fullBulanLabel}.");
     }
 
     protected function validateData(Request $request): array

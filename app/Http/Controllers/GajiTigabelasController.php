@@ -690,6 +690,13 @@ class GajiTigabelasController extends Controller
 
         abort_if(! $gaji13, 404);
 
+        $userLevel = (string) session('simpeg_user.userlevel', '');
+        $userNik = (string) session('simpeg_user.nik', '');
+        if ($userLevel === '5') {
+            abort_if(($gaji13['nik'] ?? '') !== $userNik, 403, 'Anda tidak berhak melihat slip Gaji 13 pegawai lain.');
+            abort_unless(in_array(strtolower($gaji13['status'] ?? ''), ['terbit', 'diterbitkan', 'y', 'final']), 403, 'Slip Gaji 13 periode ini belum diterbitkan.');
+        }
+
         $gaji13['bisa_approve'] = $this->canUserApprove($gaji13['status'] ?? 'draft');
         $pemecahan = self::hitungPemecahanGaji13($gaji13);
         $format = $request->get('format', 'tpendidikan');

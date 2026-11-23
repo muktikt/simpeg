@@ -28,7 +28,10 @@ class ApprovalController extends Controller
         $isDirut = ($userNik === $dirutNik);
         $isKeu   = ($userLevel === 2 || $userRole === 2 || $userNik === $keuanganNik);
 
-        $selectedStatus = strtolower(trim((string) $request->query('status', 'all')));
+        $selectedStatus = strtolower(trim((string) $request->query('status', '')));
+        if ($selectedStatus === '') {
+            $selectedStatus = $isKeu ? 'all' : 'pending';
+        }
         $pending = [];
 
         // 1. Gaji Bulanan
@@ -433,9 +436,22 @@ class ApprovalController extends Controller
         } elseif ($sort === 'nama_desc') {
             $filtered = $filtered->sortByDesc('nama', SORT_NATURAL | SORT_FLAG_CASE)->values();
         } else {
-            // Default terbaru: ID/tanggal entri terbesar di atas
-            $filtered = $filtered->sortByDesc(function ($item) {
-                return ($item['tgl_potongan'] ?? ($item['tahun'] ?? '')) . '_' . str_pad((string)($item['id'] ?? 0), 10, '0', STR_PAD_LEFT);
+            // Default terbaru: Prioritaskan berkas yang butuh persetujuan (can_approve = true) di paling atas,
+            // lalu urutkan berdasarkan tanggal & ID terbaru
+            $filtered = $filtered->sort(function ($a, $b) {
+                $aCanApprove = !empty($a['can_approve']) ? 1 : 0;
+                $bCanApprove = !empty($b['can_approve']) ? 1 : 0;
+                if ($aCanApprove !== $bCanApprove) {
+                    return $bCanApprove <=> $aCanApprove;
+                }
+
+                $aTime = !empty($a['tgl_potongan']) ? $a['tgl_potongan'] : (sprintf('%04d-%02d-01', $a['tahun'] ?? now()->year, $a['bulan'] ?? 1));
+                $bTime = !empty($b['tgl_potongan']) ? $b['tgl_potongan'] : (sprintf('%04d-%02d-01', $b['tahun'] ?? now()->year, $b['bulan'] ?? 1));
+
+                $aKey = $aTime . '_' . str_pad((string)($a['id'] ?? 0), 10, '0', STR_PAD_LEFT);
+                $bKey = $bTime . '_' . str_pad((string)($b['id'] ?? 0), 10, '0', STR_PAD_LEFT);
+
+                return strcmp($bKey, $aKey);
             })->values();
         }
 
