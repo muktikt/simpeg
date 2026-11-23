@@ -60,14 +60,16 @@ class LoginController extends Controller
                 $passwordValid = true;
             }
         }
-        // Fallback pra-produksi: jika password cocok langsung dengan NIK atau default 'password'
-        if (! $passwordValid && ($request->password === (string) $pegawai->nik || $request->password === 'password')) {
-            $passwordValid = true;
-            try {
-                DB::table('pegawai')->where('id', $pegawai->id)->update([
-                    'password' => password_hash($request->password, PASSWORD_BCRYPT),
-                ]);
-            } catch (\Throwable $e) {}
+        // Fallback pra-produksi: HANYA aktif pada environment local development
+        if (! $passwordValid && app()->environment('local')) {
+            if ($request->password === (string) $pegawai->nik || $request->password === 'password') {
+                $passwordValid = true;
+                try {
+                    DB::table('pegawai')->where('id', $pegawai->id)->update([
+                        'password' => password_hash($request->password, PASSWORD_BCRYPT),
+                    ]);
+                } catch (\Throwable $e) {}
+            }
         }
 
         if (! $passwordValid) {

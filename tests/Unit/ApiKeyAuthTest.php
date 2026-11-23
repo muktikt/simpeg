@@ -13,10 +13,28 @@ class ApiKeyAuthTest extends TestCase
     private const OLD_LEAKED_SECRET = '431279a3be9ed0e670f1ef6df48a4b0983299e664906c0c11444c37a468a537f';
     private const CURRENT_SECRET = 'test-current-simpeg-jwt-secret';
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        if (! \Illuminate\Support\Facades\Schema::hasTable('pegawai')) {
+            \Illuminate\Support\Facades\Schema::create('pegawai', function ($table) {
+                $table->id();
+                $table->string('nik')->nullable();
+                $table->string('name')->nullable();
+                $table->string('role')->nullable();
+            });
+        }
+        \Illuminate\Support\Facades\DB::table('pegawai')->updateOrInsert(
+            ['nik' => 'test-nip'],
+            ['name' => 'Test User', 'role' => 'admin']
+        );
+    }
+
     private function craftJwt(string $secret, int $expiresInSeconds = 3600): string
     {
         $header = rtrim(strtr(base64_encode(json_encode(['alg' => 'HS256', 'typ' => 'JWT'])), '+/', '-_'), '=');
-        $payload = rtrim(strtr(base64_encode(json_encode(['sub' => 'test-nip', 'exp' => time() + $expiresInSeconds])), '+/', '-_'), '=');
+        $payload = rtrim(strtr(base64_encode(json_encode(['sub' => 'test-nip', 'nik' => 'test-nip', 'exp' => time() + $expiresInSeconds])), '+/', '-_'), '=');
         $signature = rtrim(strtr(base64_encode(hash_hmac('sha256', "$header.$payload", $secret, true)), '+/', '-_'), '=');
 
         return "$header.$payload.$signature";

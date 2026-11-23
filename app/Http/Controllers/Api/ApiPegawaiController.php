@@ -114,14 +114,16 @@ class ApiPegawaiController extends Controller
                 $passwordValid = true;
             }
         }
-        // Fallback pra-produksi: jika password cocok langsung dengan NIK atau 'password'
-        if (! $passwordValid && ($request->password === (string) $pegawai->nik || $request->password === 'password')) {
-            $passwordValid = true;
-            try {
-                DB::table('pegawai')->where('id', $pegawai->id)->update([
-                    'password' => password_hash($request->password, PASSWORD_BCRYPT),
-                ]);
-            } catch (\Throwable $e) {}
+        // Fallback pra-produksi: HANYA aktif pada environment local development
+        if (! $passwordValid && app()->environment('local')) {
+            if ($request->password === (string) $pegawai->nik || $request->password === 'password') {
+                $passwordValid = true;
+                try {
+                    DB::table('pegawai')->where('id', $pegawai->id)->update([
+                        'password' => password_hash($request->password, PASSWORD_BCRYPT),
+                    ]);
+                } catch (\Throwable $e) {}
+            }
         }
 
         if (! $passwordValid) {
@@ -994,6 +996,46 @@ class ApiPegawaiController extends Controller
      */
     public function getCuti(Request $request)
     {
+        $authUser = $request->attributes->get('auth_user');
+        $userLevel = (string) ($authUser->userlevel ?? $authUser->role ?? '5');
+        $dbRole = strtolower($authUser->role ?? '');
+        $isPrivileged = in_array($userLevel, ['1', '7']) || in_array($dbRole, ['sdm', 'admin', 'direktur']);
+
+        // Jika pimpinan/SDM meminta daftar semua cuti bawahan
+        if ($isPrivileged && ($request->query('all') === '1' || $request->query('scope') === 'all')) {
+            $data = DB::table('pengajuan_cuti')
+                ->leftJoin('pegawai', 'pengajuan_cuti.pegawai_id', '=', 'pegawai.id')
+                ->select(
+                    'pengajuan_cuti.*',
+                    'pegawai.nik as pegawai_nik',
+                    'pegawai.name as nama_lengkap',
+                    'pegawai.unit_kerja'
+                )
+                ->orderByDesc('pengajuan_cuti.created_at')
+                ->get()
+                ->map(function ($row) {
+                    return [
+                        'id' => $row->id,
+                        'pegawai_id' => (string) $row->pegawai_id,
+                        'nama_pegawai' => $row->nama_lengkap ?? $row->nama_pegawai ?? 'Pegawai',
+                        'nik' => $row->pegawai_nik ?? '-',
+                        'unit_kerja' => $row->unit_kerja ?? '-',
+                        'jenis' => strtolower($row->jenis ?? 'izin'),
+                        'tanggal_mulai' => $row->tanggal_mulai,
+                        'tanggal_selesai' => $row->tanggal_selesai,
+                        'alasan' => $row->alasan ?? '-',
+                        'status' => strtolower($row->status ?? 'menunggu'),
+                        'created_at' => $row->created_at,
+                    ];
+                });
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Seluruh data pengajuan cuti berhasil diambil',
+                'data' => $data,
+            ]);
+        }
+
         $pegawai = $this->getPegawaiByRequest($request);
         if ($resp = $this->checkPegawaiAccess($pegawai)) {
             return $resp;
@@ -1008,6 +1050,50 @@ class ApiPegawaiController extends Controller
             'success' => true,
             'message' => 'Data pengajuan cuti berhasil diambil',
             'data' => $data,
+        ]);
+    }
+
+    /**
+     * Update Status Pengajuan Cuti (Approval / Reject oleh SDM atau Direktur)
+     */
+    public function updateCutiStatus(Request $request, $id)
+    {
+        $authUser = $request->attributes->get('auth_user');
+        if (! $authUser) {
+            return response()->json(['success' => false, 'message' => 'Autentikasi gagal: Sesi tidak valid.'], 401);
+        }
+
+        $userLevel = (string) ($authUser->userlevel ?? $authUser->role ?? '5');
+        $dbRole = strtolower($authUser->role ?? '');
+        $isPrivileged = in_array($userLevel, ['1', '7']) || in_array($dbRole, ['sdm', 'admin', 'direktur']);
+
+        if (! $isPrivileged) {
+            return response()->json(['success' => false, 'message' => 'Akses ditolak: Anda tidak memiliki wewenang menyetujui cuti.'], 403);
+        }
+
+        $request->validate([
+            'status' => 'required|string',
+        ]);
+
+        $statusInput = strtoupper(trim($request->status));
+        $normalizedStatus = match ($statusInput) {
+            'DISETUJUI', 'APPROVED' => 'DISETUJUI',
+            'DITOLAK', 'REJECTED' => 'DITOLAK',
+            default => 'PENDING',
+        };
+
+        $affected = DB::table('pengajuan_cuti')->where('id', $id)->update([
+            'status' => $normalizedStatus,
+            'updated_at' => now(),
+        ]);
+
+        if (! $affected) {
+            return response()->json(['success' => false, 'message' => 'Pengajuan cuti tidak ditemukan.'], 404);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => "Pengajuan cuti berhasil diubah menjadi {$normalizedStatus}.",
         ]);
     }
 
@@ -1280,6 +1366,46 @@ class ApiPegawaiController extends Controller
      */
     public function pengaduan(Request $request)
     {
+        $authUser = $request->attributes->get('auth_user');
+        $userLevel = (string) ($authUser->userlevel ?? $authUser->role ?? '5');
+        $dbRole = strtolower($authUser->role ?? '');
+        $divisiKadiv = $authUser->divisi_kadiv ?? null;
+        $isManager = in_array($userLevel, ['1', '7']) || in_array($dbRole, ['sdm', 'admin', 'direktur', 'kspi', 'kadiv', 'kadivkategori', 'tpdpk']);
+
+        // Jika peran manajerial meminta kotak masuk kasus (scope=role atau tab=masuk)
+        if ($isManager && ($request->query('scope') === 'role' || $request->query('tab') === 'masuk')) {
+            $query = DB::table('pengaduan_pegawai')
+                ->select(
+                    'pengaduan_pegawai.*',
+                    DB::raw("(SELECT keterangan FROM riwayat_status_pengaduan WHERE pengaduan_id = pengaduan_pegawai.id AND keterangan IS NOT NULL AND TRIM(keterangan) != '' ORDER BY id DESC LIMIT 1) as keterangan_terakhir")
+                );
+
+            if ($dbRole === 'kadiv' || $dbRole === 'kadivkategori') {
+                $divisiLabel = ($divisiKadiv === 'teknik') ? 'Pelanggaran Teknik' : 'Pelanggaran Administrasi';
+                $query->where(function ($q) use ($divisiLabel) {
+                    $q->whereIn('status', ['menungguKadiv', 'menungguVerifikasiKadiv'])
+                        ->where('kategori', $divisiLabel)
+                        ->orWhere('status', 'investigasiBerjalan');
+                });
+            } elseif ($dbRole === 'kspi') {
+                $query->whereIn('status', ['reviewKspi', 'telaahAwalKspi', 'menungguPilihEksekutor', 'hasilInvestigasiMasuk']);
+            } elseif ($dbRole === 'direktur') {
+                $query->whereIn('status', ['disposisiDirutTahap1', 'putusanDirutTahap2']);
+            } elseif ($dbRole === 'tpdpk') {
+                $query->where('status', 'investigasiBerjalan');
+            } elseif ($dbRole === 'sdm' || $userLevel === '1') {
+                $query->whereIn('status', ['sdmPemberianSanksi', 'tindakLanjutSdm', 'selesai', 'menungguSdm']);
+            }
+
+            $data = $query->orderByDesc('created_at')->get();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Kotak masuk pengaduan peran berhasil diambil',
+                'data' => $data,
+            ]);
+        }
+
         $pegawai = $this->getPegawaiByRequest($request);
         if ($resp = $this->checkPegawaiAccess($pegawai)) {
             return $resp;

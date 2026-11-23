@@ -10,8 +10,8 @@ use App\Http\Controllers\Api\ApiPegawaiController;
 */
 
 Route::prefix('v1')->group(function () {
-    // 1. Auth API Publik
-    Route::post('/login', [ApiPegawaiController::class, 'login']);
+    // 1. Auth API Publik (dilindungi Rate Limiter / Throttling)
+    Route::post('/login', [ApiPegawaiController::class, 'login'])->middleware('throttle:5,1');
 
     // 2. Seluruh Endpoint Operasional Wajib Terautentikasi Token Pegawai
     Route::middleware('api.key')->group(function () {
@@ -41,6 +41,7 @@ Route::prefix('v1')->group(function () {
         // Pengajuan Cuti & Lembur
         Route::get('/cuti', [ApiPegawaiController::class, 'getCuti']);
         Route::post('/cuti', [ApiPegawaiController::class, 'storeCuti']);
+        Route::put('/cuti/{id}/status', [ApiPegawaiController::class, 'updateCutiStatus']);
         Route::get('/lembur', [ApiPegawaiController::class, 'getLembur']);
         Route::get('/payroll/lembur', [ApiPegawaiController::class, 'getLembur']);
         Route::post('/lembur', [ApiPegawaiController::class, 'storeLembur']);
