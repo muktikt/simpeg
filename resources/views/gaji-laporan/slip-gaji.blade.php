@@ -53,8 +53,28 @@
 
     @else
         <div class="table-card" style="padding: 40px; text-align: center; margin-top: 16px;">
-            <div class="table-empty">Belum ada data slip gaji yang terbit untuk Anda pada {{ $bulanNama }} {{ $tahun }}. Silakan pilih bulan/tahun lain di atas.</div>
+            <div class="table-empty" style="font-size:14px; color:#64748B;">
+                Belum ada data slip gaji yang terbit untuk Anda pada periode <strong>{{ $bulanNama }} {{ $tahun }}</strong>.<br>
+                <span style="font-size:12.5px; color:#94A3B8;">(Gaji periode ini masih dalam proses entri / persetujuan berjenjang oleh SDM dan Direksi).</span>
+            </div>
         </div>
+
+        @if (!empty($riwayatGaji) && count($riwayatGaji) > 0)
+            <div class="panel" style="max-width:840px; margin:24px auto 32px;">
+                <h3 style="margin-bottom:14px; font-size:15px;">Riwayat Gaji Bulan Sebelumnya (Sudah Terbit)</h3>
+                <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(240px, 1fr)); gap:10px;">
+                    @foreach ($riwayatGaji as $rw)
+                        @php
+                            $rwBulan = \App\Http\Controllers\AbsensiController::BULAN[$rw['bulan']] ?? $rw['bulan'];
+                        @endphp
+                        <a href="{{ route('gaji-proses.show', $rw['id']) }}" style="display:flex; justify-content:space-between; align-items:center; padding:12px 14px; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:10px; text-decoration:none;" onmouseover="this.style.background='#F1F5F9'" onmouseout="this.style.background='#F8FAFC'">
+                            <span style="font-weight:600; color:#334155; font-size:13px;">{{ $rwBulan }} {{ $rw['tahun'] }}</span>
+                            <span style="font-weight:700; color:#059669; font-size:13.5px;">Rp {{ number_format($rw['gaji_bersih'], 0, ',', '.') }}</span>
+                        </a>
+                    @endforeach
+                </div>
+            </div>
+        @endif
     @endif
 
 @else

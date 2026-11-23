@@ -80,6 +80,8 @@ Route::middleware(['simpeg.auth'])->group(function () {
     Route::prefix('absensi')->name('absensi.')->middleware(['simpeg.auth:1'])->group(function () {
         Route::get('/', [AbsensiController::class, 'index'])->name('index');
         Route::get('/laporan', [AbsensiController::class, 'laporan'])->name('laporan');
+        Route::get('/template', [AbsensiController::class, 'downloadTemplate'])->name('template');
+        Route::post('/import', [AbsensiController::class, 'importExcel'])->name('import');
         Route::get('/create', [AbsensiController::class, 'create'])->name('create');
         Route::post('/', [AbsensiController::class, 'store'])->name('store');
         Route::get('/{id}/edit', [AbsensiController::class, 'edit'])->whereNumber('id')->name('edit');
@@ -133,6 +135,8 @@ Route::middleware(['simpeg.auth'])->group(function () {
     Route::prefix('prestasi')->name('prestasi.')->middleware(['simpeg.auth:1'])->group(function () {
         Route::get('/', [PrestasiController::class, 'index'])->name('index');
         Route::get('/laporan', [PrestasiController::class, 'laporan'])->name('laporan');
+        Route::get('/template', [PrestasiController::class, 'downloadTemplate'])->name('template');
+        Route::post('/import', [PrestasiController::class, 'importExcel'])->name('import');
         Route::get('/create', [PrestasiController::class, 'create'])->name('create');
         Route::post('/', [PrestasiController::class, 'store'])->name('store');
         Route::get('/{id}/edit', [PrestasiController::class, 'edit'])->whereNumber('id')->name('edit');
@@ -356,6 +360,10 @@ Route::middleware(['simpeg.auth'])->group(function () {
 
         Route::middleware(['simpeg.auth:1,5'])->group(function () {
             Route::get('/lembur', [GajiLaporanController::class, 'lembur'])->name('lembur');
+        });
+        Route::middleware(['simpeg.auth:1'])->group(function () {
+            Route::get('/lembur/template', [GajiLaporanController::class, 'downloadTemplateLembur'])->name('lembur.template');
+            Route::post('/lembur/import', [GajiLaporanController::class, 'importExcelLembur'])->name('lembur.import');
         });
 
         Route::middleware(['simpeg.auth:1,2'])->group(function () {

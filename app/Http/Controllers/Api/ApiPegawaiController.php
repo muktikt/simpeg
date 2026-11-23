@@ -410,13 +410,50 @@ class ApiPegawaiController extends Controller
             return $resp;
         }
 
-        $payrolls = DB::table('payroll')
-            ->where('pegawai_id', $pegawai->id)
-            ->orderByDesc('tahun')
-            ->orderByDesc('bulan')
-            ->get();
+        $bulanReq = $request->filled('bulan') ? (int) $request->bulan : (int) now()->month;
+        $tahunReq = $request->filled('tahun') ? (int) $request->tahun : (int) now()->year;
 
-        foreach ($payrolls as $payroll) {
+        $payroll = DB::table('payroll')
+            ->where('pegawai_id', $pegawai->id)
+            ->where('bulan', $bulanReq)
+            ->where('tahun', $tahunReq)
+            ->whereIn(DB::raw('LOWER(status)'), ['terbit', 'diterbitkan'])
+            ->first();
+
+        $bulanNames = [
+            1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
+            5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
+            9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember',
+        ];
+        $namaBulan = $bulanNames[$bulanReq] ?? ('Bulan ' . $bulanReq);
+
+        if (! $payroll) {
+            $pendingPayroll = DB::table('payroll')
+                ->where('pegawai_id', $pegawai->id)
+                ->where('bulan', $bulanReq)
+                ->where('tahun', $tahunReq)
+                ->first();
+
+            $msg = $pendingPayroll
+                ? "Slip gaji periode $namaBulan $tahunReq masih dalam proses verifikasi & approval berjenjang."
+                : "Belum ada slip gaji yang diterbitkan untuk periode $namaBulan $tahunReq.";
+
+            return response()->json([
+                'success' => false,
+                'message' => $msg,
+                'data' => [
+                    'nik' => $pegawai->nik,
+                    'nama' => $pegawai->name,
+                    'jabatan' => $pegawai->jabatan,
+                    'bulan' => $bulanReq,
+                    'tahun' => $tahunReq,
+                    'status_proses' => $pendingPayroll ? ($pendingPayroll->status ?? 'draft') : null,
+                    'payroll' => null,
+                ],
+            ]);
+        }
+
+        if ($payroll) {
             $prefix = sprintf('%04d-%02d', (int) ($payroll->tahun ?? now()->year), (int) ($payroll->bulan ?? now()->month));
             $monthPadded = str_pad((int) ($payroll->bulan ?? now()->month), 2, '0', STR_PAD_LEFT);
             try {
@@ -441,16 +478,21 @@ class ApiPegawaiController extends Controller
             } catch (\Throwable $e) {}
         }
 
-        $latest = $payrolls->first();
+        $payrolls = DB::table('payroll')
+            ->where('pegawai_id', $pegawai->id)
+            ->whereIn(DB::raw('LOWER(status)'), ['terbit', 'diterbitkan'])
+            ->orderByDesc('tahun')
+            ->orderByDesc('bulan')
+            ->get();
 
         return response()->json([
             'success' => true,
-            'message' => $latest ? 'Data slip gaji berhasil diambil' : 'Belum ada slip gaji yang diterbitkan.',
+            'message' => 'Data slip gaji berhasil diambil',
             'data' => [
                 'nik' => $pegawai->nik,
                 'nama' => $pegawai->name,
                 'jabatan' => $pegawai->jabatan,
-                'payroll' => $latest,
+                'payroll' => $payroll,
                 'history' => $payrolls,
             ],
         ]);
@@ -466,20 +508,40 @@ class ApiPegawaiController extends Controller
             return $resp;
         }
 
+        $tahunReq = $request->filled('tahun') ? (int) $request->tahun : (int) now()->year;
+
+        $thr = DB::table('thr')
+            ->where('pegawai_id', $pegawai->id)
+            ->where('tahun', $tahunReq)
+            ->whereIn(DB::raw('LOWER(status)'), ['terbit', 'diterbitkan'])
+            ->first();
+
+        if (! $thr) {
+            return response()->json([
+                'success' => false,
+                'message' => "Belum ada slip THR yang diterbitkan untuk tahun $tahunReq.",
+                'data' => [
+                    'nik' => $pegawai->nik,
+                    'nama' => $pegawai->name,
+                    'tahun' => $tahunReq,
+                    'thr' => null,
+                ],
+            ]);
+        }
+
         $thrs = DB::table('thr')
             ->where('pegawai_id', $pegawai->id)
+            ->whereIn(DB::raw('LOWER(status)'), ['terbit', 'diterbitkan'])
             ->orderByDesc('tahun')
             ->get();
 
-        $latest = $thrs->first();
-
         return response()->json([
             'success' => true,
-            'message' => $latest ? 'Data slip THR berhasil diambil' : 'Belum ada slip THR yang diterbitkan.',
+            'message' => 'Data slip THR berhasil diambil',
             'data' => [
                 'nik' => $pegawai->nik,
                 'nama' => $pegawai->name,
-                'thr' => $latest,
+                'thr' => $thr,
                 'history' => $thrs,
             ],
         ]);
@@ -563,7 +625,13 @@ class ApiPegawaiController extends Controller
             return $resp;
         }
 
-        $gaji13 = DB::table('gaji_13')->where('pegawai_id', $pegawai->id)->orderByDesc('tahun')->first();
+        $tahunReq = $request->filled('tahun') ? (int) $request->tahun : (int) now()->year;
+
+        $gaji13 = DB::table('gaji_13')
+            ->where('pegawai_id', $pegawai->id)
+            ->where('tahun', $tahunReq)
+            ->whereIn(DB::raw('LOWER(status)'), ['terbit', 'diterbitkan'])
+            ->first();
 
         $pemecahan = null;
         if ($gaji13) {
@@ -1307,6 +1375,7 @@ class ApiPegawaiController extends Controller
             try {
                 $payrollRows = DB::table('payroll')
                     ->where('pegawai_id', $pegawai->id)
+                    ->whereIn(DB::raw('LOWER(status)'), ['terbit', 'diterbitkan'])
                     ->where('lembur', '>', 0)
                     ->orderByDesc('tahun')
                     ->orderByDesc('bulan')

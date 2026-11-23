@@ -74,7 +74,7 @@ class DashboardController extends Controller
                 $payrollBulanIni = DB::table('payroll')
                     ->where('tahun', $tahunIni)
                     ->where('bulan', $bulanIni)
-                    ->where('status', 'DITERBITKAN')
+                    ->whereIn(DB::raw('LOWER(status)'), ['terbit', 'diterbitkan', 'final', 'y'])
                     ->count();
 
                 if ($payrollBulanIni > 0) {
@@ -247,7 +247,12 @@ class DashboardController extends Controller
                     $divisiKadiv = $peg->divisi_kadiv ?? $divisiKadiv;
 
                     if ($dbRole === 'direktur' || in_array($nik, ['1711001', '1711002', '1711003'])) {
-                        $userRole = 'dirut';
+                        $userRole = match ($nik) {
+                            '1711001' => 'dirut',
+                            '1711002' => 'dirum',
+                            '1711003' => 'dirtek',
+                            default => 'dirut',
+                        };
                         $userLevel = '7';
                     } elseif ($dbRole === 'kspi' && $nik === '1711161') {
                         $userRole = 'kspi';
@@ -368,8 +373,9 @@ class DashboardController extends Controller
     public function getExecutiveStats(): array
     {
         return Cache::remember('simpeg_dashboard_exec_stats', 60, function () {
-            // 1. Data Finansial Penggajian Terakhir
+            // 1. Data Finansial Penggajian Terakhir (Hanya yang Resmi Terbit / Final, bukan Draft)
             $latestPayroll = DB::table('payroll')
+                ->whereIn(DB::raw('LOWER(status)'), ['terbit', 'diterbitkan', 'final', 'y'])
                 ->select('tahun', 'bulan', 'status', DB::raw('count(*) as count'), DB::raw('sum(gapok) as tot_gapok'), DB::raw('sum(total_pendapatan) as tot_bruto'), DB::raw('sum(total_potongan) as tot_potongan'), DB::raw('sum(gaji_bersih) as tot_bersih'))
                 ->groupBy('tahun', 'bulan', 'status')
                 ->orderByDesc('tahun')
@@ -380,8 +386,9 @@ class DashboardController extends Controller
             $tahunPayroll = $latestPayroll->tahun ?? now()->year;
             $namaBulanPayroll = \App\Http\Controllers\AbsensiController::BULAN[$bulanPayroll] ?? ('Bulan ' . $bulanPayroll);
 
-            // Trend Realisasi Payroll (sampai 12 bulan terakhir)
+            // Trend Realisasi Payroll (sampai 12 bulan terakhir - Hanya yang Resmi Terbit)
             $trendPayroll = DB::table('payroll')
+                ->whereIn(DB::raw('LOWER(status)'), ['terbit', 'diterbitkan', 'final', 'y'])
                 ->select('tahun', 'bulan', DB::raw('count(*) as count'), DB::raw('sum(total_pendapatan) as bruto'), DB::raw('sum(total_potongan) as potongan'), DB::raw('sum(gaji_bersih) as bersih'))
                 ->groupBy('tahun', 'bulan')
                 ->orderBy('tahun')
@@ -399,9 +406,10 @@ class DashboardController extends Controller
                     ];
                 })->values()->toArray();
 
-            // Total YTD Belanja Gaji Tahun Berjalan
+            // Total YTD Belanja Gaji Tahun Berjalan (Hanya yang Resmi Terbit)
             $ytdPayroll = DB::table('payroll')
                 ->where('tahun', $tahunPayroll)
+                ->whereIn(DB::raw('LOWER(status)'), ['terbit', 'diterbitkan', 'final', 'y'])
                 ->select(DB::raw('sum(total_pendapatan) as ytd_bruto'), DB::raw('sum(gaji_bersih) as ytd_bersih'), DB::raw('sum(total_potongan) as ytd_potongan'))
                 ->first();
 
@@ -464,6 +472,10 @@ class DashboardController extends Controller
             $pendingCutiCount = DB::table('pengajuan_cuti')->whereRaw("LOWER(status) = 'pending'")->count();
             $pendingPotonganCount = DB::table('potongan_keu')->whereIn('status', ['dirum', 'kepegawaian'])->count();
             $pendingWbsCount = DB::table('pengaduan_pegawai')->whereIn('status', ['menungguDirutTahap1', 'menungguDirutTahap2'])->count();
+            $pendingPayrollCount = 0;
+            try {
+                $pendingPayrollCount = DB::table('payroll')->whereIn(DB::raw('LOWER(status)'), ['kepegawaian', 'dirum'])->count();
+            } catch (\Throwable $e) {}
 
             $pendingCutiList = DB::table('pengajuan_cuti')
                 ->leftJoin('pegawai', 'pengajuan_cuti.pegawai_id', '=', 'pegawai.id')
@@ -523,10 +535,11 @@ class DashboardController extends Controller
                 'golongan' => $golGroups,
                 'unit_kerja' => $unitKerjaStats,
                 'approvals' => [
-                    'total_pending' => $pendingCutiCount + $pendingPotonganCount + $pendingWbsCount,
+                    'total_pending' => $pendingCutiCount + $pendingPotonganCount + $pendingWbsCount + $pendingPayrollCount,
                     'cuti_count' => $pendingCutiCount,
                     'potongan_count' => $pendingPotonganCount,
                     'wbs_count' => $pendingWbsCount,
+                    'payroll_count' => $pendingPayrollCount,
                     'recent_cuti' => $pendingCutiList,
                 ],
             ];

@@ -50,8 +50,8 @@ trait HasApprovalChain
             return true;
         }
 
-        // Admin SDM (role 1) berhak mengesahkan tahap awal (kepegawaian)
-        if ($stage === 'kepegawaian' && (session('simpeg_user.userlevel') === '1' || session('simpeg_role') == 1)) {
+        // Approver yang berhak mengesahkan tahap awal (kepegawaian): hanya NIK yang ditunjuk (Heddy Kelana)
+        if ($stage === 'kepegawaian' && ($userNik === $expectedNik || $userNik === (string) config('simpeg_approval.kepegawaian', '1711254'))) {
             return true;
         }
 

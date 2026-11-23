@@ -512,6 +512,13 @@ class ThrController extends Controller
 
         abort_if(! $thr, 404);
 
+        $userLevel = (string) session('simpeg_user.userlevel', '');
+        $userNik = (string) session('simpeg_user.nik', '');
+        if ($userLevel === '5') {
+            abort_if(($thr['nik'] ?? '') !== $userNik, 403, 'Anda tidak berhak melihat slip THR pegawai lain.');
+            abort_unless(in_array(strtolower($thr['status'] ?? ''), ['terbit', 'diterbitkan', 'y', 'final']), 403, 'Slip THR periode ini belum diterbitkan.');
+        }
+
         $thr['bisa_approve'] = $this->canUserApprove($thr['status'] ?? 'draft');
 
         return view('thr.show', [
