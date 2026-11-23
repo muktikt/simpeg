@@ -299,6 +299,7 @@ class GajiProsesController extends Controller
             'total_pendapatan' => $totalPendapatan,
             'total_potongan' => $totalPotongan,
             'gaji_bersih' => $gajiBersih,
+            'is_minus' => ($gajiBersih < 0),
         ];
     }
 
@@ -326,10 +327,29 @@ class GajiProsesController extends Controller
         return null;
     }
 
-    protected function pegawaiList(): array
+    protected function pegawaiList(?string $kategori = null): array
     {
-        // Pegawai berstatus Pensiun (PN) tidak ditampilkan di dropdown pilih pegawai.
-        return collect(app(PegawaiController::class)->all())->where('status_peg', '!=', 'PN')->values()->all();
+        $all = collect(app(PegawaiController::class)->all())->where('status_peg', '!=', 'PN');
+        $direksiNiks = ['1711001', '1711002', '1711003'];
+
+        if ($kategori === 'dirut') {
+            return $all->filter(fn ($p) => ($p['nik'] ?? '') === '1711001' || str_contains(strtolower($p['jabatan'] ?? ''), 'direktur utama'))->values()->all();
+        }
+
+        if ($kategori === 'dirum') {
+            return $all->filter(fn ($p) => ($p['nik'] ?? '') === '1711002' || str_contains(strtolower($p['jabatan'] ?? ''), 'direktur umum'))->values()->all();
+        }
+
+        if ($kategori === 'dirtek') {
+            return $all->filter(fn ($p) => ($p['nik'] ?? '') === '1711003' || str_contains(strtolower($p['jabatan'] ?? ''), 'direktur teknik'))->values()->all();
+        }
+
+        if ($kategori === 'all') {
+            return $all->values()->all();
+        }
+
+        // Default / satuan: Jangan satukan direksi dengan pegawai biasa
+        return $all->filter(fn ($p) => !in_array($p['nik'] ?? '', $direksiNiks))->values()->all();
     }
 
     protected function pegawaiById(mixed $id): ?array
@@ -338,7 +358,7 @@ class GajiProsesController extends Controller
             return null;
         }
 
-        $pegawai = collect($this->pegawaiList())->first(function ($p) use ($id) {
+        $pegawai = collect($this->pegawaiList('all'))->first(function ($p) use ($id) {
             return (string) ($p['id'] ?? '') === (string) $id
                 || (string) ($p['db_id'] ?? '') === (string) $id
                 || (string) ($p['nik'] ?? '') === (string) $id;
@@ -431,21 +451,31 @@ class GajiProsesController extends Controller
             };
         }
 
+        $bulan = (int) ($request?->input('bulan') ?: now()->month);
+        $tahun = (int) ($request?->input('tahun') ?: now()->year);
+        $prefix = sprintf('%04d-%02d', $tahun, $bulan);
+        $monthPadded = str_pad($bulan, 2, '0', STR_PAD_LEFT);
+
         $potonganKeu = null;
         if (! empty($pegawai['nik'])) {
             try {
                 $potonganKeu = \Illuminate\Support\Facades\DB::table('potongan_keu')
                     ->where('tipe', 'gaji')
                     ->where('nik', $pegawai['nik'])
+                    ->where('bulan', $bulan)
+                    ->where('tahun', $tahun)
                     ->orderByDesc('id')
                     ->first();
+
+                if (! $potonganKeu) {
+                    $potonganKeu = \Illuminate\Support\Facades\DB::table('potongan_keu')
+                        ->where('tipe', 'gaji')
+                        ->where('nik', $pegawai['nik'])
+                        ->orderByDesc('id')
+                        ->first();
+                }
             } catch (\Throwable $e) {}
         }
-
-        $bulan = (int) ($request?->input('bulan') ?: now()->month);
-        $tahun = (int) ($request?->input('tahun') ?: now()->year);
-        $prefix = sprintf('%04d-%02d', $tahun, $bulan);
-        $monthPadded = str_pad($bulan, 2, '0', STR_PAD_LEFT);
 
         $lemburNominal = 0;
         $jamLembur = 0;
@@ -491,6 +521,405 @@ class GajiProsesController extends Controller
             }
         }
 
+        $kategoriReq = $request?->input('kategori', 'satuan');
+        $nik = $pegawai['nik'] ?? '';
+
+        $isDirut = ($kategoriReq === 'dirut' || $nik === '1711001');
+        $isDirum = ($kategoriReq === 'dirum' || $nik === '1711002');
+        $isDirtek = ($kategoriReq === 'dirtek' || $nik === '1711003');
+        $isDireksi = ($isDirut || $isDirum || $isDirtek);
+
+        // Ambil baseline payroll terakhir pegawai (jika ada) untuk acuan komponen
+        $latestPayroll = null;
+        if ($dbPegId) {
+            try {
+                $latestPayroll = \Illuminate\Support\Facades\DB::table('payroll')
+                    ->where('pegawai_id', $dbPegId)
+                    ->orderByDesc('tahun')
+                    ->orderByDesc('bulan')
+                    ->first();
+            } catch (\Throwable $e) {}
+        }
+
+        $hariKerja = (int) cache()->get('simpeg_hari_kerja', 25);
+        $baseGapok = (int) ($latestPayroll->gapok ?? 3000000);
+        $baseJabatan = (int) ($latestPayroll->tunjangan_jabatan ?? 0);
+        $baseTransport = (int) (($latestPayroll && (int) $latestPayroll->tunjangan_transportasi > 0) ? $latestPayroll->tunjangan_transportasi : ($hariKerja * 12000));
+        $basePerumahan = (int) ($latestPayroll->tunjangan_perumahan ?? 400000);
+        $basePrestasi = (int) (($latestPayroll && (int) $latestPayroll->tunjangan_prestasi > 0) ? $latestPayroll->tunjangan_prestasi : 200000);
+        $baseDapenma = (int) ($latestPayroll->potongan_dapenma ?? 0);
+        $baseKorpri = (int) ($latestPayroll->potongan_korpri ?? 0);
+
+        // 1. Auto-tarik Potongan DAPENMA dari master Dapenma (beban 5% dari PHDP)
+        $dapenmaParticipant = null;
+        try {
+            $dapenmaAll = app(DapenmaController::class)->all();
+            $dapenmaParticipant = collect($dapenmaAll)->first(function ($d) use ($pegawai, $nik, $dbPegId) {
+                return (!empty($d['nik']) && (string) $d['nik'] === (string) $nik)
+                    || (!empty($d['pegawai_id']) && (string) $d['pegawai_id'] === (string) ($pegawai['id'] ?? ''))
+                    || (!empty($d['pegawai_id']) && (string) $d['pegawai_id'] === (string) $dbPegId);
+            });
+        } catch (\Throwable $e) {}
+
+        $nominalDapenmaMaster = null;
+        if ($dapenmaParticipant) {
+            $phdp = (float) ($dapenmaParticipant['nominal_phdp'] ?? 0);
+            $nominalDapenmaMaster = (int) round($dapenmaParticipant['nominal_beban'] ?? ($phdp * 0.05));
+        }
+
+        if ($nominalDapenmaMaster !== null) {
+            $baseDapenma = $nominalDapenmaMaster;
+        }
+
+        // 2. Auto-tarik Potongan SANKSI dari modul Sanksi & SK Sanksi
+        $sanksiInfo = null;
+        $potonganSanksiNominal = 0;
+        $sanksiPersen = 0;
+
+        // Cek SK Sanksi Resmi
+        try {
+            $skRow = \Illuminate\Support\Facades\DB::table('sk_sanksi')
+                ->where(function ($q) use ($dbPegId, $nik) {
+                    if ($dbPegId) $q->where('pegawai_id', $dbPegId);
+                    if ($nik) $q->orWhere('nik', $nik);
+                })
+                ->where(function ($q) use ($bulan, $tahun, $prefix, $monthPadded) {
+                    $q->where('tanggal_berlaku', 'like', "$prefix%")
+                      ->orWhere('tanggal_berlaku', 'like', "%$tahun-$monthPadded-%")
+                      ->orWhere('tanggal_berlaku', 'like', "%$tahun-$bulan-%");
+                })
+                ->orderByDesc('id')
+                ->first();
+
+            if ($skRow) {
+                $sanksiInfo = [
+                    'tipe' => 'sk_sanksi',
+                    'nomor_sk' => $skRow->nomor_sk ?? '-',
+                    'jenis_sanksi' => $skRow->jenis_sanksi ?? 'Sanksi Disiplin',
+                    'tingkat' => $skRow->tingkat ?? 'Sedang',
+                    'nominal_penurunan_gaji' => (int) ($skRow->nominal_penurunan_gaji ?? 0),
+                    'ringkasan' => $skRow->ringkasan_pelanggaran ?? '',
+                ];
+                if (!empty($skRow->nominal_penurunan_gaji) && (int) $skRow->nominal_penurunan_gaji > 0) {
+                    $potonganSanksiNominal += (int) $skRow->nominal_penurunan_gaji;
+                }
+            }
+        } catch (\Throwable $e) {}
+
+        // Cek data sanksi di tabel sanksi (SanksiController)
+        try {
+            $sRows = \Illuminate\Support\Facades\DB::table('sanksi')
+                ->where(function ($q) use ($dbPegId) {
+                    if ($dbPegId) $q->where('pegawai_id', $dbPegId);
+                })
+                ->orderByDesc('id')
+                ->get();
+
+            foreach ($sRows as $sr) {
+                $tglStr = $sr->tanggal ?? ($sr->created_at ?? '');
+                $matchedDate = false;
+                try {
+                    $parsedDate = \Illuminate\Support\Carbon::parse($tglStr);
+                    if ($parsedDate->month === $bulan && $parsedDate->year === $tahun) {
+                        $matchedDate = true;
+                    }
+                } catch (\Throwable $e) {}
+
+                if ($matchedDate) {
+                    if (!$sanksiInfo) {
+                        $sanksiInfo = [
+                            'tipe' => 'sanksi',
+                            'jenis_sanksi' => $sr->jenis_sanksi ?? 'Sanksi Pegawai',
+                            'tingkat' => $sr->tingkat ?? 'Sedang',
+                            'ringkasan' => $sr->keterangan ?? '',
+                        ];
+                    }
+                    $potPersen = (float) ($sr->pot_persen ?? 0);
+                    if ($potPersen > 0) {
+                        $sanksiPersen = max($sanksiPersen, $potPersen);
+                    }
+                }
+            }
+        } catch (\Throwable $e) {}
+
+        $potonganSanksiFinal = $potonganSanksiNominal;
+        if ($sanksiPersen > 0) {
+            $potonganSanksiFinal += (int) round(($baseGapok / 100) * $sanksiPersen);
+        }
+
+        // Data Penalti Kehadiran (modul SDM: prestasi) & Keterlambatan (modul SDM: attendance)
+        $alpha = 0;
+        $izinKet = 0;
+        $izinNonKet = 0;
+        $sakitKet = 0;
+        $sakitNonKet = 0;
+        $karyaScore = 50;
+        $absensiScore = 50;
+
+        if (isset($pRow) && $pRow) {
+            $pMeta = json_decode($pRow->keterangan ?? '{}', true) ?: [];
+            $alpha = (int) ($pMeta['alpha'] ?? 0);
+            $izinKet = (int) ($pMeta['izin_ket'] ?? 0);
+            $izinNonKet = (int) ($pMeta['izin_non_ket'] ?? 0);
+            $sakitKet = (int) ($pMeta['sakit_ket'] ?? 0);
+            $sakitNonKet = (int) ($pMeta['sakit_non_ket'] ?? 0);
+            $karyaScore = is_numeric($pMeta['karya'] ?? null) ? (float) $pMeta['karya'] : 50;
+            $absensiScore = is_numeric($pMeta['absensi'] ?? null) ? (float) $pMeta['absensi'] : 50;
+        }
+
+        // Cek keterlambatan di tabel attendance
+        $telat = 0;
+        if ($dbPegId) {
+            try {
+                $attRow = \Illuminate\Support\Facades\DB::table('attendance')
+                    ->where('pegawai_id', $dbPegId)
+                    ->where('bulan', $bulan)
+                    ->where('tahun', $tahun)
+                    ->first();
+                if ($attRow) {
+                    $telat = (int) ($attRow->telat ?? 0);
+                }
+            } catch (\Throwable $e) {}
+        }
+
+        // Rumus Simpeg Lama (proses_cek_gaji_satuan.php:804-844):
+        // 1. Penalti Kehadiran (Alpha: 10%, Izin Ket: 5%, Izin Non Ket: 8%, Sakit Ket: 1%, Sakit Non Ket: 3%)
+        $persenPenaltiKehadiran = ($alpha * 0.10) + ($izinKet * 0.05) + ($izinNonKet * 0.08) + ($sakitKet * 0.01) + ($sakitNonKet * 0.03);
+
+        // 2. Penalti Keterlambatan (Telat: 3% per kali)
+        $persenPenaltiTelat = ($telat * 0.03);
+
+        // 3. Potongan Tunjangan Transportasi:
+        $potTransport = (int) round($baseTransport * $persenPenaltiKehadiran);
+        $calcTransport = max(0, $baseTransport - $potTransport);
+
+        // 4. Kalkulasi Tunjangan Prestasi:
+        $ubahPersen = ($karyaScore + $absensiScore) / 100;
+        $skorPrestasi = $ubahPersen - ($persenPenaltiTelat + $persenPenaltiKehadiran);
+
+        // Aturan Ambang Batas 30%:
+        // Jika total skor prestasi <= 0.3 (30%), tunjangan prestasi hangus = Rp 0!
+        if ($skorPrestasi > 0.3) {
+            $calcPrestasi = (int) round($basePrestasi * $skorPrestasi);
+        } else {
+            $calcPrestasi = 0;
+        }
+        $potPrestasi = max(0, $basePrestasi - $calcPrestasi);
+
+        $gapokDireksi = null;
+        $tunjTransportDireksi = null;
+        $tunjIstriDireksi = null;
+        $tunjAnakDireksi = null;
+        $tunjBpjstkDireksi = null;
+        $tunjBpjskesDireksi = null;
+        $potBpjstkDireksi = null;
+        $potBpjskesDireksi = null;
+        $autoKomponen = [];
+
+        if ($isDireksi) {
+            $baseNonDireksi = $this->getBasePendapatanNonDireksi($bulan, $tahun);
+            $gapokDirut = floor(($baseNonDireksi + 4000000) * 4);
+
+            if ($isDirum || $isDirtek) {
+                // Cek apakah Dirut sudah punya gapok di payroll periode ini
+                $dirutGapokCurrent = \Illuminate\Support\Facades\DB::table('payroll')
+                    ->join('pegawai', 'payroll.pegawai_id', '=', 'pegawai.id')
+                    ->where('pegawai.nik', '1711001')
+                    ->where('payroll.bulan', $bulan)
+                    ->where('payroll.tahun', $tahun)
+                    ->value('payroll.gapok');
+                if ($dirutGapokCurrent && (float) $dirutGapokCurrent > 0) {
+                    $gapokDirut = (float) $dirutGapokCurrent;
+                }
+                $gapokDireksi = floor($gapokDirut * 0.9);
+            } else {
+                $gapokDireksi = $gapokDirut;
+            }
+
+            $tunjIstriDireksi = $kawin ? floor($gapokDireksi * 0.10) : 0;
+            $tunjAnakDireksi = floor($gapokDireksi * 0.05 * $jmlAnakTunjangan);
+            $tunjTransportDireksi = floor($gapokDireksi * 0.25);
+            $tunjBpjstkDireksi = round($gapokDireksi * 0.0689);
+
+            $laporGajiBpjs = $gapokDireksi + $tunjIstriDireksi + $tunjAnakDireksi;
+            $laporBpjsnya = min($laporGajiBpjs, 12000000);
+            $tunjBpjskesDireksi = round($laporBpjsnya * 0.04);
+
+            $potBpjstkDireksi = round($gapokDireksi * 0.0689 + $gapokDireksi * 0.03);
+            $potBpjskesDireksi = round($laporBpjsnya * 0.05);
+
+            $autoKomponen = [
+                'gapok' => $gapokDireksi,
+                'tunjangan_transport' => $tunjTransportDireksi,
+                'tunjangan_istri' => $tunjIstriDireksi,
+                'tunjangan_anak' => $tunjAnakDireksi,
+                'tunjangan_pangan' => 0,
+                'tunjangan_perumahan' => 0,
+                'tunjangan_jabatan' => 0,
+                'tunjangan_prestasi' => 0,
+                'tunjangan_airminum' => 0,
+                'tunjangan_komunikasi' => 0,
+                'lembur' => 0,
+                'tunjangan_bpjstk' => $tunjBpjstkDireksi,
+                'tunjangan_bpjskes' => $tunjBpjskesDireksi,
+                'potongan_bpjstk' => $potBpjstkDireksi,
+                'potongan_bpjskes' => $potBpjskesDireksi,
+                'potongan_dapenma' => 0,
+                'potongan_korpri' => 0,
+                'potongan_sanksi' => $potonganSanksiFinal,
+            ];
+        } elseif ($kategoriReq === 'capeg') {
+            // Calon Pegawai: Gapok 80%, Tunj. Pangan 80%, Perumahan 0
+            $gapokCapeg = floor($baseGapok * 0.8);
+            $istriCapeg = $kawin ? floor($gapokCapeg * 0.10) : 0;
+            $anakCapeg = floor($gapokCapeg * 0.05 * $jmlAnakTunjangan);
+            $panganCapeg = floor(120000 * ($jmlAnakTunjangan + $jmlIstri + 1) * 0.8);
+
+            // BPJS-TK Capeg (Dasar upah min UMK)
+            $gapokTkCapeg = max($gapokCapeg, 2794237);
+            $tunjBpjstkCapeg = (int) round($gapokTkCapeg * 0.0689);
+            $potBpjstkCapeg = (int) round($gapokTkCapeg * (0.0689 + 0.03));
+
+            // BPJS-Kes Capeg (Dasar upah max 12jt, faktor 80%)
+            $upahLaporKesCapeg = $gapokCapeg + $istriCapeg + $anakCapeg + $panganCapeg;
+            $laporBpjsKesCapeg = min($upahLaporKesCapeg, 12000000);
+            $tunjBpjskesCapeg = (int) round(($laporBpjsKesCapeg * 0.04) * 0.8);
+            $potBpjskesCapeg = (int) round(($laporBpjsKesCapeg * 0.05) * 0.8);
+
+            $autoKomponen = [
+                'gapok' => $gapokCapeg,
+                'tunjangan_istri' => $istriCapeg,
+                'tunjangan_anak' => $anakCapeg,
+                'tunjangan_pangan' => $panganCapeg,
+                'tunjangan_perumahan' => 0,
+                'tunjangan_jabatan' => 0,
+                'tunjangan_prestasi' => 0,
+                'tunjangan_transport' => $calcTransport,
+                'tunjangan_bpjstk' => $tunjBpjstkCapeg,
+                'tunjangan_bpjskes' => $tunjBpjskesCapeg,
+                'lembur' => $lemburNominal,
+                'potongan_bpjstk' => $potBpjstkCapeg,
+                'potongan_bpjskes' => $potBpjskesCapeg,
+                'potongan_dapenma' => 0,
+                'potongan_korpri' => $baseKorpri,
+                'potongan_sanksi' => $potonganSanksiFinal,
+            ];
+        } elseif ($kategoriReq === 'honor') {
+            // Honorer: Tidak ada tunjangan keluarga, pangan, perumahan, prestasi, jabatan, komunikasi
+            $gapokTkHonor = max($baseGapok, 2794237);
+            $tunjBpjstkHonor = (int) round($gapokTkHonor * 0.0689);
+            $potBpjstkHonor = (int) round($gapokTkHonor * (0.0689 + 0.03));
+
+            $laporBpjsKesHonor = min($baseGapok, 12000000);
+            $tunjBpjskesHonor = (int) round($laporBpjsKesHonor * 0.04);
+            $potBpjskesHonor = (int) round($laporBpjsKesHonor * 0.05);
+
+            $autoKomponen = [
+                'gapok' => $baseGapok,
+                'tunjangan_istri' => 0,
+                'tunjangan_anak' => 0,
+                'tunjangan_pangan' => 0,
+                'tunjangan_perumahan' => 0,
+                'tunjangan_jabatan' => 0,
+                'tunjangan_prestasi' => 0,
+                'tunjangan_komunikasi' => 0,
+                'tunjangan_transport' => $calcTransport,
+                'tunjangan_bpjstk' => $tunjBpjstkHonor,
+                'tunjangan_bpjskes' => $tunjBpjskesHonor,
+                'lembur' => $lemburNominal,
+                'potongan_bpjstk' => $potBpjstkHonor,
+                'potongan_bpjskes' => $potBpjskesHonor,
+                'potongan_dapenma' => 0,
+                'potongan_korpri' => 0,
+                'potongan_sanksi' => $potonganSanksiFinal,
+            ];
+        } elseif (in_array($kategoriReq, ['kontrak', 'tt'])) {
+            // Tenaga Kontrak (PKWT) & TT: Tidak ada tunjangan keluarga, pangan, perumahan, prestasi, jabatan
+            $gapokTkKontrak = max($baseGapok, 2794237);
+            $tunjBpjstkKontrak = (int) round($gapokTkKontrak * 0.0689);
+            $potBpjstkKontrak = (int) round($gapokTkKontrak * (0.0689 + 0.03));
+
+            $laporBpjsKesKontrak = min($baseGapok, 12000000);
+            $tunjBpjskesKontrak = (int) round($laporBpjsKesKontrak * 0.04);
+            $potBpjskesKontrak = (int) round($laporBpjsKesKontrak * 0.05);
+
+            $autoKomponen = [
+                'gapok' => $baseGapok,
+                'tunjangan_istri' => 0,
+                'tunjangan_anak' => 0,
+                'tunjangan_pangan' => 0,
+                'tunjangan_perumahan' => 0,
+                'tunjangan_jabatan' => 0,
+                'tunjangan_prestasi' => 0,
+                'tunjangan_komunikasi' => 0,
+                'tunjangan_transport' => $calcTransport,
+                'tunjangan_bpjstk' => $tunjBpjstkKontrak,
+                'tunjangan_bpjskes' => $tunjBpjskesKontrak,
+                'lembur' => $lemburNominal,
+                'potongan_bpjstk' => $potBpjstkKontrak,
+                'potongan_bpjskes' => $potBpjskesKontrak,
+                'potongan_dapenma' => 0,
+                'potongan_korpri' => 0,
+                'potongan_sanksi' => $potonganSanksiFinal,
+            ];
+        } else {
+            // Pegawai Tetap (Satuan)
+            $istriSatuan = $kawin ? round($baseGapok * 0.10) : 0;
+            $anakSatuan = round($baseGapok * 0.02 * $jmlAnakTunjangan);
+            // Pangan Rp 120.000 per jiwa (pegawai + istri + anak maks 2)
+            $panganSatuan = 120000 * ($jmlAnakTunjangan + $jmlIstri + 1);
+
+            // BPJS-TK Satuan (Dasar upah min UMK Indramayu)
+            $gapokTkSatuan = max($baseGapok, 2794237);
+            $tunjBpjstkSatuan = (int) round($gapokTkSatuan * 0.0689);
+            $potBpjstkSatuan = (int) round($gapokTkSatuan * (0.0689 + 0.03));
+
+            // BPJS-Kes Satuan (Dasar upah max 12.000.000)
+            $upahLaporKesSatuan = $baseGapok + $istriSatuan + $anakSatuan + $panganSatuan + $baseJabatan + (int) ($latestPayroll->tunjangan_perusahaan ?? 300000);
+            $laporBpjsKesSatuan = min($upahLaporKesSatuan, 12000000);
+            $tunjBpjskesSatuan = (int) round($laporBpjsKesSatuan * 0.04);
+            $potBpjskesSatuan = (int) round($laporBpjsKesSatuan * 0.05);
+
+            $autoKomponen = [
+                'gapok' => $baseGapok,
+                'tunjangan_istri' => $istriSatuan,
+                'tunjangan_anak' => $anakSatuan,
+                'tunjangan_pangan' => $panganSatuan,
+                'tunjangan_perumahan' => $basePerumahan,
+                'tunjangan_jabatan' => $baseJabatan,
+                'tunjangan_prestasi' => $calcPrestasi,
+                'tunjangan_transport' => $calcTransport,
+                'tunjangan_bpjstk' => $tunjBpjstkSatuan,
+                'tunjangan_bpjskes' => $tunjBpjskesSatuan,
+                'lembur' => $lemburNominal,
+                'potongan_bpjstk' => $potBpjstkSatuan,
+                'potongan_bpjskes' => $potBpjskesSatuan,
+                'potongan_dapenma' => $baseDapenma,
+                'potongan_korpri' => $baseKorpri,
+                'potongan_sanksi' => $potonganSanksiFinal,
+            ];
+        }
+
+        // Hitung Pajak PPh 21 Otomatis (Metode TER & Gross-Up sesuai PP 58/2023 & PMK 168/2023)
+        $brutoSebelumPajak = (float) ($autoKomponen['gapok'] ?? 0)
+            + (float) ($autoKomponen['tunjangan_istri'] ?? 0)
+            + (float) ($autoKomponen['tunjangan_anak'] ?? 0)
+            + (float) ($autoKomponen['tunjangan_pangan'] ?? 0)
+            + (float) ($autoKomponen['tunjangan_perumahan'] ?? 0)
+            + (float) ($autoKomponen['tunjangan_jabatan'] ?? 0)
+            + (float) ($autoKomponen['tunjangan_prestasi'] ?? 0)
+            + (float) ($autoKomponen['tunjangan_transport'] ?? 0)
+            + (float) ($autoKomponen['lembur'] ?? 0)
+            + (float) ($autoKomponen['tunjangan_bpjstk'] ?? 0)
+            + (float) ($autoKomponen['tunjangan_bpjskes'] ?? 0)
+            + (float) ($autoKomponen['tunjangan_airminum'] ?? 0)
+            + (float) ($autoKomponen['tunjangan_komunikasi'] ?? 0);
+
+        $calcPajak = \App\Services\Pph21Calculator::hitungGrossUp($kodePtkp, $brutoSebelumPajak);
+
+        $autoKomponen['tunjangan_pajak'] = $calcPajak['tunjangan_pajak'];
+        $autoKomponen['potongan_pajak'] = $calcPajak['potongan_pajak'];
+
         return [
             'kawin' => $kawin,
             'jml_istri' => $jmlIstri,
@@ -500,9 +929,104 @@ class GajiProsesController extends Controller
             'jml_anak_pajak' => $jmlAnakPajak,
             'kode_ptkp' => $kodePtkp,
             'potongan_keu' => $potonganKeu,
-            'lembur' => $lemburNominal,
-            'jam_lembur' => $jamLembur,
+            'lembur' => $isDireksi ? 0 : $lemburNominal,
+            'jam_lembur' => $isDireksi ? 0 : $jamLembur,
+            'is_direksi' => $isDireksi,
+            'direksi_role' => $isDirut ? 'dirut' : ($isDirum ? 'dirum' : ($isDirtek ? 'dirtek' : null)),
+            'gapok_direksi' => $gapokDireksi,
+            'tunj_transport_direksi' => $tunjTransportDireksi,
+            'tunj_istri_direksi' => $tunjIstriDireksi,
+            'tunj_anak_direksi' => $tunjAnakDireksi,
+            'tunj_bpjstk_direksi' => $tunjBpjstkDireksi,
+            'tunj_bpjskes_direksi' => $tunjBpjskesDireksi,
+            'pot_bpjstk_direksi' => $potBpjstkDireksi,
+            'pot_bpjskes_direksi' => $potBpjskesDireksi,
+            'kategori' => $kategoriReq,
+            'auto_komponen' => $autoKomponen,
+            'info_pajak' => $calcPajak,
+            'info_penalti' => [
+                'has_penalti' => ($persenPenaltiKehadiran > 0 || $persenPenaltiTelat > 0),
+                'alpha' => $alpha,
+                'izin_ket' => $izinKet,
+                'izin_non_ket' => $izinNonKet,
+                'sakit_ket' => $sakitKet,
+                'sakit_non_ket' => $sakitNonKet,
+                'telat' => $telat,
+                'persen_kehadiran' => round($persenPenaltiKehadiran * 100, 1),
+                'persen_telat' => round($persenPenaltiTelat * 100, 1),
+                'skor_prestasi' => round($skorPrestasi * 100, 1),
+                'base_transport' => $baseTransport,
+                'pot_transport' => $potTransport,
+                'calc_transport' => $calcTransport,
+                'base_prestasi' => $basePrestasi,
+                'pot_prestasi' => $potPrestasi,
+                'calc_prestasi' => $calcPrestasi,
+                'prestasi_hangus' => ($skorPrestasi <= 0.3 && $basePrestasi > 0),
+            ],
+            'info_sanksi' => [
+                'has_sanksi' => ($sanksiInfo !== null || $potonganSanksiFinal > 0),
+                'detail' => $sanksiInfo,
+                'persen' => $sanksiPersen,
+                'potongan' => $potonganSanksiFinal,
+            ],
+            'info_dapenma' => [
+                'is_peserta' => ($dapenmaParticipant !== null),
+                'nomor_peserta' => $dapenmaParticipant['nomor_peserta'] ?? null,
+                'nominal_phdp' => (float) ($dapenmaParticipant['nominal_phdp'] ?? 0),
+                'nominal_beban' => $nominalDapenmaMaster ?? $baseDapenma,
+            ],
         ];
+    }
+
+    /**
+     * Mengambil dasar pendapatan tertinggi pegawai non-direksi untuk perhitungan gaji Dirut,
+     * sesuai formula sistem lama: (max_pendapatan_pegawai + 4.000.000) * 4.
+     */
+    protected function getBasePendapatanNonDireksi(int $bulan, int $tahun): float
+    {
+        // 1. Cek payroll KSPI (1711161) pada bulan & tahun tsb
+        $kspi = \Illuminate\Support\Facades\DB::table('payroll')
+            ->join('pegawai', 'payroll.pegawai_id', '=', 'pegawai.id')
+            ->where('pegawai.nik', '1711161')
+            ->where('payroll.bulan', $bulan)
+            ->where('payroll.tahun', $tahun)
+            ->value('payroll.total_pendapatan');
+
+        if ($kspi && (float) $kspi > 0) {
+            return (float) $kspi;
+        }
+
+        // 2. Cek payroll KSPI periode terbaru
+        $kspiLatest = \Illuminate\Support\Facades\DB::table('payroll')
+            ->join('pegawai', 'payroll.pegawai_id', '=', 'pegawai.id')
+            ->where('pegawai.nik', '1711161')
+            ->orderByDesc('payroll.tahun')
+            ->orderByDesc('payroll.bulan')
+            ->value('payroll.total_pendapatan');
+
+        if ($kspiLatest && (float) $kspiLatest > 0) {
+            return (float) $kspiLatest;
+        }
+
+        // 3. Cek max total_pendapatan pegawai non-direksi pada bulan & tahun tsb
+        $maxCurrent = \Illuminate\Support\Facades\DB::table('payroll')
+            ->join('pegawai', 'payroll.pegawai_id', '=', 'pegawai.id')
+            ->whereNotIn('pegawai.nik', ['1711001', '1711002', '1711003'])
+            ->where('payroll.bulan', $bulan)
+            ->where('payroll.tahun', $tahun)
+            ->max('payroll.total_pendapatan');
+
+        if ($maxCurrent && (float) $maxCurrent > 0) {
+            return (float) $maxCurrent;
+        }
+
+        // 4. Fallback: max total_pendapatan non-direksi secara keseluruhan di payroll
+        $maxAny = \Illuminate\Support\Facades\DB::table('payroll')
+            ->join('pegawai', 'payroll.pegawai_id', '=', 'pegawai.id')
+            ->whereNotIn('pegawai.nik', ['1711001', '1711002', '1711003'])
+            ->max('payroll.total_pendapatan');
+
+        return (float) ($maxAny ?: 12400000);
     }
 
     public function index(Request $request)
@@ -516,9 +1040,25 @@ class GajiProsesController extends Controller
             ->where('bulan', $bulan)
             ->where('tahun', $tahun)
             ->when(!empty($kategori), function ($collection) use ($kategori) {
+                if ($kategori === 'satuan') {
+                    return $collection->where('kategori', 'satuan')
+                        ->whereNotIn('nik', ['1711001', '1711002', '1711003']);
+                }
+                if ($kategori === 'dirut') {
+                    return $collection->filter(fn ($r) => ($r['kategori'] ?? '') === 'dirut' || ($r['nik'] ?? '') === '1711001');
+                }
+                if ($kategori === 'dirum') {
+                    return $collection->filter(fn ($r) => ($r['kategori'] ?? '') === 'dirum' || ($r['nik'] ?? '') === '1711002');
+                }
+                if ($kategori === 'dirtek') {
+                    return $collection->filter(fn ($r) => ($r['kategori'] ?? '') === 'dirtek' || ($r['nik'] ?? '') === '1711003');
+                }
                 return $collection->where('kategori', $kategori);
             })
             ->when(!empty($status), function ($collection) use ($status) {
+                if ($status === 'minus') {
+                    return $collection->where('gaji_bersih', '<', 0);
+                }
                 return $collection->where('status', $status);
             })
             ->map(function ($row) {
@@ -542,6 +1082,8 @@ class GajiProsesController extends Controller
             $pageTitle = 'Proses Cek Gaji Dirtek';
         }
 
+        $auditData = $this->getAuditData($bulan, $tahun);
+
         return view('gaji-proses.index', [
             'gaji' => $gaji,
             'bulan' => $bulan,
@@ -550,17 +1092,139 @@ class GajiProsesController extends Controller
             'status' => $status,
             'pageTitle' => $pageTitle,
             'bulanList' => AbsensiController::BULAN,
+            'auditCounts' => [
+                'absensi' => count($auditData['belumAbsensi']),
+                'potongan' => count($auditData['belumPotongan']),
+                'prestasi' => count($auditData['belumPrestasi']),
+                'rekening' => count($auditData['belumRekening']),
+                'minus' => count($auditData['gajiMinus']),
+            ],
         ]);
+    }
+
+    public function audit(Request $request)
+    {
+        $bulan = (int) $request->get('bulan', now()->month);
+        $tahun = (int) $request->get('tahun', now()->year);
+        $tab = $request->get('tab', 'absensi');
+
+        $auditData = $this->getAuditData($bulan, $tahun);
+
+        return view('gaji-proses.audit', [
+            'bulan' => $bulan,
+            'tahun' => $tahun,
+            'tab' => $tab,
+            'bulanList' => AbsensiController::BULAN,
+            'auditData' => $auditData,
+            'counts' => [
+                'absensi' => count($auditData['belumAbsensi']),
+                'potongan' => count($auditData['belumPotongan']),
+                'prestasi' => count($auditData['belumPrestasi']),
+                'rekening' => count($auditData['belumRekening']),
+                'minus' => count($auditData['gajiMinus']),
+            ],
+        ]);
+    }
+
+    public function getAuditData(int $bulan, int $tahun): array
+    {
+        $allPegawai = collect(app(PegawaiController::class)->all())
+            ->where('status_peg', '!=', 'PN')
+            ->values();
+
+        // 1. Absensi Belum Masuk
+        $niksAbsensi = [];
+        try {
+            $niksAbsensi = \Illuminate\Support\Facades\DB::table('attendance')
+                ->where('bulan', $bulan)
+                ->where('tahun', $tahun)
+                ->leftJoin('pegawai', 'attendance.pegawai_id', '=', 'pegawai.id')
+                ->pluck('pegawai.nik')
+                ->filter()
+                ->all();
+        } catch (\Throwable $e) {}
+        $belumAbsensi = $allPegawai->filter(fn ($p) => !in_array($p['nik'] ?? '', $niksAbsensi))->values();
+
+        // 2. Potongan Belum Masuk (tipe = gaji)
+        $niksPotongan = [];
+        try {
+            $niksPotongan = \Illuminate\Support\Facades\DB::table('potongan_keu')
+                ->where('tipe', 'gaji')
+                ->where('bulan', $bulan)
+                ->where('tahun', $tahun)
+                ->pluck('nik')
+                ->filter()
+                ->all();
+        } catch (\Throwable $e) {}
+        $belumPotongan = $allPegawai->filter(fn ($p) => !in_array($p['nik'] ?? '', $niksPotongan))->values();
+
+        // 3. Prestasi Belum Masuk
+        $niksPrestasi = [];
+        try {
+            $niksPrestasi = \Illuminate\Support\Facades\DB::table('prestasi')
+                ->whereMonth('tanggal', $bulan)
+                ->whereYear('tanggal', $tahun)
+                ->leftJoin('pegawai', 'prestasi.pegawai_id', '=', 'pegawai.id')
+                ->pluck('pegawai.nik')
+                ->filter()
+                ->all();
+        } catch (\Throwable $e) {}
+        $belumPrestasi = $allPegawai->filter(fn ($p) => !in_array($p['nik'] ?? '', $niksPrestasi))->values();
+
+        // 4. Rekening Belum Masuk
+        $belumRekening = $allPegawai->filter(fn ($p) => empty($p['rekening']) && empty($p['no_rekening']))->values();
+
+        // 5. Gaji Minus pada periode terpilih
+        $gajiMinus = collect($this->all())
+            ->filter(fn ($r) => ($r['bulan'] ?? 0) === $bulan && ($r['tahun'] ?? 0) === $tahun && ($r['gaji_bersih'] ?? 0) < 0)
+            ->values();
+
+        return [
+            'belumAbsensi' => $belumAbsensi,
+            'belumPotongan' => $belumPotongan,
+            'belumPrestasi' => $belumPrestasi,
+            'belumRekening' => $belumRekening,
+            'gajiMinus' => $gajiMinus,
+        ];
     }
 
     public function create(Request $request)
     {
         $kategori = $request->get('kategori', 'satuan');
 
+        $pegawaiList = $this->pegawaiList($kategori);
+        $kategoriList = self::KATEGORI;
+
+        if ($kategori === 'satuan' || empty($kategori)) {
+            $kategoriList = collect($kategoriList)
+                ->except(['dirut', 'dirum', 'dirtek'])
+                ->all();
+        } elseif (in_array($kategori, ['dirut', 'dirum', 'dirtek'])) {
+            $kategoriList = [
+                $kategori => self::KATEGORI[$kategori] ?? ucfirst($kategori),
+            ];
+        }
+
+        $selectedPegawaiId = null;
+        if (count($pegawaiList) === 1) {
+            $selectedPegawaiId = $pegawaiList[0]['id'];
+        }
+
+        $pageTitle = 'Proses Gaji Pegawai';
+        if ($kategori === 'dirut') {
+            $pageTitle = 'Proses Gaji Direktur Utama';
+        } elseif ($kategori === 'dirum') {
+            $pageTitle = 'Proses Gaji Direktur Umum';
+        } elseif ($kategori === 'dirtek') {
+            $pageTitle = 'Proses Gaji Direktur Teknik';
+        }
+
         return view('gaji-proses.create', [
-            'pegawaiList' => $this->pegawaiList(),
-            'kategoriList' => self::KATEGORI,
+            'pegawaiList' => $pegawaiList,
+            'kategoriList' => $kategoriList,
             'selectedKategori' => $kategori,
+            'selectedPegawaiId' => $selectedPegawaiId,
+            'pageTitle' => $pageTitle,
             'komponenPendapatan' => self::KOMPONEN_PENDAPATAN,
             'komponenPotongan' => self::KOMPONEN_POTONGAN,
             'gapokList' => app(GajiPokokController::class)->all(),
@@ -583,8 +1247,17 @@ class GajiProsesController extends Controller
         $pegawai = $this->pegawaiById($validated['pegawai_id']);
         $keluargaCalc = $this->hitungKeluarga($validated['pegawai_id'], $request);
 
-        // Ambil nominal lembur resmi dari modul Prestasi SDM (bukan dari input manual)
-        $validated['lembur'] = (int) ($keluargaCalc['lembur'] ?? 0);
+        // Ambil nominal lembur resmi dari modul Prestasi SDM (bukan dari input manual), Direksi tidak ada lembur
+        $validated['lembur'] = !empty($keluargaCalc['is_direksi']) ? 0 : (int) ($keluargaCalc['lembur'] ?? 0);
+
+        // Pastikan kategori direksi tersimpan dengan tepat
+        if (($pegawai['nik'] ?? '') === '1711001') {
+            $validated['kategori'] = 'dirut';
+        } elseif (($pegawai['nik'] ?? '') === '1711002') {
+            $validated['kategori'] = 'dirum';
+        } elseif (($pegawai['nik'] ?? '') === '1711003') {
+            $validated['kategori'] = 'dirtek';
+        }
 
         $totalPendapatan = collect(array_keys(self::KOMPONEN_PENDAPATAN))
             ->sum(fn ($key) => (float) ($validated[$key] ?? 0));

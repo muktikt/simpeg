@@ -21,7 +21,10 @@ class PegawaiController extends Controller
 
         $list = \Illuminate\Support\Facades\Cache::remember('simpeg_all_pegawai_list', 120, function () {
             try {
-                $dbPegawai = \Illuminate\Support\Facades\DB::table('pegawai')->select('id', 'nik', 'name', 'gelar', 'jabatan', 'unit_kerja', 'status', 'no_telp', 'alamat')->get();
+                $dbPegawai = \Illuminate\Support\Facades\DB::table('pegawai')
+                    ->select('id', 'nik', 'name', 'gelar', 'jabatan', 'unit_kerja', 'status', 'no_telp', 'alamat')
+                    ->orderBy('nik', 'asc')
+                    ->get();
                 if ($dbPegawai->isNotEmpty()) {
                     $res = [];
                     $index = 1;
@@ -65,9 +68,13 @@ class PegawaiController extends Controller
         \Illuminate\Support\Facades\Cache::forget('simpeg_dashboard_stats');
     }
 
-    public function find(int $id): ?array
+    public function find(int|string $id): ?array
     {
-        $pegawai = collect($this->all())->firstWhere('id', $id);
+        $all = collect($this->all());
+        $pegawai = is_numeric($id) ? $all->firstWhere('id', (int) $id) : null;
+        if (! $pegawai) {
+            $pegawai = $all->firstWhere('nik', (string) $id) ?? $all->firstWhere('db_id', (string) $id);
+        }
         if ($pegawai) {
             // Muat relasi detail hanya untuk pegawai yang dibuka ini (on-demand)
             if (!empty($pegawai['db_id'])) {
@@ -180,22 +187,61 @@ class PegawaiController extends Controller
 
     public function index(Request $request)
     {
-        $keyword = strtolower($request->get('q', ''));
+        $keyword = strtolower(trim((string)$request->get('q', '')));
+        $sort = strtolower(trim((string)$request->get('sort', 'nama_asc')));
 
-        $pegawai = collect($this->all())
+        $collection = collect($this->all())
             ->where('status_peg', '!=', 'PN') // pegawai pensiun tidak ditampilkan di daftar utama
-            ->when($keyword !== '', function ($collection) use ($keyword) {
-                return $collection->filter(function ($p) use ($keyword) {
+            ->when($keyword !== '', function ($coll) use ($keyword) {
+                return $coll->filter(function ($p) use ($keyword) {
                     return str_contains(strtolower($p['nama'] ?? ''), $keyword)
                         || str_contains(strtolower($p['nik'] ?? ''), $keyword)
                         || str_contains(strtolower($p['jabatan'] ?? ''), $keyword)
                         || str_contains(strtolower($p['unit_kerja'] ?? ''), $keyword);
                 });
-            })
-            ->sortBy('nama')
-            ->values();
+            });
 
-        return view('pegawai.index', compact('pegawai', 'keyword'));
+        // Opsi Pengurutan (Ascending / Descending)
+        if ($sort === 'terbaru') {
+            $collection = $collection->sortByDesc(fn ($p) => ($p['created_at'] ?? '') . '_' . str_pad((string)($p['id'] ?? 0), 6, '0', STR_PAD_LEFT))->values();
+        } elseif ($sort === 'terlama') {
+            $collection = $collection->sortBy(fn ($p) => ($p['created_at'] ?? '') . '_' . str_pad((string)($p['id'] ?? 0), 6, '0', STR_PAD_LEFT))->values();
+        } elseif ($sort === 'nik_asc') {
+            $collection = $collection->sortBy('nik')->values();
+        } elseif ($sort === 'nik_desc') {
+            $collection = $collection->sortByDesc('nik')->values();
+        } elseif ($sort === 'nama_desc') {
+            $collection = $collection->sortByDesc('nama', SORT_NATURAL | SORT_FLAG_CASE)->values();
+        } else {
+            // Default nama_asc (A - Z)
+            $collection = $collection->sortBy('nama', SORT_NATURAL | SORT_FLAG_CASE)->values();
+        }
+
+        // Pagination 20 Data per Halaman
+        $perPage = 20;
+        $currentPage = (int) $request->query('page', 1);
+        if ($currentPage < 1) $currentPage = 1;
+
+        $totalFiltered = $collection->count();
+        $pagedItems = $collection->slice(($currentPage - 1) * $perPage, $perPage)->values();
+
+        $paginator = new \Illuminate\Pagination\LengthAwarePaginator(
+            $pagedItems,
+            $totalFiltered,
+            $perPage,
+            $currentPage,
+            [
+                'path' => $request->url(),
+                'query' => $request->query(),
+            ]
+        );
+
+        return view('pegawai.index', [
+            'pegawai'   => $pagedItems,
+            'paginator' => $paginator,
+            'keyword'   => $keyword,
+            'sort'      => $sort,
+        ]);
     }
 
     public function create()
@@ -336,7 +382,10 @@ class PegawaiController extends Controller
         \Illuminate\Support\Facades\Cache::forget('simpeg_dashboard_stats');
         \Illuminate\Support\Facades\Cache::forget('pegawai_master_cache');
 
-        return redirect()->route('pegawai.show', $id)->with('success', 'Data pegawai berhasil diperbarui di database.');
+        $refreshed = collect($this->all())->firstWhere('db_id', $dbId);
+        $targetId = $refreshed['id'] ?? $id;
+
+        return redirect()->route('pegawai.show', $targetId)->with('success', 'Data pegawai berhasil diperbarui di database.');
     }
 
     public function destroy(int $id)
@@ -390,7 +439,10 @@ class PegawaiController extends Controller
         \Illuminate\Support\Facades\Cache::forget('simpeg_dashboard_stats');
         \Illuminate\Support\Facades\Cache::forget('pegawai_master_cache');
 
-        return redirect()->route('pegawai.show', $id)->with('success', 'Pegawai berhasil diangkat menjadi Pegawai Tetap dengan NIK baru: '.$validated['nik_baru']);
+        $refreshed = collect($this->all())->firstWhere('db_id', $dbId);
+        $targetId = $refreshed['id'] ?? $id;
+
+        return redirect()->route('pegawai.show', $targetId)->with('success', 'Pegawai berhasil diangkat menjadi Pegawai Tetap dengan NIK baru: '.$validated['nik_baru']);
     }
 
     /**
@@ -481,40 +533,154 @@ class PegawaiController extends Controller
     }
 
     /**
-     * Data Pegawai Per Unit Kerja — dropdown pilih unit kerja, tampilkan daftar pegawai.
-     * Disamakan dengan daftar_pegawai_unit_kerja.php di sistem lama.
+     * Helper privat untuk mengambil data pegawai per unit kerja dengan profil lengkap,
+     * status kepegawaian resmi, dan masa kerja akurat.
+     */
+    protected function getPegawaiUnitKerjaData(?string $selectedUnit = null): array
+    {
+        $unitKerjaList = \Illuminate\Support\Facades\DB::table('pegawai')
+            ->whereNotNull('unit_kerja')
+            ->where('unit_kerja', '!=', '')
+            ->select('unit_kerja')
+            ->distinct()
+            ->orderBy('unit_kerja')
+            ->pluck('unit_kerja')
+            ->values();
+
+        $query = \Illuminate\Support\Facades\DB::table('pegawai')
+            ->where(function ($q) {
+                $q->whereNull('status')
+                  ->orWhereNotIn(\Illuminate\Support\Facades\DB::raw('UPPER(status)'), ['PN', 'PENSIUN', 'KELUAR']);
+            });
+
+        if (!empty($selectedUnit) && $selectedUnit !== 'all') {
+            $query->where('unit_kerja', $selectedUnit);
+        }
+
+        $rows = $query->orderBy('unit_kerja', 'asc')
+            ->orderBy('jabatan', 'asc')
+            ->orderBy('nik', 'asc')
+            ->get();
+
+        $filtered = $rows->map(function ($p, $idx) {
+            $p = (array) $p;
+            $nik = trim((string)($p['nik'] ?? ''));
+            $rawNik = preg_replace('/\s+/', '', $nik);
+
+            // Format NIK berjarak sesuai standar dokumen kedinasan (contoh: 17 11 252)
+            $formattedNik = strlen($rawNik) >= 6
+                ? substr($rawNik, 0, 2) . ' ' . substr($rawNik, 2, 2) . ' ' . substr($rawNik, 4)
+                : $nik;
+
+            // Hitung Masa Kerja akurat berdasarkan NIK Perumdam Tirta Darma Ayu (YY MM sequence)
+            $masaKerja = '-';
+            if (strlen($rawNik) >= 4) {
+                $yy = (int) substr($rawNik, 0, 2);
+                $mm = (int) substr($rawNik, 2, 2);
+                $year = ($yy > 50) ? (1900 + $yy) : (2000 + $yy);
+                if ($mm >= 1 && $mm <= 12 && $year <= now()->year) {
+                    $tglMasuk = \Illuminate\Support\Carbon::create($year, $mm, 1);
+                    $diff = $tglMasuk->diff(now());
+                    $masaKerja = "{$diff->y} Thn, {$diff->m} Bln";
+                }
+            } elseif (!empty($p['created_at'])) {
+                $diff = \Illuminate\Support\Carbon::parse($p['created_at'])->diff(now());
+                $masaKerja = "{$diff->y} Thn, {$diff->m} Bln";
+            }
+
+            // Normalisasi Status Pegawai
+            $rawStatus = trim((string)($p['status'] ?? 'Pegawai Tetap'));
+            $statusLabel = match (strtoupper($rawStatus)) {
+                'CP', 'CAPEG'                 => 'Calon Pegawai',
+                'PH', 'HONORER'               => 'Pegawai Honorer',
+                'PK', 'PKWT', 'KONTRAK', 'TK' => 'PKWT / Kontrak',
+                'DI', 'DIREKSI', 'AKTIF'      => 'Direksi / Eksekutif',
+                default                       => 'Pegawai Tetap',
+            };
+
+            $gelar = trim((string)($p['gelar'] ?? ''));
+            $nama = trim((string)($p['name'] ?? 'Pegawai'));
+            $namaLengkap = $nama . (!empty($gelar) ? ', ' . $gelar : '');
+
+            $golonganTeks = trim(($p['golongan'] ?? '-') . (!empty($p['golongan_detail']) ? ' (' . $p['golongan_detail'] . ')' : ''));
+            if ($golonganTeks === '-' || empty($golonganTeks)) {
+                $golonganTeks = 'Staf Pelaksana';
+            }
+
+            $p['no'] = $idx + 1;
+            $p['formatted_nik'] = $formattedNik;
+            $p['nama_lengkap'] = $namaLengkap;
+            $p['status_label'] = $statusLabel;
+            $p['masa_kerja'] = $masaKerja;
+            $p['golongan_teks'] = $golonganTeks;
+            $p['unit_kerja'] = $p['unit_kerja'] ?: 'Kantor Pusat';
+            $p['jabatan'] = $p['jabatan'] ?: 'Staf';
+
+            return $p;
+        });
+
+        // Rekapitulasi Statistik
+        $totalPegawai = $filtered->count();
+        $totalTetap   = $filtered->where('status_label', 'Pegawai Tetap')->count();
+        $totalPkwt    = $filtered->filter(fn($p) => str_contains($p['status_label'], 'Kontrak') || str_contains($p['status_label'], 'PKWT'))->count();
+        $totalCapeg   = $filtered->where('status_label', 'Calon Pegawai')->count();
+        $totalHonorer = $filtered->where('status_label', 'Pegawai Honorer')->count();
+        $totalDireksi = $filtered->where('status_label', 'Direksi / Eksekutif')->count();
+
+        // Rekapitulasi per Cabang / Unit Kerja
+        $rekapPerUnit = $filtered->groupBy('unit_kerja')->map(function ($group, $unitName) {
+            return [
+                'unit_kerja' => $unitName ?: 'Kantor Pusat',
+                'total'      => $group->count(),
+                'tetap'      => $group->where('status_label', 'Pegawai Tetap')->count(),
+                'pkwt'       => $group->filter(fn($p) => str_contains($p['status_label'], 'Kontrak') || str_contains($p['status_label'], 'PKWT'))->count(),
+                'capeg'      => $group->where('status_label', 'Calon Pegawai')->count(),
+                'honorer'    => $group->where('status_label', 'Pegawai Honorer')->count(),
+            ];
+        })->values();
+
+        $pejabatTtd = PejabatTtdController::getTtd('gaji');
+
+        return compact(
+            'unitKerjaList',
+            'filtered',
+            'totalPegawai',
+            'totalTetap',
+            'totalPkwt',
+            'totalCapeg',
+            'totalHonorer',
+            'totalDireksi',
+            'rekapPerUnit',
+            'pejabatTtd'
+        );
+    }
+
+    /**
+     * Data Pegawai Per Unit Kerja (Web View).
+     * Disamakan dan disempurnakan dari daftar_pegawai_unit_kerja.php di sistem lama.
      */
     public function perUnitKerja(Request $request)
     {
-        $pegawai = collect($this->all());
+        $selected = $request->get('unit_kerja', 'all');
+        $data = $this->getPegawaiUnitKerjaData($selected);
 
-        // Ambil daftar unit kerja unik
-        $unitKerjaList = $pegawai->pluck('unit_kerja')->unique()->sort()->values();
+        return view('pegawai.per-unit-kerja', array_merge($data, [
+            'selected' => $selected,
+        ]));
+    }
 
-        $selected = $request->unit_kerja;
-        $filtered = collect();
+    /**
+     * Cetak Fisik Kedinasan Daftar Pegawai per Cabang / Unit Kerja (Format Landscape A4).
+     * Sesuai standar operasional PERUMDAM Tirta Darma Ayu untuk Role 1 (SDM) dan Role 7 (Direksi).
+     */
+    public function cetakPerUnitKerja(Request $request)
+    {
+        $selected = $request->get('unit_kerja', 'all');
+        $data = $this->getPegawaiUnitKerjaData($selected);
 
-        if ($selected) {
-            $filtered = $pegawai->where('unit_kerja', $selected)
-                ->where('status_peg', '!=', 'PN')
-                ->map(function ($p) {
-                    $statusMap = ['CP' => 'Capeg', 'PH' => 'Honorer', 'PK' => 'Kontrak', 'DI' => 'Direksi', 'TK' => 'Tenaga Kontrak'];
-                    $p['status_label'] = $statusMap[$p['status_peg']] ?? 'Tetap';
-
-                    if (! empty($p['tgl_masuk'])) {
-                        $masuk = \Illuminate\Support\Carbon::parse($p['tgl_masuk']);
-                        $diff = $masuk->diff(now());
-                        $p['masa_kerja'] = $diff->y . ' Thn, ' . $diff->m . ' Bln';
-                    } else {
-                        $p['masa_kerja'] = '-';
-                    }
-                    return $p;
-                })
-                ->sortBy('jabatan')
-                ->values();
-        }
-
-        return view('pegawai.per-unit-kerja', compact('unitKerjaList', 'selected', 'filtered'));
+        return view('pegawai.cetak-unit-kerja', array_merge($data, [
+            'selected' => $selected,
+        ]));
     }
 
     protected function validateData(Request $request, ?int $ignoreId = null): array

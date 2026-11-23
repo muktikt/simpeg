@@ -180,6 +180,28 @@ class DashboardController extends Controller
             $dashboardData['userRole'] = $userRole;
             $dashboardData['stats']['pengaduan_card'] = $this->getPengaduanCardForUser();
 
+            // Cek apakah tampilan khusus Eksekutif Direksi (Role 7) aktif
+            $isDireksi = ($userLevel === '7' || $userRole === 'dirut' || in_array($ctx['nik'], ['1711001', '1711002', '1711003']) || request('view') === 'direksi');
+            if (request('view') === 'standard') {
+                $isDireksi = false;
+            }
+
+            $execData = [];
+            $namaDirektur = null;
+            $jabatanDirektur = null;
+
+            if ($isDireksi) {
+                $execData = $this->getExecutiveStats();
+                $pegawaiDireksi = DB::table('pegawai')->where('nik', $ctx['nik'])->first();
+                $namaDirektur = $pegawaiDireksi ? trim(($pegawaiDireksi->name ?? 'Direksi') . ($pegawaiDireksi->gelar ? ', ' . $pegawaiDireksi->gelar : '')) : (session('simpeg_user.nama_peg') ?? 'Direksi PERUMDAM Tirta Darma Ayu');
+                $jabatanDirektur = $pegawaiDireksi->jabatan ?? 'Direksi';
+            }
+
+            $dashboardData['isDireksi'] = $isDireksi;
+            $dashboardData['execData'] = $execData;
+            $dashboardData['namaDirektur'] = $namaDirektur;
+            $dashboardData['jabatanDirektur'] = $jabatanDirektur;
+
             return view('dashboard', $dashboardData);
         } catch (\Throwable $e) {
             // Fallback aman jika terjadi gangguan jaringan remote DB
@@ -224,8 +246,9 @@ class DashboardController extends Controller
                     $dbRole = strtolower($peg->role ?? '');
                     $divisiKadiv = $peg->divisi_kadiv ?? $divisiKadiv;
 
-                    if ($dbRole === 'direktur') {
+                    if ($dbRole === 'direktur' || in_array($nik, ['1711001', '1711002', '1711003'])) {
                         $userRole = 'dirut';
+                        $userLevel = '7';
                     } elseif ($dbRole === 'kspi' && $nik === '1711161') {
                         $userRole = 'kspi';
                     } elseif ($dbRole === 'tpdpk') {
@@ -336,5 +359,177 @@ class DashboardController extends Controller
                 'highlight' => false,
             ];
         }
+    }
+
+    /**
+     * Data statistik komprehensif khusus Eksekutif Direksi (Role 7).
+     * Disimpan dalam cache 60 detik agar load dashboard langsung instan.
+     */
+    public function getExecutiveStats(): array
+    {
+        return Cache::remember('simpeg_dashboard_exec_stats', 60, function () {
+            // 1. Data Finansial Penggajian Terakhir
+            $latestPayroll = DB::table('payroll')
+                ->select('tahun', 'bulan', 'status', DB::raw('count(*) as count'), DB::raw('sum(gapok) as tot_gapok'), DB::raw('sum(total_pendapatan) as tot_bruto'), DB::raw('sum(total_potongan) as tot_potongan'), DB::raw('sum(gaji_bersih) as tot_bersih'))
+                ->groupBy('tahun', 'bulan', 'status')
+                ->orderByDesc('tahun')
+                ->orderByDesc('bulan')
+                ->first();
+
+            $bulanPayroll = $latestPayroll->bulan ?? now()->month;
+            $tahunPayroll = $latestPayroll->tahun ?? now()->year;
+            $namaBulanPayroll = \App\Http\Controllers\AbsensiController::BULAN[$bulanPayroll] ?? ('Bulan ' . $bulanPayroll);
+
+            // Trend Realisasi Payroll (sampai 12 bulan terakhir)
+            $trendPayroll = DB::table('payroll')
+                ->select('tahun', 'bulan', DB::raw('count(*) as count'), DB::raw('sum(total_pendapatan) as bruto'), DB::raw('sum(total_potongan) as potongan'), DB::raw('sum(gaji_bersih) as bersih'))
+                ->groupBy('tahun', 'bulan')
+                ->orderBy('tahun')
+                ->orderBy('bulan')
+                ->limit(12)
+                ->get()
+                ->map(function ($tp) {
+                    $bln = \App\Http\Controllers\AbsensiController::BULAN[$tp->bulan] ?? ('Bln ' . $tp->bulan);
+                    return [
+                        'label' => substr($bln, 0, 3) . ' ' . $tp->tahun,
+                        'bruto' => (float) $tp->bruto,
+                        'bersih' => (float) $tp->bersih,
+                        'potongan' => (float) $tp->potongan,
+                        'count' => (int) $tp->count,
+                    ];
+                })->values()->toArray();
+
+            // Total YTD Belanja Gaji Tahun Berjalan
+            $ytdPayroll = DB::table('payroll')
+                ->where('tahun', $tahunPayroll)
+                ->select(DB::raw('sum(total_pendapatan) as ytd_bruto'), DB::raw('sum(gaji_bersih) as ytd_bersih'), DB::raw('sum(total_potongan) as ytd_potongan'))
+                ->first();
+
+            // Realisasi THR
+            $thrTotal = 0;
+            try {
+                if (\Illuminate\Support\Facades\Schema::hasTable('thr')) {
+                    $thrTotal = (float) DB::table('thr')->where('tahun', $tahunPayroll)->sum('nominal');
+                }
+            } catch (\Throwable $e) {}
+
+            // Realisasi Tunjangan Pendidikan
+            $tunjPendidikanTotal = 0;
+            try {
+                if (\Illuminate\Support\Facades\Schema::hasTable('tunjangan_pendidikan')) {
+                    $tunjPendidikanTotal = (float) DB::table('tunjangan_pendidikan')->where('tahun', $tahunPayroll)->sum('nominal');
+                }
+            } catch (\Throwable $e) {}
+
+            // 2. Demografi & Komposisi SDM Eksekutif
+            $allPegawai = DB::table('pegawai')->get(['id', 'nik', 'name', 'status', 'role', 'jabatan', 'unit_kerja', 'golongan', 'created_at']);
+            $totalPegawai = $allPegawai->count();
+
+            $ptCount = $allPegawai->filter(fn($p) => str_contains(strtolower($p->status ?? ''), 'tetap') || strtolower($p->status ?? '') === 'pt')->count();
+            $pkwtCount = $allPegawai->filter(fn($p) => str_contains(strtolower($p->status ?? ''), 'pkwt') || str_contains(strtolower($p->status ?? ''), 'kontrak'))->count();
+            $dirCount = $allPegawai->filter(fn($p) => strtolower($p->role ?? '') === 'direktur' || str_contains(strtolower($p->jabatan ?? ''), 'direktur'))->count();
+            $cpCount = $allPegawai->filter(fn($p) => str_contains(strtolower($p->status ?? ''), 'calon') || strtolower($p->status ?? '') === 'cp')->count();
+            $phCount = $allPegawai->filter(fn($p) => str_contains(strtolower($p->status ?? ''), 'honorer') || strtolower($p->status ?? '') === 'ph')->count();
+            $pnCount = $allPegawai->filter(fn($p) => str_contains(strtolower($p->status ?? ''), 'pensiun') || strtolower($p->status ?? '') === 'pn')->count();
+
+            // Golongan Kepangkatan
+            $golGroups = [
+                'Golongan D' => 0,
+                'Golongan C' => 0,
+                'Golongan B' => 0,
+                'Golongan A' => 0,
+                'Lainnya'    => 0,
+            ];
+            foreach ($allPegawai as $p) {
+                $g = strtoupper(trim($p->golongan ?? ''));
+                if (str_contains($g, '/ D.') || str_contains($g, '/D.') || str_starts_with($g, 'D.')) $golGroups['Golongan D']++;
+                elseif (str_contains($g, '/ C.') || str_contains($g, '/C.') || str_starts_with($g, 'C.')) $golGroups['Golongan C']++;
+                elseif (str_contains($g, '/ B.') || str_contains($g, '/B.') || str_starts_with($g, 'B.')) $golGroups['Golongan B']++;
+                elseif (str_contains($g, '/ A.') || str_contains($g, '/A.') || str_starts_with($g, 'A.')) $golGroups['Golongan A']++;
+                else $golGroups['Lainnya']++;
+            }
+
+            // Sebaran Unit Kerja & Cabang Pelayanan (Top 10)
+            $unitKerjaStats = $allPegawai->groupBy(function($p) {
+                return $p->unit_kerja ?: 'Kantor Pusat';
+            })->map->count()->sortDesc()->take(10)->map(function($count, $unit) use ($totalPegawai) {
+                return [
+                    'unit' => $unit,
+                    'count' => $count,
+                    'percent' => $totalPegawai > 0 ? round(($count / $totalPegawai) * 100, 1) : 0,
+                ];
+            })->values()->toArray();
+
+            // 3. Approval & Keputusan Strategis Menunggu Direksi
+            $pendingCutiCount = DB::table('pengajuan_cuti')->whereRaw("LOWER(status) = 'pending'")->count();
+            $pendingPotonganCount = DB::table('potongan_keu')->whereIn('status', ['dirum', 'kepegawaian'])->count();
+            $pendingWbsCount = DB::table('pengaduan_pegawai')->whereIn('status', ['menungguDirutTahap1', 'menungguDirutTahap2'])->count();
+
+            $pendingCutiList = DB::table('pengajuan_cuti')
+                ->leftJoin('pegawai', 'pengajuan_cuti.pegawai_id', '=', 'pegawai.id')
+                ->whereRaw("LOWER(pengajuan_cuti.status) = 'pending'")
+                ->select('pengajuan_cuti.*', 'pegawai.nik as peg_nik', 'pegawai.name as peg_nama', 'pegawai.jabatan as peg_jabatan', 'pegawai.unit_kerja as peg_unit')
+                ->orderByDesc('pengajuan_cuti.created_at')
+                ->limit(5)
+                ->get()
+                ->map(function ($r) {
+                    return [
+                        'id' => $r->id,
+                        'tipe' => 'Izin Cuti ' . ($r->jenis ?? 'Tahunan'),
+                        'nama' => $r->peg_nama ?? $r->nama_pegawai ?? 'Pegawai',
+                        'nik' => $r->peg_nik ?? '-',
+                        'unit' => $r->peg_unit ?? 'Kantor Pusat',
+                        'tanggal' => $r->tanggal_mulai ?? $r->created_at,
+                        'keterangan' => $r->alasan ?? 'Keperluan pribadi',
+                        'link' => route('approval.index', ['jenis' => 'cuti']),
+                    ];
+                })->toArray();
+
+            // Presensi Hari Ini
+            $presensiHariIni = DB::table('absensi_harian')->where('tanggal', now()->toDateString())->count();
+            $persenKehadiran = $totalPegawai > 0 ? round(($presensiHariIni / $totalPegawai) * 100, 1) : 0;
+
+            return [
+                'payroll_summary' => [
+                    'bulan' => $bulanPayroll,
+                    'tahun' => $tahunPayroll,
+                    'periode_label' => $namaBulanPayroll . ' ' . $tahunPayroll,
+                    'total_bruto' => (float) ($latestPayroll->tot_bruto ?? 0),
+                    'total_bersih' => (float) ($latestPayroll->tot_bersih ?? 0),
+                    'total_potongan' => (float) ($latestPayroll->tot_potongan ?? 0),
+                    'total_gapok' => (float) ($latestPayroll->tot_gapok ?? 0),
+                    'total_tunjangan' => max(0, (float) (($latestPayroll->tot_bruto ?? 0) - ($latestPayroll->tot_gapok ?? 0))),
+                    'pegawai_tergaji' => (int) ($latestPayroll->count ?? 0),
+                    'status_otorisasi' => ($latestPayroll->status ?? 'DRAFT') === 'DITERBITKAN' ? 'Disetujui & Diterbitkan' : 'Tahap Verifikasi',
+                    'ytd_bruto' => (float) ($ytdPayroll->ytd_bruto ?? 0),
+                    'ytd_bersih' => (float) ($ytdPayroll->ytd_bersih ?? 0),
+                    'ytd_potongan' => (float) ($ytdPayroll->ytd_potongan ?? 0),
+                    'thr_total' => $thrTotal,
+                    'tunj_pendidikan_total' => $tunjPendidikanTotal,
+                ],
+                'trend_payroll' => $trendPayroll,
+                'sdm' => [
+                    'total' => $totalPegawai,
+                    'tetap' => $ptCount,
+                    'pkwt' => $pkwtCount,
+                    'direksi' => $dirCount,
+                    'calon' => $cpCount,
+                    'honorer' => $phCount,
+                    'pensiun' => $pnCount,
+                    'rasio_tetap' => $totalPegawai > 0 ? round(($ptCount / $totalPegawai) * 100, 1) : 0,
+                    'presensi_hari_ini' => $presensiHariIni,
+                    'persen_kehadiran' => $persenKehadiran,
+                ],
+                'golongan' => $golGroups,
+                'unit_kerja' => $unitKerjaStats,
+                'approvals' => [
+                    'total_pending' => $pendingCutiCount + $pendingPotonganCount + $pendingWbsCount,
+                    'cuti_count' => $pendingCutiCount,
+                    'potongan_count' => $pendingPotonganCount,
+                    'wbs_count' => $pendingWbsCount,
+                    'recent_cuti' => $pendingCutiList,
+                ],
+            ];
+        });
     }
 }

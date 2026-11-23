@@ -331,6 +331,7 @@ class GajiTigabelasController extends Controller
                 'tunjangan_istri' => $tIstri,
                 'tunjangan_anak' => $tAnak,
                 'total_pendapatan' => $pendapatanTpendidikan,
+                'pendapatan' => $pendapatanTpendidikan,
                 'potongan_koperasi' => $koperasiTpendidikan,
                 'potongan_kas' => $kasTpendidikan,
                 'potongan_zakat' => $zakatTpendidikan,
@@ -351,6 +352,7 @@ class GajiTigabelasController extends Controller
                 'insentif_air_minum' => (int) ($gaji13['tunjangan_airminum'] ?? ($gaji13['tunjangan_air_minum'] ?? 0)),
                 'insentif_komunikasi' => (int) ($gaji13['tunjangan_komunikasi'] ?? 0),
                 'total_insentif' => $pendapatanInsentif,
+                'pendapatan' => $pendapatanInsentif,
 
                 'potongan_sanksi_perusahaan' => $potSanksi,
                 'potongan_trandist_pmi_lain' => $potLain,
@@ -362,6 +364,7 @@ class GajiTigabelasController extends Controller
                 'potongan_pajak' => $potPajak,
                 'potongan_bpjs_kesehatan' => $potBpjskes,
                 'total_potongan_insentif' => $totalPotonganPendapatanInsentif,
+                'potongan_pendapatan' => $totalPotonganPendapatanInsentif,
 
                 'potongan_koperasi' => $koperasiInsentif,
                 'potongan_darma_wanita' => $potDarmawanita,
@@ -374,6 +377,7 @@ class GajiTigabelasController extends Controller
                 'potongan_asuransi' => $potAsuransi,
                 'potongan_zakat_profesi' => $zakatInsentif,
                 'total_potongan_non_insentif' => $totalPotonganNonPendapatanInsentif,
+                'potongan_non_pendapatan' => $totalPotonganNonPendapatanInsentif,
 
                 'total_potongan' => $totalPotonganInsentif,
                 'insentif_diterima' => $insentifDiterima,
@@ -504,23 +508,50 @@ class GajiTigabelasController extends Controller
     public function laporanBukuBesar(Request $request)
     {
         $tahun = (int) $request->get('tahun', now()->year);
-        $data = $this->gaji13Terbit($tahun)->sortBy('nama')->values();
-        $total = $data->sum('gaji13_diterima');
+        $format = $request->get('format', 'tpendidikan');
+        $kategori = $request->get('kategori', 'all');
 
-        return view('gaji-tigabelas.laporan-buku-besar', compact('data', 'tahun', 'total'));
+        $data = $this->gaji13Terbit($tahun)
+            ->when($kategori === 'direksi', fn ($c) => $c->filter(fn ($r) => in_array($r['kategori'] ?? '', ['dirut', 'dirum', 'dirtek']) || in_array($r['nik'] ?? '', ['1711001', '1711002', '1711003'])))
+            ->when($kategori === 'pegawai', fn ($c) => $c->filter(fn ($r) => !in_array($r['kategori'] ?? '', ['dirut', 'dirum', 'dirtek']) && !in_array($r['nik'] ?? '', ['1711001', '1711002', '1711003'])))
+            ->map(function ($row) {
+                $row['pemecahan'] = self::hitungPemecahanGaji13($row);
+                return $row;
+            })
+            ->sortBy('nama')
+            ->values();
+
+        $totalTpendidikan = $data->sum(fn ($r) => $r['pemecahan']['tunjangan_pendidikan']['diterima'] ?? 0);
+        $totalInsentif = $data->sum(fn ($r) => $r['pemecahan']['insentif']['diterima'] ?? 0);
+        $totalUtuh = $data->sum(fn ($r) => $r['pemecahan']['gaji_13_utuh']['diterima'] ?? 0);
+
+        $total = ($format === 'insentif') ? $totalInsentif : (($format === 'utuh') ? $totalUtuh : $totalTpendidikan);
+
+        return view('gaji-tigabelas.laporan-buku-besar', compact('data', 'tahun', 'format', 'kategori', 'total', 'totalTpendidikan', 'totalInsentif', 'totalUtuh'));
     }
 
     public function laporanBukuBesarPerSub(Request $request)
     {
         $tahun = (int) $request->get('tahun', now()->year);
+        $format = $request->get('format', 'tpendidikan');
+        $kategori = $request->get('kategori', 'all');
+
         $data = $this->gaji13Terbit($tahun)
+            ->when($kategori === 'direksi', fn ($c) => $c->filter(fn ($r) => in_array($r['kategori'] ?? '', ['dirut', 'dirum', 'dirtek']) || in_array($r['nik'] ?? '', ['1711001', '1711002', '1711003'])))
+            ->when($kategori === 'pegawai', fn ($c) => $c->filter(fn ($r) => !in_array($r['kategori'] ?? '', ['dirut', 'dirum', 'dirtek']) && !in_array($r['nik'] ?? '', ['1711001', '1711002', '1711003'])))
+            ->map(function ($row) {
+                $row['pemecahan'] = self::hitungPemecahanGaji13($row);
+                return $row;
+            })
             ->groupBy('unit_kerja')
             ->map(fn ($group) => [
                 'rows' => $group->sortBy('nama')->values(),
-                'total' => $group->sum('gaji13_diterima'),
+                'total_tpendidikan' => $group->sum(fn ($r) => $r['pemecahan']['tunjangan_pendidikan']['diterima'] ?? 0),
+                'total_insentif' => $group->sum(fn ($r) => $r['pemecahan']['insentif']['diterima'] ?? 0),
+                'total_utuh' => $group->sum(fn ($r) => $r['pemecahan']['gaji_13_utuh']['diterima'] ?? 0),
             ]);
 
-        return view('gaji-tigabelas.laporan-buku-besar-per-sub', compact('data', 'tahun'));
+        return view('gaji-tigabelas.laporan-buku-besar-per-sub', compact('data', 'tahun', 'format', 'kategori'));
     }
 
     public function create(Request $request)

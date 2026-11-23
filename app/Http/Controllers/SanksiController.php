@@ -70,17 +70,173 @@ class SanksiController extends Controller
 
     protected function withPegawai(array $rows): array
     {
-        return collect($rows)->map(function ($row) {
-            $p = $this->pegawaiById($row['pegawai_id'] ?? null);
-            $row['nik'] = $p['nik'] ?? ($row['nik'] ?? '-');
-            $row['nama'] = $p['nama'] ?? ($row['nama_pegawai'] ?? '(pegawai tidak ditemukan)');
-            $row['jenis_sanksi'] = $row['jenis_sanksi'] ?? ($row['jenis'] ?? '-');
-            $row['keterangan'] = $row['keterangan'] ?? ($row['ket_sanksi'] ?? '-');
-            $row['potongan_persen'] = $row['potongan_persen'] ?? ($row['pot_persen'] ?? 0);
-            $row['tanggal'] = $row['tanggal'] ?? ($row['tgl_sanksi'] ?? ($row['created_at'] ?? now()->toDateString()));
+        $pegList = collect(app(PegawaiController::class)->all());
+        $pegMap = $pegList->keyBy('db_id');
+        $pegNikMap = $pegList->keyBy('nik');
+        $skMap = collect();
+        try {
+            $skMap = \Illuminate\Support\Facades\DB::table('sk_sanksi')->get()->keyBy('id');
+        } catch (\Throwable $e) {}
+
+        $bulanIndo = [
+            'januari' => 1, 'februari' => 2, 'maret' => 3, 'april' => 4,
+            'mei' => 5, 'juni' => 6, 'juli' => 7, 'agustus' => 8,
+            'september' => 9, 'oktober' => 10, 'november' => 11, 'desember' => 12
+        ];
+
+        return collect($rows)->map(function ($row) use ($pegMap, $pegNikMap, $skMap, $bulanIndo) {
+            $row = (array) $row;
+            $pegId = $row['pegawai_id'] ?? null;
+            $p = $pegMap->get($pegId) ?: ($pegNikMap->get($row['nik'] ?? '') ?: $this->pegawaiById($pegId));
+
+            $skId = $row['sk_sanksi_id'] ?? null;
+            $sk = $skId ? $skMap->get($skId) : null;
+
+            $nik = trim((string)($p['nik'] ?? ($row['nik'] ?? '-')));
+            $rawNik = preg_replace('/\s+/', '', $nik);
+            $formattedNik = strlen($rawNik) >= 6
+                ? substr($rawNik, 0, 2) . ' ' . substr($rawNik, 2, 2) . ' ' . substr($rawNik, 4)
+                : $nik;
+
+            $nama = trim((string)($p['nama'] ?? ($row['nama_pegawai'] ?? 'Pegawai')));
+            $gelar = trim((string)($p['gelar'] ?? ''));
+            $namaLengkap = $nama . (!empty($gelar) ? ', ' . $gelar : '');
+
+            // Tanggal parsing
+            $rawDate = (string)($row['tanggal'] ?? ($row['tgl_sanksi'] ?? ($row['created_at'] ?? now()->toDateString())));
+            $tahunNum = (int) now()->year;
+            $bulanNum = (int) now()->month;
+            $formattedDate = $rawDate;
+            $bulanTeks = '-';
+
+            if (preg_match('/(\d{1,2})\s+([a-zA-Z]+)\s+(\d{4})/', $rawDate, $m)) {
+                $day = (int)$m[1];
+                $monthName = strtolower($m[2]);
+                $tahunNum = (int)$m[3];
+                $bulanNum = $bulanIndo[$monthName] ?? (int)now()->month;
+                $formattedDate = sprintf('%02d/%02d/%04d', $day, $bulanNum, $tahunNum);
+                $bulanTeks = ucfirst($monthName) . ' ' . $tahunNum;
+            } else {
+                try {
+                    $c = new \DateTime($rawDate);
+                    $tahunNum = (int) $c->format('Y');
+                    $bulanNum = (int) $c->format('m');
+                    $formattedDate = $c->format('d/m/Y');
+                    $bulanTeks = $c->format('F Y');
+                } catch (\Throwable $e) {}
+            }
+
+            // Normalisasi Tingkat Sanksi
+            $jenisSanksi = trim((string)($row['jenis_sanksi'] ?? ($row['jenis'] ?? ($sk?->jenis_sanksi ?? '-'))));
+            $tingkat = trim((string)($row['tingkat'] ?? ($sk?->tingkat ?? '')));
+            if (empty($tingkat) || $tingkat === 'Internal') {
+                $upperJenis = strtoupper($jenisSanksi);
+                if (str_contains($upperJenis, 'LISAN') || str_contains($upperJenis, 'PERINGATAN I') || str_contains($upperJenis, 'TEGURAN')) {
+                    $tingkat = 'Ringan';
+                } elseif (str_contains($upperJenis, 'PTDH') || str_contains($upperJenis, 'KELUAR') || str_contains($upperJenis, 'SKORSING')) {
+                    $tingkat = 'Berat';
+                } else {
+                    $tingkat = 'Sedang';
+                }
+            }
+
+            $potPersen = (float)($row['potongan_persen'] ?? ($row['pot_persen'] ?? 0));
+            if ($potPersen == 0 && !empty($sk?->nominal_penurunan_gaji) && $sk->nominal_penurunan_gaji > 0) {
+                $potPersen = round(($sk->nominal_penurunan_gaji / 4500000) * 100, 1);
+            }
+
+            $nomorSk = $sk?->nomor_sk ?? '-';
+            $keterangan = $row['keterangan'] ?? ($row['ket_sanksi'] ?? ($sk?->ringkasan_pelanggaran ?? '-'));
+
+            $row['nik'] = $nik;
+            $row['formatted_nik'] = $formattedNik;
+            $row['nama'] = $nama;
+            $row['gelar'] = $gelar;
+            $row['nama_lengkap'] = $namaLengkap;
+            $row['unit_kerja'] = $p['unit_kerja'] ?? ($row['unit_kerja'] ?? 'Kantor Pusat');
+            $row['jabatan'] = $p['jabatan'] ?? ($row['jabatan'] ?? '-');
+            $row['jenis_sanksi'] = $jenisSanksi;
+            $row['tingkat'] = $tingkat;
+            $row['nomor_sk'] = $nomorSk;
+            $row['keterangan'] = $keterangan;
+            $row['potongan_persen'] = $potPersen;
+            $row['tanggal'] = $rawDate;
+            $row['tanggal_formatted'] = $formattedDate;
+            $row['bulan_teks'] = $bulanTeks;
+            $row['bulan_num'] = $bulanNum;
+            $row['tahun_num'] = $tahunNum;
 
             return $row;
         })->all();
+    }
+
+    /**
+     * Helper terpusat untuk memfilter data sanksi pegawai dan menghitung KPI statistik kedinasan.
+     */
+    public function getEnrichedSanksiData(Request $request): array
+    {
+        $tahun = $request->get('tahun', now()->year);
+        $bulan = $request->get('bulan', 'all');
+        $unitKerja = $request->get('unit_kerja', 'all');
+        $nik = $request->get('nik', 'all');
+
+        $allSanksi = collect($this->withPegawai($this->all()));
+
+        $filtered = $allSanksi->filter(function ($item) use ($tahun, $bulan, $unitKerja, $nik) {
+            if ($tahun !== 'all' && !empty($tahun)) {
+                if ((int)$item['tahun_num'] !== (int)$tahun) {
+                    return false;
+                }
+            }
+            if ($bulan !== 'all' && !empty($bulan)) {
+                if ((int)$item['bulan_num'] !== (int)$bulan) {
+                    return false;
+                }
+            }
+            if ($unitKerja !== 'all' && !empty($unitKerja)) {
+                if (strcasecmp(trim($item['unit_kerja'] ?? ''), trim($unitKerja)) !== 0) {
+                    return false;
+                }
+            }
+            if ($nik !== 'all' && !empty($nik)) {
+                if (trim($item['nik'] ?? '') !== trim($nik)) {
+                    return false;
+                }
+            }
+            return true;
+        })->sortByDesc('tanggal')->values();
+
+        // Rangkuman Statistik Sanksi
+        $totalSanksi = $filtered->count();
+        $totalRingan = $filtered->where('tingkat', 'Ringan')->count();
+        $totalSedang = $filtered->where('tingkat', 'Sedang')->count();
+        $totalBerat  = $filtered->where('tingkat', 'Berat')->count();
+
+        // Daftar unit kerja unik untuk dropdown filter
+        $unitKerjaList = collect(app(PegawaiController::class)->all())
+            ->pluck('unit_kerja')
+            ->filter()
+            ->unique()
+            ->sort()
+            ->values();
+
+        $pegawaiList = $this->pegawaiList();
+        $pejabatTtd = PejabatTtdController::getTtd('gaji');
+
+        return compact(
+            'filtered',
+            'tahun',
+            'bulan',
+            'unitKerja',
+            'nik',
+            'totalSanksi',
+            'totalRingan',
+            'totalSedang',
+            'totalBerat',
+            'unitKerjaList',
+            'pegawaiList',
+            'pejabatTtd'
+        );
     }
 
     public function index()
@@ -93,16 +249,44 @@ class SanksiController extends Controller
     }
 
     /**
-     * Halaman Laporan (read-only, format cetak) - dipisah dari index()
-     * yang jadi halaman kelola/SET. Data sumbernya sama, tampilannya beda.
+     * Halaman Laporan Sanksi Pegawai (Web View Interaktif).
+     * Terintegrasi filter tahun, bulan, unit kerja, dan pegawai.
      */
-    public function laporan()
+    public function laporan(Request $request)
     {
-        $sanksi = collect($this->withPegawai($this->all()))
-            ->sortByDesc('tanggal')
-            ->values();
+        $data = $this->getEnrichedSanksiData($request);
+        return view('sanksi.laporan', $data);
+    }
 
-        return view('sanksi.laporan', compact('sanksi'));
+    /**
+     * Cetak Fisik Kedinasan Laporan Sanksi Pegawai Keseluruhan (Format Landscape A4).
+     * Disamakan dengan cetak_sanksi_all.php di sistem lama.
+     */
+    public function cetakAll(Request $request)
+    {
+        $data = $this->getEnrichedSanksiData($request);
+        return view('sanksi.cetak-all', $data);
+    }
+
+    /**
+     * Cetak Fisik Kedinasan Laporan Sanksi Per Pegawai (Format Portrait/Landscape A4).
+     * Disamakan dengan cetak_sanksi_per_pegawai.php di sistem lama.
+     */
+    public function cetakPegawai(Request $request)
+    {
+        $nik = $request->get('nik');
+        if (empty($nik) || $nik === 'all') {
+            $first = collect($this->withPegawai($this->all()))->first();
+            $nik = $first['nik'] ?? null;
+            $request->merge(['nik' => $nik]);
+        }
+
+        $data = $this->getEnrichedSanksiData($request);
+        $targetPegawai = $this->pegawaiById($nik);
+
+        return view('sanksi.cetak-pegawai', array_merge($data, [
+            'targetPegawai' => $targetPegawai,
+        ]));
     }
 
     public function create()

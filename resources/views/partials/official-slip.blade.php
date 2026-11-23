@@ -402,8 +402,8 @@
                 </div>
 
                 <!-- Total Akhir Diterima (Take Home Pay) -->
-                <div class="slip-row slip-row-bold slip-row-net">
-                    <span class="slip-label">{{ $labelDiterima ?? 'JUMLAH PENDAPATAN DITERIMA' }}</span>
+                <div class="slip-row slip-row-bold slip-row-net" @if($pendapatanDiterima < 0) style="color:#b91c1c;" @endif>
+                    <span class="slip-label">{{ $labelDiterima ?? 'JUMLAH PENDAPATAN DITERIMA' }} @if($pendapatanDiterima < 0) <span style="font-size:10px; padding:1px 4px; background:#fee2e2; border:1px solid #fca5a5; border-radius:3px;">(MINUS)</span> @endif</span>
                     <span class="slip-colon">:</span>
                     <span class="slip-val-num">{{ number_format($pendapatanDiterima, 0, ',', '.') }}</span>
                 </div>

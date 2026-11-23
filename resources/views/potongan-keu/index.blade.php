@@ -130,6 +130,41 @@
     border-color: #059669;
     background: #ECFDF5;
 }
+
+/* Pagination Buttons */
+.pagination-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 34px;
+    height: 34px;
+    padding: 0 10px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+    border: 1px solid #CBD5E1;
+    color: #334155;
+    background: #ffffff;
+    transition: all 0.15s ease;
+}
+.pagination-btn:hover {
+    background: #F1F5F9;
+    border-color: #94A3B8;
+    color: #0F2A3D;
+}
+.pagination-btn.active {
+    background: #0D2C6E;
+    color: #ffffff;
+    border-color: #0D2C6E;
+    font-weight: 700;
+}
+.pagination-btn.disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    pointer-events: none;
+    background: #F8FAFC;
+}
 </style>
 
 <div class="page-head">
@@ -174,7 +209,7 @@
 @endif
 
 <div class="toolbar" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:12px;">
-    <form method="GET" action="{{ route('potongan-keu.index', $tipe) }}" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; flex:1; max-width:680px;">
+    <form method="GET" action="{{ route('potongan-keu.index', $tipe) }}" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; flex:1; max-width:860px;">
         <select name="bulan" class="form-control" style="height:40px; border-radius:8px; border:1px solid #CBD5E1; font-size:13px; font-weight:600; width:auto; min-width:130px; background:#ffffff; color:#0F2A3D;" onchange="this.form.submit()">
             <option value="all" {{ (string)$bulan === 'all' ? 'selected' : '' }}>Semua Bulan</option>
             @foreach ($bulanNames as $bNum => $bNama)
@@ -188,12 +223,22 @@
             @endfor
         </select>
 
-        <div style="position:relative; flex:1; min-width:200px;">
+        <!-- Pilihan Urutan (Sort Ascending / Descending) -->
+        <select name="sort" class="form-control" style="height:40px; border-radius:8px; border:1px solid #CBD5E1; font-size:13px; font-weight:600; width:auto; min-width:160px; background:#ffffff; color:#0F2A3D;" onchange="this.form.submit()">
+            <option value="terlama" {{ ($sort ?? '') === 'terlama' ? 'selected' : '' }}>Urutan File (Awal - Akhir)</option>
+            <option value="terbaru" {{ ($sort ?? '') === 'terbaru' ? 'selected' : '' }}>Entry Terbaru</option>
+            <option value="nik_asc" {{ ($sort ?? '') === 'nik_asc' ? 'selected' : '' }}>NIK (Terkecil - Terbesar)</option>
+            <option value="nik_desc" {{ ($sort ?? '') === 'nik_desc' ? 'selected' : '' }}>NIK (Terbesar - Terkecil)</option>
+            <option value="nama_asc" {{ ($sort ?? '') === 'nama_asc' ? 'selected' : '' }}>Nama Pegawai (A - Z)</option>
+            <option value="nama_desc" {{ ($sort ?? '') === 'nama_desc' ? 'selected' : '' }}>Nama Pegawai (Z - A)</option>
+        </select>
+
+        <div style="position:relative; flex:1; min-width:180px;">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="position:absolute; left:12px; top:50%; transform:translateY(-50%); color:#64748B;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             <input type="text" name="q" value="{{ $keyword }}" placeholder="Cari NIK, nama pegawai, jabatan..." class="form-control table-search-input" style="padding-left:36px; height:40px; border-radius:8px; width:100%; border:1px solid #CBD5E1; font-size:13px;">
         </div>
         <button type="submit" class="btn btn-outline" style="height:40px; padding:0 16px; font-weight:600; font-size:13px;">Cari</button>
-        @if ($keyword !== '' || (string)$bulan === 'all' || (int)$bulan !== (int)now()->month || (int)$tahun !== (int)now()->year)
+        @if ($keyword !== '' || (string)$bulan === 'all' || (int)$bulan !== (int)now()->month || (int)$tahun !== (int)now()->year || ($sort ?? 'terbaru') !== 'terbaru')
             <a href="{{ route('potongan-keu.index', $tipe) }}" class="btn btn-outline" style="height:40px; padding:0 12px; color:#DC2626; border-color:#FECACA; font-size:13px; display:inline-flex; align-items:center;" title="Reset Filter">Reset</a>
         @endif
     </form>
@@ -204,9 +249,9 @@
             Input Manual 1 Pegawai
         </a>
 
-        <a href="{{ route('potongan-keu.terbit', [$tipe, 'bulan' => $bulan, 'tahun' => $tahun]) }}" class="btn btn-outline" style="font-weight:600; padding:9px 16px; font-size:13px;">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="margin-right:6px; color:#2E86AB;"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-            Lihat Halaman Penerbitan Realtime
+        <a href="{{ route('approval.index', ['jenis' => 'potongan_' . $tipe]) }}" class="btn btn-outline" style="font-weight:600; padding:9px 16px; font-size:13px;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="margin-right:6px; color:#2E86AB;"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+            Persetujuan & Approval ({{ strtoupper($tipe) }})
         </a>
     </div>
 </div>
@@ -231,7 +276,7 @@
             <tbody>
                 @forelse ($items as $item)
                     <tr>
-                        <td>{{ $loop->iteration }}</td>
+                        <td>{{ isset($paginator) ? (($paginator->currentPage() - 1) * $paginator->perPage() + $loop->iteration) : $loop->iteration }}</td>
                         <td>{{ formatTglIndo($item['tgl_potongan'], 'd/m/Y') }}</td>
                         <td class="cell-nik">{{ $item['nik'] }}</td>
                         <td class="cell-name">{{ $item['nama'] }}</td>
@@ -275,12 +320,23 @@
                                     <div style="font-size:13px; color:#64748B; margin-bottom:14px;">Coba gunakan kata kunci NIK atau nama pegawai yang lain.</div>
                                     <a href="{{ route('potongan-keu.index', $tipe) }}" class="btn btn-outline" style="font-size:13px;">Tampilkan Semua Potongan</a>
                                 @else
-                                    <div style="font-weight:700; color:#334155; font-size:15px; margin-bottom:4px;">Belum ada data {{ strtolower($tipeLabel) }} periode ini.</div>
-                                    <div style="font-size:13px; color:#64748B; margin-bottom:14px;">Gunakan fitur <strong>Import File Excel / CSV</strong> untuk mengisi otomatis seluruh potongan pegawai sekaligus.</div>
-                                    <button type="button" class="pk-btn-excel" onclick="openImportModal()">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
-                                        Unggah File Excel / CSV Sekarang
-                                    </button>
+                                    <div style="font-weight:700; color:#334155; font-size:15px; margin-bottom:4px;">Belum ada data {{ strtolower($tipeLabel) }} periode {{ $bulan === 'all' ? 'ini' : ($bulanNames[(int)$bulan] ?? 'Bulan ' . $bulan) . ' ' . $tahun }}.</div>
+                                    <div style="font-size:13px; color:#64748B; margin-bottom:16px;">Anda dapat menyalin data potongan dari bulan sebelumnya, atau mengimpor berkas Excel baru.</div>
+                                    <div style="display:flex; gap:10px; justify-content:center; align-items:center; flex-wrap:wrap;">
+                                        <form action="{{ route('potongan-keu.salin-bulan-lalu', $tipe) }}" method="POST" style="margin:0;" onsubmit="return confirmSubmit(event, 'Salin data potongan dari riwayat bulan sebelumnya ke periode {{ $bulan === 'all' ? 'ini' : ($bulanNames[(int)$bulan] ?? 'Bulan ' . $bulan) . ' ' . $tahun }}?', 'Konfirmasi Salin Potongan', 'info', 'Ya, Salin');">
+                                            @csrf
+                                            <input type="hidden" name="target_bulan" value="{{ $bulan === 'all' ? now()->month : $bulan }}">
+                                            <input type="hidden" name="target_tahun" value="{{ $tahun }}">
+                                            <button type="submit" class="btn btn-outline" style="background:#ffffff; border-color:#0D2C6E; color:#0D2C6E; font-weight:700; padding:9px 18px; border-radius:10px; display:inline-flex; align-items:center; gap:6px;">
+                                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                                                Salin dari Bulan Lalu
+                                            </button>
+                                        </form>
+                                        <button type="button" class="pk-btn-excel" onclick="openImportModal()">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+                                            Unggah File Excel / CSV
+                                        </button>
+                                    </div>
                                 @endif
                             </div>
                         </td>
@@ -290,6 +346,58 @@
         </table>
     </div>
 </div>
+
+<!-- Pagination Navigasi (20 Per Halaman) -->
+@if (isset($paginator) && $paginator->hasPages())
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-top:18px; padding:12px 18px; background:#ffffff; border:1px solid #E2E8F0; border-radius:12px; box-shadow:0 2px 6px rgba(15, 42, 61, 0.02);">
+        <div style="font-size:13px; color:#64748B;">
+            Menampilkan <strong>{{ $paginator->firstItem() }}</strong> - <strong>{{ $paginator->lastItem() }}</strong> dari <strong>{{ $paginator->total() }}</strong> data
+            <span style="margin:0 4px; color:#CBD5E1;">&bull;</span>
+            Halaman <strong>{{ $paginator->currentPage() }}</strong> dari <strong>{{ $paginator->lastPage() }}</strong>
+        </div>
+        
+        <div style="display:flex; gap:5px; align-items:center; flex-wrap:wrap;">
+            @if ($paginator->onFirstPage())
+                <span class="pagination-btn disabled">&laquo; Sebelumnya</span>
+            @else
+                <a href="{{ $paginator->previousPageUrl() }}" class="pagination-btn">&laquo; Sebelumnya</a>
+            @endif
+
+            @php
+                $startPage = max(1, $paginator->currentPage() - 2);
+                $endPage   = min($paginator->lastPage(), $paginator->currentPage() + 2);
+            @endphp
+
+            @if ($startPage > 1)
+                <a href="{{ $paginator->url(1) }}" class="pagination-btn">1</a>
+                @if ($startPage > 2)
+                    <span style="padding:0 3px; color:#94A3B8;">...</span>
+                @endif
+            @endif
+
+            @for ($i = $startPage; $i <= $endPage; $i++)
+                @if ($i == $paginator->currentPage())
+                    <span class="pagination-btn active">{{ $i }}</span>
+                @else
+                    <a href="{{ $paginator->url($i) }}" class="pagination-btn">{{ $i }}</a>
+                @endif
+            @endfor
+
+            @if ($endPage < $paginator->lastPage())
+                @if ($endPage < $paginator->lastPage() - 1)
+                    <span style="padding:0 3px; color:#94A3B8;">...</span>
+                @endif
+                <a href="{{ $paginator->url($paginator->lastPage()) }}" class="pagination-btn">{{ $paginator->lastPage() }}</a>
+            @endif
+
+            @if ($paginator->hasMorePages())
+                <a href="{{ $paginator->nextPageUrl() }}" class="pagination-btn">Selanjutnya &raquo;</a>
+            @else
+                <span class="pagination-btn disabled">Selanjutnya &raquo;</span>
+            @endif
+        </div>
+    </div>
+@endif
 
 <!-- Modal Import Excel / CSV Potongan -->
 <div id="pk-modal-import" class="pk-modal-overlay">
@@ -327,7 +435,26 @@
             </label>
             <input type="file" name="file_excel" id="import-file-input" accept=".csv,.xlsx,.xls,.txt,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required style="position:absolute; width:1px; height:1px; opacity:0; pointer-events:none;" onchange="handleImportFile(this)">
 
-            <div style="margin-top:16px;">
+            <div style="margin-top:16px; display:flex; gap:12px;">
+                <div style="flex:1;">
+                    <label style="display:block; font-size:12.5px; font-weight:600; color:#334155; margin-bottom:4px;">Target Periode Bulan:</label>
+                    <select name="bulan" class="form-control" style="height:38px; border-radius:8px; border:1px solid #CBD5E1; font-size:13px; font-weight:600; width:100%; background:#ffffff;">
+                        @foreach ($bulanNames as $bNum => $bNama)
+                            <option value="{{ $bNum }}" {{ (string)($bulan === 'all' ? now()->month : $bulan) === (string)$bNum ? 'selected' : '' }}>{{ $bNama }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div style="width:120px;">
+                    <label style="display:block; font-size:12.5px; font-weight:600; color:#334155; margin-bottom:4px;">Tahun:</label>
+                    <select name="tahun" class="form-control" style="height:38px; border-radius:8px; border:1px solid #CBD5E1; font-size:13px; font-weight:600; width:100%; background:#ffffff;">
+                        @for ($y = now()->year + 1; $y >= 2024; $y--)
+                            <option value="{{ $y }}" {{ (int)$tahun === $y ? 'selected' : '' }}>{{ $y }}</option>
+                        @endfor
+                    </select>
+                </div>
+            </div>
+
+            <div style="margin-top:14px;">
                 <label style="display:block; font-size:13px; font-weight:600; color:#334155; margin-bottom:6px;">Opsi Data Duplikat:</label>
                 <div style="display:flex; gap:16px; font-size:13px; color:#334155;">
                     <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">

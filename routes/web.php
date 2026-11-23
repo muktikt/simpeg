@@ -32,6 +32,9 @@ use App\Http\Controllers\PengumumanController;
 use App\Http\Controllers\DokumenSuratController;
 use App\Http\Controllers\TunjanganPendidikanController;
 use App\Http\Controllers\InsentifPendidikanController;
+use App\Http\Controllers\PejabatTtdController;
+use App\Http\Controllers\AuditLogController;
+use App\Http\Controllers\NotifikasiController;
 
 Route::get('/', [LoginController::class, 'showLoginForm'])->name('login');
 Route::get('/login', [LoginController::class, 'showLoginForm']);
@@ -52,6 +55,7 @@ Route::middleware(['simpeg.auth'])->group(function () {
             Route::get('/', [PegawaiController::class, 'index'])->name('index');
             Route::get('/laporan-anak', [PegawaiController::class, 'laporanAnakDiatas21'])->name('laporan-anak');
             Route::get('/per-unit-kerja', [PegawaiController::class, 'perUnitKerja'])->name('per-unit-kerja');
+            Route::get('/per-unit-kerja/cetak', [PegawaiController::class, 'cetakPerUnitKerja'])->name('per-unit-kerja.cetak');
         });
 
         Route::get('/{id}', [PegawaiController::class, 'show'])->whereNumber('id')->name('show');
@@ -107,15 +111,22 @@ Route::middleware(['simpeg.auth'])->group(function () {
         Route::delete('/{id}', [DrdTukinController::class, 'destroy'])->whereNumber('id')->name('destroy');
     });
 
-    // Sanksi Pegawai - Admin SDM only
-    Route::prefix('sanksi')->name('sanksi.')->middleware(['simpeg.auth:1'])->group(function () {
-        Route::get('/', [SanksiController::class, 'index'])->name('index');
-        Route::get('/laporan', [SanksiController::class, 'laporan'])->name('laporan');
-        Route::get('/create', [SanksiController::class, 'create'])->name('create');
-        Route::post('/', [SanksiController::class, 'store'])->name('store');
-        Route::get('/{id}/edit', [SanksiController::class, 'edit'])->whereNumber('id')->name('edit');
-        Route::put('/{id}', [SanksiController::class, 'update'])->whereNumber('id')->name('update');
-        Route::delete('/{id}', [SanksiController::class, 'destroy'])->whereNumber('id')->name('destroy');
+    // Sanksi Pegawai - Laporan & Cetak untuk SDM (Role 1), Keuangan (Role 2), & Direksi (Role 7)
+    Route::prefix('sanksi')->name('sanksi.')->group(function () {
+        Route::middleware(['simpeg.auth:1,2,7'])->group(function () {
+            Route::get('/laporan', [SanksiController::class, 'laporan'])->name('laporan');
+            Route::get('/cetak-all', [SanksiController::class, 'cetakAll'])->name('cetak-all');
+            Route::get('/cetak-pegawai', [SanksiController::class, 'cetakPegawai'])->name('cetak-pegawai');
+        });
+
+        Route::middleware(['simpeg.auth:1'])->group(function () {
+            Route::get('/', [SanksiController::class, 'index'])->name('index');
+            Route::get('/create', [SanksiController::class, 'create'])->name('create');
+            Route::post('/', [SanksiController::class, 'store'])->name('store');
+            Route::get('/{id}/edit', [SanksiController::class, 'edit'])->whereNumber('id')->name('edit');
+            Route::put('/{id}', [SanksiController::class, 'update'])->whereNumber('id')->name('update');
+            Route::delete('/{id}', [SanksiController::class, 'destroy'])->whereNumber('id')->name('destroy');
+        });
     });
 
     // Prestasi - Admin SDM only
@@ -135,6 +146,7 @@ Route::middleware(['simpeg.auth'])->group(function () {
 
         Route::middleware(['simpeg.auth:1,7'])->group(function () {
             Route::get('/', [GajiProsesController::class, 'index'])->name('index');
+            Route::get('/audit', [GajiProsesController::class, 'audit'])->name('audit');
             Route::post('/terbitkan-semua', [GajiProsesController::class, 'terbitkanSemua'])->name('terbitkan-semua');
             Route::post('/{id}/terbitkan', [GajiProsesController::class, 'terbitkan'])->whereNumber('id')->name('terbitkan');
         });
@@ -248,6 +260,13 @@ Route::middleware(['simpeg.auth'])->group(function () {
         Route::put('/', [SettingAplikasiController::class, 'update'])->name('update');
     });
 
+    // SET Pejabat Penandatangan Laporan Dinamis (tbl_ttd) - Admin SDM (1), Keuangan (2), Direksi (7)
+    Route::prefix('pejabat-ttd')->name('pejabat-ttd.')->middleware(['simpeg.auth:1,2,7'])->group(function () {
+        Route::get('/', [PejabatTtdController::class, 'index'])->name('index');
+        Route::get('/{id}/edit', [PejabatTtdController::class, 'edit'])->whereNumber('id')->name('edit');
+        Route::post('/{id}', [PejabatTtdController::class, 'update'])->whereNumber('id')->name('update');
+    });
+
     // Dokumen Surat Pegawai (Unggah & Kelola untuk Admin SDM, Unduh untuk semua user)
     Route::prefix('dokumen-surat')->name('dokumen-surat.')->group(function () {
         Route::get('/download/{id?}', [DokumenSuratController::class, 'download'])->middleware(['simpeg.auth'])->name('download');
@@ -269,6 +288,8 @@ Route::middleware(['simpeg.auth'])->group(function () {
     // Cuti Pegawai & Laporan Cuti
     Route::prefix('cuti')->name('cuti.')->group(function () {
         Route::get('/', [CutiController::class, 'index'])->middleware(['simpeg.auth:1,5,7'])->name('index');
+        Route::post('/', [CutiController::class, 'store'])->middleware(['simpeg.auth:1,5'])->name('store');
+        Route::get('/{id}/surat', [CutiController::class, 'surat'])->middleware(['simpeg.auth:1,5,7'])->name('surat');
         Route::put('/{id}/status', [CutiController::class, 'updateStatus'])->middleware(['simpeg.auth:1'])->whereNumber('id')->name('update-status');
     });
 
@@ -295,6 +316,20 @@ Route::middleware(['simpeg.auth'])->group(function () {
         Route::get('/{id}/edit', [UserAksesController::class, 'edit'])->whereNumber('id')->name('edit');
         Route::put('/{id}', [UserAksesController::class, 'update'])->whereNumber('id')->name('update');
         Route::delete('/{id}', [UserAksesController::class, 'destroy'])->whereNumber('id')->name('destroy');
+    });
+
+    // Audit Trail & Log Aktivitas Pengguna - Role 1 (SDM) & Role 7 (Direksi)
+    Route::prefix('audit-log')->name('audit-log.')->middleware(['simpeg.auth:1,7'])->group(function () {
+        Route::get('/', [AuditLogController::class, 'index'])->name('index');
+        Route::get('/cetak', [AuditLogController::class, 'cetak'])->name('cetak');
+    });
+
+    // Pusat Notifikasi In-App & Status Tracking (Semua Role: 1, 2, 5, 7)
+    Route::prefix('notifikasi')->name('notifikasi.')->middleware(['simpeg.auth:1,2,5,7'])->group(function () {
+        Route::get('/', [NotifikasiController::class, 'index'])->name('index');
+        Route::get('/count', [NotifikasiController::class, 'unreadCount'])->name('count');
+        Route::post('/{id}/read', [NotifikasiController::class, 'markAsRead'])->whereNumber('id')->name('read');
+        Route::post('/read-all', [NotifikasiController::class, 'markAllAsRead'])->name('read-all');
     });
 
     // Asuransi (Dapenma) - Admin SDM only
@@ -354,6 +389,7 @@ Route::middleware(['simpeg.auth'])->group(function () {
         Route::delete('/{tipe}/{id}', [PotonganKeuController::class, 'destroy'])->name('destroy')->where('tipe', 'gaji|thr|gaji13')->whereNumber('id');
         Route::post('/{tipe}/terbitkan', [PotonganKeuController::class, 'terbitkan'])->name('terbitkan')->where('tipe', 'gaji|thr|gaji13');
         Route::post('/{tipe}/batal-terbit', [PotonganKeuController::class, 'batalTerbit'])->name('batal-terbit')->where('tipe', 'gaji|thr|gaji13');
+        Route::post('/{tipe}/salin-bulan-lalu', [PotonganKeuController::class, 'salinBulanLalu'])->name('salin-bulan-lalu')->where('tipe', 'gaji|thr|gaji13');
         Route::get('/{tipe}/belum-masuk', [PotonganKeuController::class, 'belumMasuk'])->name('belum-masuk')->where('tipe', 'gaji|thr|gaji13');
     });
 
@@ -368,8 +404,9 @@ Route::middleware(['simpeg.auth'])->group(function () {
         Route::get('/belum-masuk', [RekeningBjbController::class, 'belumMasuk'])->name('belum-masuk');
     });
 
-    // Cek NIK & Hapus Kesalahan NIK
-    Route::prefix('cek-nik')->name('cek-nik.')->middleware(['simpeg.auth:2'])->group(function () {
+    // Cek NIK, Komparasi Selisih & Hapus Kesalahan NIK
+    Route::prefix('cek-nik')->name('cek-nik.')->middleware(['simpeg.auth:1,2'])->group(function () {
+        Route::get('/komparasi', [CekNikController::class, 'komparasi'])->name('komparasi');
         Route::get('/bulan-lalu', [CekNikController::class, 'bulanLalu'])->name('bulan-lalu');
         Route::get('/bulan-ini', [CekNikController::class, 'bulanIni'])->name('bulan-ini');
         Route::get('/hapus', [CekNikController::class, 'hapusForm'])->name('hapus');
@@ -377,10 +414,13 @@ Route::middleware(['simpeg.auth'])->group(function () {
     });
 
     // Laporan Potongan Keuangan
-    Route::prefix('laporan-potongan')->name('laporan-potongan.')->middleware(['simpeg.auth:2'])->group(function () {
+    Route::prefix('laporan-potongan')->name('laporan-potongan.')->middleware(['simpeg.auth:1,2,7'])->group(function () {
         Route::get('/potongan-keu', [LaporanPotonganController::class, 'potonganKeu'])->name('potongan-keu');
         Route::get('/potongan-keu-minus', [LaporanPotonganController::class, 'potonganKeuMinus'])->name('potongan-keu-minus');
+        Route::get('/potongan-keu-minus/cetak', [LaporanPotonganController::class, 'cetakMinus'])->name('cetak-minus');
+        Route::get('/potongan-keu-minus/cetak-payroll', [LaporanPotonganController::class, 'cetakPayrollMinus'])->name('cetak-payroll-minus');
         Route::get('/potongan-keu-non-minus', [LaporanPotonganController::class, 'potonganKeuNonMinus'])->name('potongan-keu-non-minus');
+        Route::get('/potongan-keu-non-minus/cetak', [LaporanPotonganController::class, 'cetakNonMinus'])->name('cetak-non-minus');
         Route::get('/potongan-bpjs', [LaporanPotonganController::class, 'potonganBpjs'])->name('potongan-bpjs');
         Route::get('/potongan-thr', [LaporanPotonganController::class, 'potonganThr'])->name('potongan-thr');
         Route::get('/payroll-thr', [LaporanPotonganController::class, 'payrollThr'])->name('payroll-thr');
@@ -391,9 +431,10 @@ Route::middleware(['simpeg.auth'])->group(function () {
 
     // ══════════════════════════════════════════════════════════════
 
-    // Approval - dashboard kotak masuk, menggabungkan item pending dari
-    // Gaji Proses/THR/Gaji13 yang menunggu approval user yang login.
+    // Approval - dashboard kotak masuk & aksi approval terpadu (single / bulk)
     Route::get('/approval', [ApprovalController::class, 'index'])->middleware(['simpeg.auth:1,2,7'])->name('approval.index');
+    Route::post('/approval/approve', [ApprovalController::class, 'approveSingle'])->middleware(['simpeg.auth:1,2,7'])->name('approval.approve');
+    Route::post('/approval/approve-bulk', [ApprovalController::class, 'approveBulk'])->middleware(['simpeg.auth:1,2,7'])->name('approval.approve-bulk');
 
     // Pengaduan Pegawai - Multi-Role Workflow (Pegawai, Kadiv, KSPI, DIRUT, TPDPK, SDM)
     Route::prefix('pengaduan')->name('pengaduan.')->group(function () {

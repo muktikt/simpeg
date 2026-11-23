@@ -45,4 +45,6 @@
         </tbody>
     </table>
 </div>
+
+@include('partials.signature-block', ['kodeTtd' => 'gaji'])
 @endsection

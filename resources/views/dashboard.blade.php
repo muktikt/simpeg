@@ -1,8 +1,11 @@
 @extends('layouts.app')
 
-@section('title', 'Beranda')
+@section('title', !empty($isDireksi) ? 'Dashboard Eksekutif Direksi' : 'Beranda')
 
 @section('content')
+@if (!empty($isDireksi))
+    @include('dashboard.direksi')
+@else
 @php
     $segments = [
         ['key' => 'pegawai_tetap', 'label' => 'Pegawai tetap', 'color' => 'var(--teal-mid)'],
@@ -134,4 +137,16 @@
         </div>
     </div>
 </div>
+
+@if (session('simpeg_user.userlevel') === '1')
+    <div style="margin-top:24px; padding:14px 20px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; display:flex; justify-content:space-between; align-items:center;">
+        <span style="font-size:13px; color:#64748b;">
+            <strong style="color:#0f2a3d;">Akses Khusus Admin SDM:</strong> Anda dapat melihat pratinjau statistik level Direksi.
+        </span>
+        <a href="{{ route('dashboard', ['view' => 'direksi']) }}" class="btn" style="background:#0284c7; color:#ffffff; font-size:12.5px; font-weight:600; padding:6px 14px; border-radius:8px; text-decoration:none;">
+            Buka Dashboard Eksekutif Direksi &rarr;
+        </a>
+    </div>
+@endif
+@endif
 @endsection
