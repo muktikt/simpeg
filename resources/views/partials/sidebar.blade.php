@@ -10,6 +10,7 @@
         'calendar' => '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/><path d="M8 2v4M16 2v4"/>',
         'shield' => '<path d="M12 2l8 4v6c0 5-3.4 8.4-8 10-4.6-1.6-8-5-8-10V6l8-4z"/>',
         'user' => '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+        'bell' => '<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>',
         'report' => '<path d="M6 9V3h12v6"/><path d="M6 18h12v4H6z"/><rect x="4" y="9" width="16" height="9" rx="1"/>',
     ];
 
@@ -48,7 +49,7 @@
                     }
                     return true;
                 } else {
-                    if (request()->has('kategori') || request()->has('status') || request()->has('tipe')) {
+                    if (request()->has('kategori') || request()->has('status') || request()->has('tipe') || (request()->has('jenis') && request('jenis') !== 'all')) {
                         return false;
                     }
                     return true;
@@ -78,6 +79,9 @@
                 $href = $item['route_name'] ? route($item['route_name']) : route('placeholder', $slugify($item['label']));
                 if (!empty($item['personal'])) $href .= (str_contains($href, '?') ? '&' : '?') . 'my=1';
                 $isSingleActive = request()->routeIs($item['route_name']) && (!empty($item['personal']) ? request('my') : true);
+                if ($item['route_name'] === 'approval.index' && request()->routeIs('approval.*')) {
+                    $isSingleActive = !request()->has('jenis') || request('jenis') === 'all';
+                }
             @endphp
             <a href="{{ $href }}" class="nav-link {{ $isSingleActive ? 'active' : '' }}">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">{!! $icons[$item['icon']] !!}</svg>

@@ -207,18 +207,30 @@
 }
 </style>
 
-<div class="page-head">
-    <div class="breadcrumb">Home / Pengaturan Keuangan / Alur Terbit & Approval / {{ $tipeLabel }}</div>
-    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:12px;">
-        <div>
-            <h1 style="margin:0;">ALUR APPROVAL & PENERBITAN {{ strtoupper($tipeLabel) }}</h1>
-            <p style="margin:4px 0 0 0; color:#64748B; font-size:13px;">Data yang di-upload atau di-input berstatus Draft, disetujui SDM, lalu diterbitkan Final oleh Keuangan.</p>
-        </div>
-        <div style="display:flex; gap:10px; align-items:center;">
-            <a href="{{ route('potongan-keu.index', $tipe) }}" class="btn btn-outline" style="font-size:13px; padding:7px 14px;">
+<div class="page-head" style="margin-bottom:18px;">
+    <div style="margin-bottom:10px;">
+        @if ($isSdm && !$isKeu)
+            <a href="{{ route('approval.index') }}" class="btn btn-outline" style="font-size:12.5px; padding:6px 14px; display:inline-flex; align-items:center; gap:6px; background:#ffffff; border-radius:8px; font-weight:600; text-decoration:none; color:#475569;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><polyline points="15 18 9 12 15 6"/></svg>
+                Kembali ke Approval
+            </a>
+        @else
+            <a href="{{ route('potongan-keu.index', $tipe) }}" class="btn btn-outline" style="font-size:12.5px; padding:6px 14px; display:inline-flex; align-items:center; gap:6px; background:#ffffff; border-radius:8px; font-weight:600; text-decoration:none; color:#475569;">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><polyline points="15 18 9 12 15 6"/></svg>
                 Kembali ke Data Potongan
             </a>
+        @endif
+    </div>
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
+        <div>
+            <h1 style="margin:0;">
+                {{ $isSdm && !$isKeu ? 'PERSETUJUAN ' . strtoupper($tipeLabel) : 'ALUR APPROVAL & PENERBITAN ' . strtoupper($tipeLabel) }}
+            </h1>
+            <p style="margin:4px 0 0 0; color:#64748B; font-size:13px;">
+                {{ $isSdm && !$isKeu ? 'Verifikasi dan setujui data draf potongan pegawai sebelum diterbitkan final oleh Bagian Keuangan.' : 'Data yang di-upload atau di-input berstatus Draft, disetujui SDM, lalu diterbitkan Final oleh Keuangan.' }}
+            </p>
+        </div>
+        <div style="display:flex; gap:10px; align-items:center;">
             <div class="live-pulse-badge">
                 <span class="live-dot"></span>
                 <span>REALTIME SYNC</span>
@@ -317,19 +329,6 @@
             </form>
         @endif
 
-        <!-- Tombol Terbitkan Semua Final untuk Keuangan -->
-        @if ($isKeu && ($countDraft + $countDisetujuiSdm) > 0)
-            <form action="{{ route('potongan-keu.terbitkan', $tipe) }}" method="POST" onsubmit="return confirmSubmit(event, 'Terbitkan secara Final semua potongan periode ini? Potongan yang diterbitkan akan sah dan langsung masuk perhitungan slip gaji.', 'Konfirmasi Terbitkan Final', 'warning', 'Ya, Terbitkan Final');">
-                @csrf
-                <input type="hidden" name="bulan" value="{{ $bulan }}">
-                <input type="hidden" name="tahun" value="{{ $tahun }}">
-                <button type="submit" class="btn btn-success" style="font-weight:700; height:40px; padding:0 18px; box-shadow:0 4px 12px rgba(22, 163, 74, 0.25);">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="margin-right:6px;"><path d="M20 6L9 17l-5-5"/></svg>
-                    TERBITKAN SEMUA (FINAL)
-                </button>
-            </form>
-        @endif
-
         <!-- Tombol Batal Terbit Semua untuk Kembalikan ke Draf -->
         @if ($isKeu && $countFinal > 0)
             <form action="{{ route('potongan-keu.batal-terbit', $tipe) }}" method="POST" onsubmit="return confirmSubmit(event, 'Batalkan status terbit dan kembalikan seluruh {{ $countFinal }} data potongan yang sudah diterbitkan ke status Draf (Menunggu SDM)?', 'Konfirmasi Batalkan Penerbitan', 'warning', 'Ya, Batal Terbit');">
@@ -355,18 +354,22 @@
     </div>
 
     <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-        <button type="button" class="btn btn-sm" style="background:#4338CA; color:#ffffff; border:none; padding:8px 14px; font-weight:700;" onclick="submitBatchApproval('sdm')">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" style="margin-right:4px;"><polyline points="20 6 9 17 4 12"/></svg>
-            Setujui SDM (Terpilih)
-        </button>
-        <button type="button" class="btn btn-sm btn-success" style="padding:8px 16px; font-weight:700;" onclick="submitBatchApproval('terbitkan')">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" style="margin-right:4px;"><path d="M20 6L9 17l-5-5"/></svg>
-            Terbitkan Final (Terpilih)
-        </button>
-        <button type="button" class="btn btn-sm" style="background:#FFF1F2; color:#E11D48; border:1px solid #FECDD3; padding:8px 14px; font-weight:700;" onclick="submitBatchApproval('batal')">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" style="margin-right:4px;"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
-            Batal Terbit (Terpilih)
-        </button>
+        @if ($isSdm)
+            <button type="button" class="btn btn-sm" style="background:#4338CA; color:#ffffff; border:none; padding:8px 14px; font-weight:700;" onclick="submitBatchApproval('sdm')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" style="margin-right:4px;"><polyline points="20 6 9 17 4 12"/></svg>
+                Setujui SDM (Terpilih)
+            </button>
+        @endif
+        @if ($isKeu)
+            <button type="button" class="btn btn-sm btn-success" style="padding:8px 16px; font-weight:700;" onclick="submitBatchApproval('terbitkan')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" style="margin-right:4px;"><path d="M20 6L9 17l-5-5"/></svg>
+                Terbitkan Final (Terpilih)
+            </button>
+            <button type="button" class="btn btn-sm" style="background:#FFF1F2; color:#E11D48; border:1px solid #FECDD3; padding:8px 14px; font-weight:700;" onclick="submitBatchApproval('batal')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" style="margin-right:4px;"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                Batal Terbit (Terpilih)
+            </button>
+        @endif
         <button type="button" class="btn btn-sm btn-outline" style="color:#ffffff; border-color:rgba(255,255,255,0.3); padding:8px 12px;" onclick="clearSelection()">
             Batal
         </button>
@@ -398,9 +401,9 @@
                 @forelse ($items as $item)
                     @php
                         $st = $item['status'] ?? 'N';
-                        $isTerbit = in_array($st, ['Y', 'terbit'], true);
-                        $isSdm = ($st === 'kepegawaian');
-                        $statusCategory = $isTerbit ? 'final' : ($isSdm ? 'sdm' : 'draft');
+                        $rowIsTerbit = in_array($st, ['Y', 'terbit'], true);
+                        $rowIsSdmApproved = ($st === 'kepegawaian');
+                        $statusCategory = $rowIsTerbit ? 'final' : ($rowIsSdmApproved ? 'sdm' : 'draft');
                     @endphp
                     <tr id="row-potongan-{{ $item['id'] }}" class="item-row" data-id="{{ $item['id'] }}" data-status="{{ $statusCategory }}" data-nik="{{ strtolower($item['nik']) }}" data-nama="{{ strtolower($item['nama']) }}">
                         <td style="text-align:center;">
@@ -420,12 +423,12 @@
                         
                         <!-- Status Column -->
                         <td style="text-align:center;" id="status-cell-{{ $item['id'] }}">
-                            @if ($isTerbit)
+                            @if ($rowIsTerbit)
                                 <span class="badge-status-terbit" title="Disahkan oleh: {{ $item['disetujui_oleh'] ?? '-' }}">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M20 6L9 17l-5-5"/></svg>
                                     Diterbitkan Final
                                 </span>
-                            @elseif ($isSdm)
+                            @elseif ($rowIsSdmApproved)
                                 <span class="badge-status-kepegawaian" title="Disetujui SDM: {{ $item['disetujui_kepegawaian_oleh'] ?? '-' }}">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><polyline points="20 6 9 17 4 12"/></svg>
                                     Disetujui SDM
@@ -440,7 +443,7 @@
 
                         <!-- Action Column -->
                         <td style="text-align:center;" id="action-cell-{{ $item['id'] }}">
-                            @if ($isTerbit)
+                            @if ($rowIsTerbit)
                                 <div style="display:inline-flex; align-items:center; gap:6px;">
                                     <span style="font-size:12px; color:#16A34A; font-weight:600; display:inline-flex; align-items:center; gap:4px;">
                                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="13" height="13"><polyline points="20 6 9 17 4 12"/></svg>
@@ -453,16 +456,27 @@
                                         </button>
                                     @endif
                                 </div>
-                            @elseif ($isSdm)
-                                <button type="button" class="btn-sm-action btn-keu-terbit" onclick="ajaxTerbitkanSingle({{ $item['id'] }})" title="Terbitkan potongan pegawai ini ke perhitungan final">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M20 6L9 17l-5-5"/></svg>
-                                    Terbitkan Final
-                                </button>
+                            @elseif ($rowIsSdmApproved)
+                                @if ($isKeu)
+                                    <button type="button" class="btn-sm-action btn-keu-terbit" onclick="ajaxTerbitkanSingle({{ $item['id'] }})" title="Terbitkan potongan pegawai ini ke perhitungan final">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M20 6L9 17l-5-5"/></svg>
+                                        Terbitkan Final
+                                    </button>
+                                @else
+                                    <span style="font-size:12px; color:#4338CA; font-weight:600; display:inline-flex; align-items:center; gap:4px;">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="13" height="13"><polyline points="20 6 9 17 4 12"/></svg>
+                                        Disetujui SDM
+                                    </span>
+                                @endif
                             @else
-                                <button type="button" class="btn-sm-action btn-sdm-approve" onclick="ajaxSetujuiSdmSingle({{ $item['id'] }})" title="Setujui potongan pegawai ini sebagai SDM">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><polyline points="20 6 9 17 4 12"/></svg>
-                                    Setujui SDM
-                                </button>
+                                @if ($isSdm)
+                                    <button type="button" class="btn-sm-action btn-sdm-approve" onclick="ajaxSetujuiSdmSingle({{ $item['id'] }})" title="Setujui potongan pegawai ini sebagai SDM">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><polyline points="20 6 9 17 4 12"/></svg>
+                                        Setujui SDM
+                                    </button>
+                                @else
+                                    <span style="font-size:12px; color:#D97706; font-weight:600;">Menunggu SDM</span>
+                                @endif
                             @endif
                         </td>
                     </tr>
@@ -494,6 +508,10 @@
 </div>
 
 <script>
+// Role Flags
+const isUserSdm = {{ $isSdm ? 'true' : 'false' }};
+const isUserKeu = {{ $isKeu ? 'true' : 'false' }};
+
 // Endpoints & Tokens
 const realtimeUrl = "{{ route('potongan-keu.realtime-status', $tipe) }}";
 const terbitkanUrl = "{{ route('potongan-keu.terbitkan', $tipe) }}";
@@ -602,31 +620,48 @@ function submitBatchApproval(actionType) {
         confirmMsg = `Batalkan status terbit untuk ${ids.length} pegawai terpilih dan kembalikan ke status Draf (Menunggu SDM)?`;
     }
 
-    if (!confirm(confirmMsg)) return;
+    const modalType = (actionType === 'batal') ? 'danger' : 'success';
+    const confirmTitle = (actionType === 'sdm') ? 'Persetujuan SDM' : (actionType === 'terbitkan' ? 'Penerbitan Final' : 'Batalkan Status');
+    const confirmBtnText = (actionType === 'batal') ? 'Ya, Batalkan' : 'Ya, Lanjutkan';
 
-    fetch(url, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': csrfToken,
-            'X-Requested-With': 'XMLHttpRequest',
-            'Accept': 'application/json'
-        },
-        body: JSON.stringify({ ids: ids })
-    })
-    .then(r => r.json())
-    .then(data => {
-        clearSelection();
-        fetchRealtimeStatus();
-        if (typeof showCustomAlert === 'function') {
-            showCustomAlert(data.message || 'Operasi berhasil diproses.', 'Berhasil', 'success');
-        } else {
-            alert(data.message || 'Operasi berhasil diproses.');
+    showCustomModal({
+        title: confirmTitle,
+        text: confirmMsg,
+        type: modalType,
+        confirmText: confirmBtnText,
+        cancelText: 'Batal',
+        showCancel: true,
+        confirmBtnBg: (actionType === 'batal') ? '#DC2626' : '#15803D',
+        onConfirm: () => {
+            fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({ ids: ids })
+            })
+            .then(r => r.json())
+            .then(data => {
+                clearSelection();
+                fetchRealtimeStatus();
+                if (typeof showCustomAlert === 'function') {
+                    showCustomAlert(data.message || 'Operasi berhasil diproses.', 'Berhasil', 'success');
+                } else {
+                    alert(data.message || 'Operasi berhasil diproses.');
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                if (typeof showCustomAlert === 'function') {
+                    showCustomAlert('Terjadi kesalahan saat memproses data.', 'Gangguan Jaringan', 'danger');
+                } else {
+                    alert('Terjadi kesalahan saat memproses data.');
+                }
+            });
         }
-    })
-    .catch(err => {
-        console.error(err);
-        alert('Terjadi kesalahan saat memproses data.');
     });
 }
 
@@ -672,29 +707,43 @@ function ajaxTerbitkanSingle(rowId) {
 }
 
 function ajaxBatalTerbitSingle(rowId) {
-    if (!confirm('Kembalikan potongan pegawai ini ke status Draf (Menunggu SDM)?')) return;
-    fetch(batalTerbitUrl, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': csrfToken,
-            'X-Requested-With': 'XMLHttpRequest',
-            'Accept': 'application/json'
-        },
-        body: JSON.stringify({ id: rowId })
-    })
-    .then(r => r.json())
-    .then(data => {
-        fetchRealtimeStatus();
-        if (typeof showCustomAlert === 'function') {
-            showCustomAlert(data.message || 'Penerbitan dibatalkan. Status dikembalikan ke Draf.', 'Batal Terbit', 'info');
-        } else {
-            alert(data.message || 'Penerbitan dibatalkan.');
+    showCustomModal({
+        title: 'Batalkan Status Terbit',
+        text: 'Kembalikan potongan pegawai ini ke status Draf (Menunggu SDM)?',
+        type: 'danger',
+        confirmText: 'Ya, Kembalikan',
+        cancelText: 'Batal',
+        showCancel: true,
+        confirmBtnBg: '#DC2626',
+        onConfirm: () => {
+            fetch(batalTerbitUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({ id: rowId })
+            })
+            .then(r => r.json())
+            .then(data => {
+                fetchRealtimeStatus();
+                if (typeof showCustomAlert === 'function') {
+                    showCustomAlert(data.message || 'Penerbitan dibatalkan. Status dikembalikan ke Draf.', 'Batal Terbit', 'info');
+                } else {
+                    alert(data.message || 'Penerbitan dibatalkan.');
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                if (typeof showCustomAlert === 'function') {
+                    showCustomAlert('Terjadi kesalahan saat membatalkan penerbitan.', 'Gangguan Jaringan', 'danger');
+                } else {
+                    alert('Terjadi kesalahan saat membatalkan penerbitan.');
+                }
+            });
         }
-    })
-    .catch(err => {
-        console.error(err);
-        alert('Terjadi kesalahan saat membatalkan penerbitan.');
     });
 }
 
@@ -750,10 +799,12 @@ function fetchRealtimeStatus() {
                                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="13" height="13"><polyline points="20 6 9 17 4 12"/></svg>
                                         Final
                                     </span>
+                                    ${isUserKeu ? `
                                     <button type="button" class="btn-sm-action btn-batal-terbit" onclick="ajaxBatalTerbitSingle(${it.id})" title="Kembalikan status ke Draf (Menunggu SDM)">
                                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="11" height="11"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
                                         Batal
                                     </button>
+                                    ` : ''}
                                 </div>
                             `;
                         }
@@ -765,12 +816,21 @@ function fetchRealtimeStatus() {
                             </span>
                         `;
                         if (actionCell) {
-                            actionCell.innerHTML = `
-                                <button type="button" class="btn-sm-action btn-keu-terbit" onclick="ajaxTerbitkanSingle(${it.id})" title="Terbitkan potongan pegawai ini ke perhitungan final">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M20 6L9 17l-5-5"/></svg>
-                                    Terbitkan Final
-                                </button>
-                            `;
+                            if (isUserKeu) {
+                                actionCell.innerHTML = `
+                                    <button type="button" class="btn-sm-action btn-keu-terbit" onclick="ajaxTerbitkanSingle(${it.id})" title="Terbitkan potongan pegawai ini ke perhitungan final">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="M20 6L9 17l-5-5"/></svg>
+                                        Terbitkan Final
+                                    </button>
+                                `;
+                            } else {
+                                actionCell.innerHTML = `
+                                    <span style="font-size:12px; color:#4338CA; font-weight:600; display:inline-flex; align-items:center; gap:4px;">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="13" height="13"><polyline points="20 6 9 17 4 12"/></svg>
+                                        Disetujui SDM
+                                    </span>
+                                `;
+                            }
                         }
                     } else {
                         cell.innerHTML = `
@@ -780,12 +840,16 @@ function fetchRealtimeStatus() {
                             </span>
                         `;
                         if (actionCell) {
-                            actionCell.innerHTML = `
-                                <button type="button" class="btn-sm-action btn-sdm-approve" onclick="ajaxSetujuiSdmSingle(${it.id})" title="Setujui potongan pegawai ini sebagai SDM">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><polyline points="20 6 9 17 4 12"/></svg>
-                                    Setujui SDM
-                                </button>
-                            `;
+                            if (isUserSdm) {
+                                actionCell.innerHTML = `
+                                    <button type="button" class="btn-sm-action btn-sdm-approve" onclick="ajaxSetujuiSdmSingle(${it.id})" title="Setujui potongan pegawai ini sebagai SDM">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><polyline points="20 6 9 17 4 12"/></svg>
+                                        Setujui SDM
+                                    </button>
+                                `;
+                            } else {
+                                actionCell.innerHTML = `<span style="font-size:12px; color:#D97706; font-weight:600;">Menunggu SDM</span>`;
+                            }
                         }
                     }
                 }

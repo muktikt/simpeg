@@ -39,16 +39,16 @@ class PotonganKeuController extends Controller
 
     protected array $kolomLabels = [
         'pot_koperasi'      => 'Koperasi',
-        'pot_darmawanita'   => 'Darmawanita',
+        'pot_darmawanita'   => 'D. Wanita',
         'pot_air'           => 'Ledeng',
         'pot_kas'           => 'KAS',
         'pot_bjb'           => 'BJB',
-        'pot_bjbs'          => 'BJBS',
+        'pot_bjbs'          => 'BJB Syariah',
         'pot_asuransi'      => 'Asuransi',
         'pot_btn'           => 'BTN',
-        'pot_zakat_profesi' => 'Zakat Profesi',
+        'pot_zakat_profesi' => 'Zakat',
         'pot_bpjs'          => 'BPJS',
-        'pot_bpr'           => 'BPR',
+        'pot_bpr'           => 'BRI / BPR',
     ];
 
     protected function all(string $tipe, mixed $bulan = null, ?int $tahun = null): array
@@ -149,19 +149,38 @@ class PotonganKeuController extends Controller
         $keyword = trim((string) $request->query('q', ''));
         $bulanParam = $request->query('bulan');
         $tahunParam = $request->query('tahun');
+        $sort = strtolower(trim((string) $request->query('sort', 'terlama')));
 
         $bulan = $bulanParam !== null ? ($bulanParam === 'all' ? 'all' : (int) $bulanParam) : (int) now()->month;
         $tahun = $tahunParam !== null ? (int) $tahunParam : (int) now()->year;
 
         $allItems = collect($this->all($tipe, $bulan, $tahun))
-            ->map(fn ($row) => $this->withCalculated($row, $pegawaiMap))
-            ->sortBy('nik')
-            ->values();
+            ->map(fn ($row) => $this->withCalculated($row, $pegawaiMap));
 
-        $items = $allItems;
+        // Pengurutan (Sorting)
+        if ($sort === 'terbaru') {
+            $allItems = $allItems->sortByDesc(function ($r) {
+                return ($r['tgl_potongan'] ?? '') . '_' . str_pad((string)($r['id'] ?? 0), 10, '0', STR_PAD_LEFT);
+            })->values();
+        } elseif ($sort === 'nik_asc') {
+            $allItems = $allItems->sortBy('nik')->values();
+        } elseif ($sort === 'nik_desc') {
+            $allItems = $allItems->sortByDesc('nik')->values();
+        } elseif ($sort === 'nama_asc') {
+            $allItems = $allItems->sortBy('nama', SORT_NATURAL | SORT_FLAG_CASE)->values();
+        } elseif ($sort === 'nama_desc') {
+            $allItems = $allItems->sortByDesc('nama', SORT_NATURAL | SORT_FLAG_CASE)->values();
+        } else {
+            // Default: 'terlama' (Urutan sesuai baris import file / ID terkecil ke terbesar)
+            $allItems = $allItems->sortBy(function ($r) {
+                return ($r['tgl_potongan'] ?? '') . '_' . str_pad((string)($r['id'] ?? 0), 10, '0', STR_PAD_LEFT);
+            })->values();
+        }
+
+        $filtered = $allItems;
         if ($keyword !== '') {
             $lowerKw = strtolower($keyword);
-            $items = $items->filter(function ($r) use ($lowerKw) {
+            $filtered = $filtered->filter(function ($r) use ($lowerKw) {
                 return str_contains(strtolower($r['nik'] ?? ''), $lowerKw)
                     || str_contains(strtolower($r['nama'] ?? ''), $lowerKw)
                     || str_contains(strtolower($r['jabatan'] ?? ''), $lowerKw)
@@ -169,16 +188,38 @@ class PotonganKeuController extends Controller
             })->values();
         }
 
+        // Pagination 20 Data per Halaman
+        $perPage = 20;
+        $currentPage = (int) $request->query('page', 1);
+        if ($currentPage < 1) $currentPage = 1;
+
+        $totalFiltered = $filtered->count();
+        $pagedItems = $filtered->slice(($currentPage - 1) * $perPage, $perPage)->values();
+
+        $paginator = new \Illuminate\Pagination\LengthAwarePaginator(
+            $pagedItems,
+            $totalFiltered,
+            $perPage,
+            $currentPage,
+            [
+                'path' => $request->url(),
+                'query' => $request->query(),
+            ]
+        );
+
         $totalPegawai = count($pegawaiList);
         $sudahMasuk   = $allItems->pluck('nik')->unique()->count();
         $belumMasuk   = max(0, $totalPegawai - $sudahMasuk);
 
         return view('potongan-keu.index', [
-            'items'       => $items,
+            'paginator'   => $paginator,
+            'items'       => $pagedItems,
             'keyword'     => $keyword,
+            'sort'        => $sort,
             'bulan'       => $bulan,
             'tahun'       => $tahun,
             'totalItems'  => $allItems->count(),
+            'filteredCount' => $totalFiltered,
             'tipe'        => $tipe,
             'tipeLabel'   => $this->tipeLabels[$tipe],
             'kolom'       => $this->kolom,
@@ -315,10 +356,7 @@ class PotonganKeuController extends Controller
             'Expires' => '0',
         ];
 
-        $columns = ['NIK', 'Nama Pegawai'];
-        foreach ($this->kolom as $k) {
-            $columns[] = $this->kolomLabels[$k];
-        }
+        $columns = ['NO', 'NIK', 'NAMA', 'KOPERASI', 'D. WANITA', 'LEDENG', 'KAS', 'BJB', 'BJB SYARIAH', 'ASURANSI', 'BTN', 'ZAKAT', 'BPJS', 'BRI', 'JML POT.'];
 
         $callback = function () use ($columns, $pegawaiList) {
             $handle = fopen('php://output', 'w');
@@ -326,12 +364,25 @@ class PotonganKeuController extends Controller
             fputs($handle, "\xEF\xBB\xBF");
             fputcsv($handle, $columns);
 
+            $no = 1;
             foreach ($pegawaiList as $p) {
-                $row = [$p['nik'], $p['nama']];
-                // Isi nominal sample / 0
-                foreach (range(1, count($this->kolom)) as $i) {
-                    $row[] = '0';
-                }
+                $row = [
+                    $no++,
+                    $p['nik'] ?? '',
+                    $p['nama'] ?? '',
+                    0, // KOPERASI
+                    0, // D. WANITA
+                    0, // LEDENG
+                    0, // KAS
+                    0, // BJB
+                    0, // BJB SYARIAH
+                    0, // ASURANSI
+                    0, // BTN
+                    0, // ZAKAT
+                    0, // BPJS
+                    0, // BRI
+                    0, // JML POT.
+                ];
                 fputcsv($handle, $row);
             }
             fclose($handle);
@@ -347,6 +398,10 @@ class PotonganKeuController extends Controller
     {
         $this->validateTipe($tipe);
 
+        @ini_set('max_execution_time', '0');
+        @ini_set('memory_limit', '512M');
+        @set_time_limit(0);
+
         $request->validate([
             'file_excel' => 'required|file|max:10240',
             'mode'       => 'nullable|in:update,skip',
@@ -361,6 +416,9 @@ class PotonganKeuController extends Controller
         if (in_array($extension, ['csv', 'txt'], true)) {
             $rows = $this->parseCsv($file->getRealPath());
         } elseif ($extension === 'xlsx') {
+            if (! class_exists(\ZipArchive::class)) {
+                return back()->with('error', 'Ekstensi PHP "zip" baru saja diaktifkan di php.ini. Silakan restart terminal "php artisan serve" Anda, atau simpan/ekspor file Excel ke format CSV (.csv) lalu upload kembali.');
+            }
             $rows = $this->parseXlsx($file->getRealPath());
         } else {
             // Coba parse sebagai CSV jika extension lain
@@ -371,35 +429,72 @@ class PotonganKeuController extends Controller
             return back()->with('error', 'Gagal membaca isi file atau file kosong. Pastikan format sesuai template.');
         }
 
-        // Mapping index kolom dari baris header (baris pertama)
-        $header = array_shift($rows);
+        // Cari baris header yang mengandung kolom 'NIK' (bila ada baris kosong di awal file)
+        $header = null;
+        while (! empty($rows)) {
+            $candidate = array_shift($rows);
+            $hasNik = false;
+            foreach ($candidate as $colVal) {
+                if (str_contains(strtolower(trim((string) $colVal)), 'nik')) {
+                    $hasNik = true;
+                    break;
+                }
+            }
+            if ($hasNik) {
+                $header = $candidate;
+                break;
+            }
+        }
+
+        if (! $header) {
+            return back()->with('error', 'Kolom header "NIK" tidak ditemukan di dalam file. Pastikan format sesuai.');
+        }
+
+        // Mapping alias kolom fleksibel
         $headerMap = [];
         foreach ($header as $colIdx => $colName) {
             $cleanName = strtolower(trim((string) $colName));
+            if ($cleanName === '') {
+                continue;
+            }
+
             if (str_contains($cleanName, 'nik')) {
                 $headerMap['nik'] = $colIdx;
-            }
-            foreach ($this->kolomLabels as $colKey => $label) {
-                if (str_contains($cleanName, strtolower($label)) || str_contains($cleanName, strtolower($colKey))) {
-                    $headerMap[$colKey] = $colIdx;
-                }
+            } elseif (str_contains($cleanName, 'koperasi')) {
+                $headerMap['pot_koperasi'] = $colIdx;
+            } elseif (str_contains($cleanName, 'wanita') || str_contains($cleanName, 'darma') || str_contains($cleanName, 'dharma')) {
+                $headerMap['pot_darmawanita'] = $colIdx;
+            } elseif (str_contains($cleanName, 'ledeng') || str_contains($cleanName, 'air') || str_contains($cleanName, 'pdam')) {
+                $headerMap['pot_air'] = $colIdx;
+            } elseif ($cleanName === 'kas' || str_contains($cleanName, 'pot_kas')) {
+                $headerMap['pot_kas'] = $colIdx;
+            } elseif (str_contains($cleanName, 'bjb syariah') || str_contains($cleanName, 'bjbs') || str_contains($cleanName, 'syariah')) {
+                $headerMap['pot_bjbs'] = $colIdx;
+            } elseif (str_contains($cleanName, 'bjb') && ! str_contains($cleanName, 'syariah')) {
+                $headerMap['pot_bjb'] = $colIdx;
+            } elseif (str_contains($cleanName, 'asuransi') || str_contains($cleanName, 'bumida')) {
+                $headerMap['pot_asuransi'] = $colIdx;
+            } elseif (str_contains($cleanName, 'btn')) {
+                $headerMap['pot_btn'] = $colIdx;
+            } elseif (str_contains($cleanName, 'zakat') || str_contains($cleanName, 'infaq')) {
+                $headerMap['pot_zakat_profesi'] = $colIdx;
+            } elseif (str_contains($cleanName, 'bpjs')) {
+                $headerMap['pot_bpjs'] = $colIdx;
+            } elseif (str_contains($cleanName, 'bpr') || str_contains($cleanName, 'bri') || str_contains($cleanName, 'bank')) {
+                $headerMap['pot_bpr'] = $colIdx;
             }
         }
 
-        // Jika header tidak lengkap, fallback ke urutan kolom default
+        // Jika NIK belum terpetakan, fallback ke indeks 1 atau 0
         if (! isset($headerMap['nik'])) {
-            $headerMap['nik'] = 0;
-            $idx = 2; // Mulai setelah NIK dan Nama
-            foreach ($this->kolom as $k) {
-                $headerMap[$k] = $idx++;
-            }
+            $headerMap['nik'] = 1;
         }
 
-        @set_time_limit(300);
-        @ini_set('memory_limit', '512M');
+        $bulan = (int) $request->input('bulan', now()->month);
+        $tahun = (int) $request->input('tahun', now()->year);
+        if ($bulan < 1 || $bulan > 12) $bulan = (int) now()->month;
+        if ($tahun < 2000) $tahun = (int) now()->year;
 
-        $bulan = (int) now()->month;
-        $tahun = (int) now()->year;
         $petugasEntri = session('simpeg_user.nama_peg', 'Admin (Excel Import)');
         $now = now();
         $today = $now->toDateString();
@@ -486,25 +581,123 @@ class PotonganKeuController extends Controller
             }
         }
 
-        // 3. Batch insert semua data baru sekaligus per 100 baris (efisien & bebas timeout)
-        if (! empty($insertBatch)) {
+        // 3. Simpan data ke database secara transaksional & batch (efisien dan cepat)
+        \Illuminate\Support\Facades\DB::transaction(function () use ($insertBatch, $updateBatch) {
+            if (! empty($insertBatch)) {
+                foreach (array_chunk($insertBatch, 100) as $chunk) {
+                    \Illuminate\Support\Facades\DB::table('potongan_keu')->insert($chunk);
+                }
+            }
+
+            if (! empty($updateBatch)) {
+                $updateColumns = array_merge(['petugas_entri', 'updated_at', 'pegawai_id'], $this->kolom);
+                foreach (array_chunk($updateBatch, 100) as $chunk) {
+                    \Illuminate\Support\Facades\DB::table('potongan_keu')->upsert($chunk, ['id'], $updateColumns);
+                }
+            }
+        });
+
+        return redirect()->route('potongan-keu.index', ['tipe' => $tipe, 'bulan' => $bulan, 'tahun' => $tahun])->with(
+            'success',
+            "Berhasil mengimpor potongan {$this->tipeLabels[$tipe]} dari file Excel ke database periode {$bulan}/{$tahun}: {$importedCount} data baru ditambahkan, {$updatedCount} data diperbarui."
+        );
+    }
+
+    /**
+     * Salin seluruh potongan dari bulan sebelumnya ke bulan target jika bulan target belum ada data / ingin disamakan.
+     */
+    public function salinBulanLalu(Request $request, string $tipe)
+    {
+        $this->validateTipe($tipe);
+
+        $targetBulan = (int) $request->input('target_bulan', now()->month);
+        $targetTahun = (int) $request->input('target_tahun', now()->year);
+
+        // Sumber: cari data bulan sebelumnya
+        $sumberBulan = $targetBulan === 1 ? 12 : $targetBulan - 1;
+        $sumberTahun = $targetBulan === 1 ? $targetTahun - 1 : $targetTahun;
+
+        $sourceRows = \Illuminate\Support\Facades\DB::table('potongan_keu')
+            ->where('tipe', $tipe)
+            ->where('bulan', $sumberBulan)
+            ->where('tahun', $sumberTahun)
+            ->get();
+
+        // Jika bulan persis sebelumnya kosong, cari periode terakhir yang ada datanya
+        if ($sourceRows->isEmpty()) {
+            $lastRecord = \Illuminate\Support\Facades\DB::table('potongan_keu')
+                ->where('tipe', $tipe)
+                ->orderByDesc('tahun')
+                ->orderByDesc('bulan')
+                ->first();
+
+            if ($lastRecord) {
+                $sumberBulan = (int) $lastRecord->bulan;
+                $sumberTahun = (int) $lastRecord->tahun;
+                $sourceRows = \Illuminate\Support\Facades\DB::table('potongan_keu')
+                    ->where('tipe', $tipe)
+                    ->where('bulan', $sumberBulan)
+                    ->where('tahun', $sumberTahun)
+                    ->get();
+            }
+        }
+
+        if ($sourceRows->isEmpty()) {
+            return back()->with('error', 'Tidak ditemukan riwayat potongan sebelumnya untuk disalin.');
+        }
+
+        $existingNiks = \Illuminate\Support\Facades\DB::table('potongan_keu')
+            ->where('tipe', $tipe)
+            ->where('bulan', $targetBulan)
+            ->where('tahun', $targetTahun)
+            ->pluck('nik')
+            ->all();
+        $existingMap = array_flip($existingNiks);
+
+        $now = now();
+        $today = $now->toDateString();
+        $petugasEntri = session('simpeg_user.nama_peg', 'Admin (Salin Otomatis)');
+
+        $insertBatch = [];
+        foreach ($sourceRows as $src) {
+            if (isset($existingMap[$src->nik])) {
+                continue;
+            }
+
+            $newRow = [
+                'tipe'          => $tipe,
+                'tgl_potongan'  => $today,
+                'nik'           => $src->nik,
+                'pegawai_id'    => $src->pegawai_id,
+                'bulan'         => $targetBulan,
+                'tahun'         => $targetTahun,
+                'petugas_entri' => $petugasEntri,
+                'status'        => 'N',
+                'created_at'    => $now,
+                'updated_at'    => $now,
+            ];
+            foreach ($this->kolom as $k) {
+                $newRow[$k] = (int) ($src->$k ?? 0);
+            }
+            $insertBatch[] = $newRow;
+        }
+
+        if (!empty($insertBatch)) {
             foreach (array_chunk($insertBatch, 100) as $chunk) {
                 \Illuminate\Support\Facades\DB::table('potongan_keu')->insert($chunk);
             }
         }
 
-        // 4. Batch update data lama sekaligus per 100 baris menggunakan upsert
-        if (! empty($updateBatch)) {
-            $updateColumns = array_merge(['petugas_entri', 'updated_at', 'pegawai_id'], $this->kolom);
-            foreach (array_chunk($updateBatch, 100) as $chunk) {
-                \Illuminate\Support\Facades\DB::table('potongan_keu')->upsert($chunk, ['id'], $updateColumns);
-            }
-        }
+        $bulanNames = [
+            1 => 'Januari', 2 => 'Februari', 3 => 'Maret', 4 => 'April',
+            5 => 'Mei', 6 => 'Juni', 7 => 'Juli', 8 => 'Agustus',
+            9 => 'September', 10 => 'Oktober', 11 => 'November', 12 => 'Desember'
+        ];
+        $srcName = ($bulanNames[$sumberBulan] ?? $sumberBulan) . ' ' . $sumberTahun;
+        $tgtName = ($bulanNames[$targetBulan] ?? $targetBulan) . ' ' . $targetTahun;
 
-        return redirect()->route('potongan-keu.index', $tipe)->with(
-            'success',
-            "Berhasil mengimpor potongan {$this->tipeLabels[$tipe]} dari file Excel ke database: {$importedCount} data baru ditambahkan, {$updatedCount} data diperbarui."
-        );
+        return redirect()->route('potongan-keu.index', ['tipe' => $tipe, 'bulan' => $targetBulan, 'tahun' => $targetTahun])
+            ->with('success', "Berhasil menyalin " . count($insertBatch) . " data potongan dari {$srcName} ke periode {$tgtName} (status: Draft).");
     }
 
     /**
@@ -535,7 +728,11 @@ class PotonganKeuController extends Controller
      */
     protected function parseXlsx(string $path): array
     {
-        $zip = new ZipArchive();
+        if (! class_exists(\ZipArchive::class)) {
+            return $this->parseCsv($path);
+        }
+
+        $zip = new \ZipArchive();
         if ($zip->open($path) !== true) {
             return $this->parseCsv($path);
         }
@@ -575,10 +772,31 @@ class PotonganKeuController extends Controller
                         if ($cellType === 's' && isset($sharedStrings[(int) $val])) {
                             $val = $sharedStrings[(int) $val];
                         }
-                        $rowVals[] = $val;
+
+                        // Petakan kolom berdasarkan koordinat sel (misal: A1, B1, C1) agar kolom kosong tidak menggeser posisi
+                        $cellRef = (string) $cell['r'];
+                        $colLetters = preg_replace('/[^A-Za-z]/', '', $cellRef);
+                        $colIdx = 0;
+                        for ($i = 0; $i < strlen($colLetters); $i++) {
+                            $colIdx = $colIdx * 26 + (ord(strtoupper($colLetters[$i])) - ord('A') + 1);
+                        }
+                        $colIdx = max(0, $colIdx - 1);
+                        $rowVals[$colIdx] = $val;
                     }
-                    if (count(array_filter($rowVals, fn ($v) => trim((string)$v) !== '')) > 0) {
-                        $rows[] = $rowVals;
+
+                    // Urutkan key array kolom dari 0
+                    if (! empty($rowVals)) {
+                        ksort($rowVals);
+                        // Normalisasi indeks dari 0 sampai indeks terbesar
+                        $maxIdx = max(array_keys($rowVals));
+                        $normalizedRow = [];
+                        for ($k = 0; $k <= $maxIdx; $k++) {
+                            $normalizedRow[$k] = $rowVals[$k] ?? '';
+                        }
+
+                        if (count(array_filter($normalizedRow, fn ($v) => trim((string)$v) !== '')) > 0) {
+                            $rows[] = $normalizedRow;
+                        }
                     }
                 }
             }
@@ -593,61 +811,10 @@ class PotonganKeuController extends Controller
     public function terbitIndex(Request $request, string $tipe)
     {
         $this->validateTipe($tipe);
-        $pegawaiList = $this->pegawaiList();
-        $pegawaiMap = collect($pegawaiList)->keyBy('nik');
-
-        $bulanParam = $request->query('bulan');
-        $tahunParam = $request->query('tahun');
-        $bulan = $bulanParam !== null ? ($bulanParam === 'all' ? 'all' : (int) $bulanParam) : (int) now()->month;
-        $tahun = $tahunParam !== null ? (int) $tahunParam : (int) now()->year;
-
-        $allItems = collect($this->all($tipe, $bulan, $tahun))
-            ->map(fn ($row) => $this->withCalculated($row, $pegawaiMap))
-            ->sortBy('nik')
-            ->values();
-
-        // Hitung status berjenjang: Draft (N), Disetujui SDM (kepegawaian), Diterbitkan Final (Y)
-        $countDraft = $allItems->filter(fn ($r) => in_array($r['status'] ?? 'N', ['N', 'draft', null, ''], true))->count();
-        $countDisetujuiSdm = $allItems->filter(fn ($r) => ($r['status'] ?? '') === 'kepegawaian')->count();
-        $countFinal = $allItems->filter(fn ($r) => in_array($r['status'] ?? '', ['Y', 'terbit'], true))->count();
-
-        $items = $allItems;
-        $belumDiterbitkan = $countDraft + $countDisetujuiSdm;
-        $sudahDiterbitkan = $countFinal;
-
-        // Role approval check
-        $userLevel = (int) session('simpeg_user.userlevel', 0);
-        $userRole  = (int) session('simpeg_role', 0);
-        $userNik   = (string) session('simpeg_user.nik', '');
-        $sdmNik    = (string) config('simpeg_approval.kepegawaian', '1711254');
-        $keuNik    = (string) config('simpeg_approval.keuangan', '1711296');
-
-        $isSdm = ($userLevel === 1 || $userRole === 1 || $userNik === $sdmNik);
-        $isKeu = ($userLevel === 2 || $userRole === 2 || $userNik === $keuNik || $userLevel === 1);
-
-        $totals = [];
-        foreach ($this->kolom as $k) {
-            $totals[$k] = $items->sum($k);
-        }
-        $totals['grand_total'] = $items->sum('total');
-
-        return view('potongan-keu.terbit', [
-            'items'                => $items,
-            'allItems'             => $allItems,
-            'countDraft'           => $countDraft,
-            'countDisetujuiSdm'    => $countDisetujuiSdm,
-            'countFinal'           => $countFinal,
-            'belumDiterbitkan'     => $belumDiterbitkan,
-            'sudahDiterbitkan'     => $sudahDiterbitkan,
-            'isSdm'                => $isSdm,
-            'isKeu'                => $isKeu,
-            'bulan'                => $bulan,
-            'tahun'                => $tahun,
-            'tipe'                 => $tipe,
-            'tipeLabel'            => $this->tipeLabels[$tipe],
-            'kolom'                => $this->kolom,
-            'kolomLabels'          => $this->kolomLabels,
-            'totals'               => $totals,
+        return redirect()->route('approval.index', [
+            'jenis' => 'potongan_' . $tipe,
+            'bulan' => $request->query('bulan', 'all'),
+            'tahun' => $request->query('tahun', 'all'),
         ]);
     }
 
@@ -733,6 +900,20 @@ class PotonganKeuController extends Controller
     public function setujuiKepegawaian(Request $request, string $tipe)
     {
         $this->validateTipe($tipe);
+
+        $userLevel = (int) session('simpeg_user.userlevel', 0);
+        $userRole  = (int) session('simpeg_role', 0);
+        $userNik   = (string) session('simpeg_user.nik', '');
+        $sdmNik    = (string) config('simpeg_approval.kepegawaian', '1711254');
+        $isSdm = ($userLevel === 1 || $userRole === 1 || $userNik === $sdmNik);
+
+        if (! $isSdm) {
+            if ($request->wantsJson() || $request->ajax()) {
+                return response()->json(['success' => false, 'message' => 'Hanya Bagian Kepegawaian (SDM) yang berhak menyetujui draf potongan.'], 403);
+            }
+            return redirect()->back()->with('error', 'Hanya Bagian Kepegawaian (SDM) yang berhak menyetujui draf potongan.');
+        }
+
         $targetIds = $request->input('ids');
         $targetId = $request->input('id');
         $approver = session('simpeg_user.nama_peg', 'SDM / Kepegawaian');
@@ -782,7 +963,7 @@ class PotonganKeuController extends Controller
             return response()->json(['success' => true, 'message' => $msg, 'affectedCount' => $affectedCount]);
         }
 
-        return redirect()->route('potongan-keu.terbit', $tipe)->with('success', $msg);
+        return redirect()->route('approval.index', ['jenis' => 'potongan_' . $tipe])->with('success', $msg);
     }
 
     /**
@@ -792,6 +973,20 @@ class PotonganKeuController extends Controller
     public function terbitkan(Request $request, string $tipe)
     {
         $this->validateTipe($tipe);
+
+        $userLevel = (int) session('simpeg_user.userlevel', 0);
+        $userRole  = (int) session('simpeg_role', 0);
+        $userNik   = (string) session('simpeg_user.nik', '');
+        $keuNik    = (string) config('simpeg_approval.keuangan', '1711296');
+        $isKeu = ($userLevel === 2 || $userRole === 2 || $userNik === $keuNik);
+
+        if (! $isKeu) {
+            if ($request->wantsJson() || $request->ajax()) {
+                return response()->json(['success' => false, 'message' => 'Hanya Bagian Keuangan yang berhak menerbitkan final potongan.'], 403);
+            }
+            return redirect()->back()->with('error', 'Hanya Bagian Keuangan yang berhak menerbitkan final potongan.');
+        }
+
         $targetIds = $request->input('ids');
         $targetId = $request->input('id');
         $approverNik = session('simpeg_user.nik', config('simpeg_approval.keuangan', '0'));
@@ -839,7 +1034,7 @@ class PotonganKeuController extends Controller
             return response()->json(['success' => true, 'message' => $msg, 'affectedCount' => $affectedCount]);
         }
 
-        return redirect()->route('potongan-keu.terbit', $tipe)->with('success', $msg);
+        return redirect()->route('approval.index', ['jenis' => 'potongan_' . $tipe])->with('success', $msg);
     }
 
     /**
@@ -849,6 +1044,20 @@ class PotonganKeuController extends Controller
     public function batalTerbit(Request $request, string $tipe)
     {
         $this->validateTipe($tipe);
+
+        $userLevel = (int) session('simpeg_user.userlevel', 0);
+        $userRole  = (int) session('simpeg_role', 0);
+        $userNik   = (string) session('simpeg_user.nik', '');
+        $keuNik    = (string) config('simpeg_approval.keuangan', '1711296');
+        $isKeu = ($userLevel === 2 || $userRole === 2 || $userNik === $keuNik);
+
+        if (! $isKeu) {
+            if ($request->wantsJson() || $request->ajax()) {
+                return response()->json(['success' => false, 'message' => 'Hanya Bagian Keuangan yang berhak membatalkan penerbitan.'], 403);
+            }
+            return redirect()->back()->with('error', 'Hanya Bagian Keuangan yang berhak membatalkan penerbitan.');
+        }
+
         $targetIds = $request->input('ids');
         $targetId = $request->input('id');
 
@@ -884,7 +1093,7 @@ class PotonganKeuController extends Controller
             return response()->json(['success' => true, 'message' => $msg, 'affectedCount' => $affectedCount]);
         }
 
-        return redirect()->route('potongan-keu.terbit', $tipe)->with('success', $msg);
+        return redirect()->route('approval.index', ['jenis' => 'potongan_' . $tipe])->with('success', $msg);
     }
 
     /**

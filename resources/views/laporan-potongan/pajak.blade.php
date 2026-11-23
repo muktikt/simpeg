@@ -61,4 +61,6 @@
         </tbody>
     </table>
 </div>
+
+@include('partials.signature-block', ['kodeTtd' => 'keuangan'])
 @endsection

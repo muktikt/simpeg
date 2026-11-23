@@ -287,7 +287,44 @@ input.css-input:focus {
 
     <div class="main">
         <header class="topbar">
-            <div class="topbar-right" style="margin-left: auto;">
+            <div class="topbar-right" style="margin-left: auto; display: flex; align-items: center; gap: 14px;">
+                <!-- Pusat Notifikasi Topbar -->
+                <div class="topbar-notif-wrap" style="position: relative;">
+                    <button type="button" id="btn-topbar-notif" onclick="toggleNotifDropdown(event)" title="Pusat Notifikasi"
+                            style="position: relative; background: #ffffff; border: 1px solid #CBD5E1; color: #0F2A3D; width: 38px; height: 38px; border-radius: 10px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.15s ease;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                            <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                        </svg>
+                        <span id="notif-badge" style="display: none; position: absolute; top: -4px; right: -4px; background: #EF4444; color: #ffffff; font-size: 10px; font-weight: 700; min-width: 18px; height: 18px; border-radius: 9px; padding: 0 4px; display: inline-flex; align-items: center; justify-content: center; border: 2px solid #ffffff; line-height: 1;">0</span>
+                    </button>
+
+                    <!-- Dropdown Popover Notifikasi -->
+                    <div id="notif-dropdown" style="display: none; position: absolute; right: 0; top: calc(100% + 8px); width: 360px; max-width: 90vw; background: #ffffff; border: 1px solid #E2E8F0; border-radius: 14px; box-shadow: 0 10px 25px -5px rgba(15,42,61,0.15), 0 8px 10px -6px rgba(15,42,61,0.08); z-index: 99999; overflow: hidden;">
+                        <div style="padding: 12px 16px; background: #F8FAFC; border-bottom: 1px solid #E2E8F0; display: flex; align-items: center; justify-content: space-between;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span style="font-weight: 700; font-size: 14px; color: #0F2A3D;">Notifikasi</span>
+                                <span id="notif-unread-pill" style="display: none; background: #DCFCE7; color: #15803D; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 10px;">0 Baru</span>
+                            </div>
+                            <button type="button" onclick="markAllNotifRead(event)" style="border: none; background: transparent; color: #0284C7; font-size: 11.5px; font-weight: 600; cursor: pointer; padding: 0; display: inline-flex; align-items: center; gap: 4px;">
+                                <span>Tandai Semua Dibaca</span>
+                            </button>
+                        </div>
+
+                        <div id="notif-dropdown-body" style="max-height: 360px; overflow-y: auto; padding: 4px 0;">
+                            <div style="padding: 24px 16px; text-align: center; color: #94A3B8; font-size: 13px;">
+                                Memuat notifikasi...
+                            </div>
+                        </div>
+
+                        <div style="padding: 10px 16px; background: #F8FAFC; border-top: 1px solid #E2E8F0; text-align: center;">
+                            <a href="{{ route('notifikasi.index') }}" style="font-size: 12.5px; font-weight: 600; color: #0284C7; text-decoration: none; display: inline-flex; align-items: center; gap: 4px;">
+                                Lihat Semua Notifikasi &rarr;
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="profile">
                     @if (session('simpeg_user.userlevel') === '5')
                         <a href="{{ route('profile.show') }}" style="display:flex; align-items:center; gap:10px; text-decoration:none; color:inherit;">
@@ -447,7 +484,7 @@ input.css-input:focus {
 <script>
 let customModalConfirmCallback = null;
 
-function showCustomModal({ title, text, type = 'warning', confirmText = 'Ya, Lanjutkan', cancelText = 'Batal', showCancel = true, onConfirm = null }) {
+function showCustomModal({ title, text, type = 'warning', confirmText = 'Ya, Lanjutkan', cancelText = 'Batal', showCancel = true, confirmBtnBg = null, onConfirm = null }) {
     const modal = document.getElementById('global-custom-modal');
     const iconContainer = document.getElementById('global-modal-icon');
     const titleEl = document.getElementById('global-modal-title');
@@ -514,8 +551,12 @@ function showCustomModal({ title, text, type = 'warning', confirmText = 'Ya, Lan
     }
 
     confirmBtn.textContent = confirmText;
-    if (type === 'danger' || type === 'delete' || type === 'logout') {
-        confirmBtn.style.background = '#D85A30';
+    if (confirmBtnBg) {
+        confirmBtn.style.background = confirmBtnBg;
+    } else if (type === 'danger' || type === 'delete' || type === 'logout') {
+        confirmBtn.style.background = '#DC2626';
+    } else if (type === 'success') {
+        confirmBtn.style.background = '#16A34A';
     } else if (type === 'download' || type === 'info') {
         confirmBtn.style.background = '#0284C7';
     } else {
@@ -651,13 +692,16 @@ function initLiveTableSearch() {
             clearBtn.addEventListener('click', function(e) {
                 e.preventDefault();
                 input.value = '';
-                filterTable(input, '');
                 clearBtn.style.display = 'none';
                 input.focus();
                 
                 const form = input.closest('form');
                 if (form && new URLSearchParams(window.location.search).has(input.name || 'q')) {
+                    const pageInput = form.querySelector('input[name="page"]');
+                    if (pageInput) pageInput.remove();
                     form.submit();
+                } else {
+                    filterTable(input, '');
                 }
             });
         }
@@ -668,32 +712,62 @@ function initLiveTableSearch() {
             }
         };
 
-        // Live filter saat pengguna mengetik (real-time 0ms delay)
-        input.addEventListener('input', function() {
-            updateClearBtn();
-            filterTable(input, input.value.trim().toLowerCase());
-        });
+        const form = input.closest('form');
+        const isServerSearch = form && (input.name === 'q' || input.name === 'search' || input.name === 'keyword') && form.getAttribute('action');
+        const hasPagination = document.querySelector('.pagination-btn, .pagination, [class*="pagination"]') !== null;
+        let searchDebounceTimer = null;
+
+        if (isServerSearch && hasPagination) {
+            // Pada tabel dengan server-side pagination, JANGAN filter DOM baris saat mengetik
+            // karena DOM hanya memuat 20 baris di halaman (slide) aktif saat itu.
+            // Gunakan debounce submit atau Enter/Cari agar mencari ke SELURUH data di database.
+            input.addEventListener('input', function() {
+                updateClearBtn();
+                clearTimeout(searchDebounceTimer);
+                searchDebounceTimer = setTimeout(function() {
+                    const pageInput = form.querySelector('input[name="page"]');
+                    if (pageInput) pageInput.remove();
+                    form.submit();
+                }, 600);
+            });
+        } else {
+            // Live filter saat pengguna mengetik untuk tabel non-paginasi (single page)
+            input.addEventListener('input', function() {
+                updateClearBtn();
+                filterTable(input, input.value.trim().toLowerCase());
+            });
+
+            // Inisialisasi awal jika ada value
+            if (input.value.trim().length > 0) {
+                filterTable(input, input.value.trim().toLowerCase());
+            }
+        }
 
         // Tombol Escape untuk membersihkan pencarian
         input.addEventListener('keydown', function(e) {
             if (e.key === 'Escape') {
                 input.value = '';
                 updateClearBtn();
-                filterTable(input, '');
+                if (isServerSearch) {
+                    const pageInput = form.querySelector('input[name="page"]');
+                    if (pageInput) pageInput.remove();
+                    form.submit();
+                } else {
+                    filterTable(input, '');
+                }
             }
         });
 
-        // Inisialisasi awal jika ada value
         updateClearBtn();
-        if (input.value.trim().length > 0) {
-            filterTable(input, input.value.trim().toLowerCase());
-        }
 
-        // Jika input di dalam form pencarian (misal pegawai/index), Enter tetap submit ke backend jika diinginkan
-        const form = input.closest('form');
+        // Jika input di dalam form pencarian, Enter submit ke backend dan selalu reset ke page 1
         if (form && (input.name === 'q' || input.name === 'search' || input.name === 'keyword')) {
             input.addEventListener('keydown', function(e) {
                 if (e.key === 'Enter') {
+                    e.preventDefault();
+                    clearTimeout(searchDebounceTimer);
+                    const pageInput = form.querySelector('input[name="page"]');
+                    if (pageInput) pageInput.remove();
                     form.submit();
                 }
             });
@@ -1061,6 +1135,150 @@ function initSearchablePegawaiSelects() {
         });
     });
 }
+
+// --- Notifikasi In-App Topbar Script ---
+let notifDropdownOpen = false;
+
+async function fetchNotifications() {
+    try {
+        const res = await fetch('{{ route('notifikasi.count') }}', {
+            headers: {
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+
+        const badge = document.getElementById('notif-badge');
+        const unreadPill = document.getElementById('notif-unread-pill');
+        const body = document.getElementById('notif-dropdown-body');
+
+        if (badge) {
+            if (data.count > 0) {
+                badge.textContent = data.count > 99 ? '99+' : data.count;
+                badge.style.display = 'inline-flex';
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+
+        if (unreadPill) {
+            if (data.count > 0) {
+                unreadPill.textContent = data.count + ' Baru';
+                unreadPill.style.display = 'inline-block';
+            } else {
+                unreadPill.style.display = 'none';
+            }
+        }
+
+        if (body && data.items) {
+            if (data.items.length === 0) {
+                body.innerHTML = `
+                    <div style="padding:28px 16px; text-align:center; color:#94A3B8; font-size:13px;">
+                        <svg width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="margin-bottom:6px; display:inline-block;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+                        <div>Tidak ada notifikasi baru</div>
+                    </div>`;
+            } else {
+                body.innerHTML = data.items.map(item => {
+                    const bgStyle = !item.dibaca ? 'background:#F0F9FF;' : 'background:#ffffff;';
+                    const titleWeight = !item.dibaca ? '700' : '600';
+                    const dot = !item.dibaca ? '<span style="width:7px; height:7px; border-radius:50%; background:#0284C7; flex-shrink:0;"></span>' : '';
+                    const escapedMsg = (item.pesan || '').replace(/"/g, '&quot;');
+
+                    return `
+                        <div onclick="clickNotifItem(${item.id}, '${item.url}')"
+                             style="${bgStyle} padding:10px 16px; border-bottom:1px solid #F1F5F9; cursor:pointer; display:flex; align-items:flex-start; gap:10px; transition:background 0.15s ease;"
+                             onmouseover="this.style.background='#F8FAFC'"
+                             onmouseout="this.style.background='${!item.dibaca ? '#F0F9FF' : '#ffffff'}'">
+                            <div style="width:32px; height:32px; border-radius:8px; background:${item.badge_bg}; color:${item.badge_color}; display:flex; align-items:center; justify-content:center; flex-shrink:0; font-size:14px;">
+                                ${item.type === 'cuti' ? '📅' : (item.type === 'payroll' ? '💳' : (item.type === 'pengaduan' ? '⚠️' : '📢'))}
+                            </div>
+                            <div style="flex:1; min-width:0;">
+                                <div style="display:flex; align-items:center; justify-content:space-between; gap:6px; margin-bottom:2px;">
+                                    <span style="font-size:13px; font-weight:${titleWeight}; color:#0F2A3D; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                                        ${item.judul}
+                                    </span>
+                                    ${dot}
+                                </div>
+                                <div style="font-size:12px; color:#475569; line-height:1.4; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">
+                                    ${escapedMsg}
+                                </div>
+                                <div style="font-size:11px; color:#94A3B8; margin-top:4px;">
+                                    ${item.waktu_relatif}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+        }
+    } catch (err) {
+        console.error('Error fetching notifications:', err);
+    }
+}
+
+function toggleNotifDropdown(e) {
+    if (e) e.stopPropagation();
+    const dropdown = document.getElementById('notif-dropdown');
+    if (!dropdown) return;
+
+    notifDropdownOpen = !notifDropdownOpen;
+    dropdown.style.display = notifDropdownOpen ? 'block' : 'none';
+
+    if (notifDropdownOpen) {
+        fetchNotifications();
+    }
+}
+
+async function clickNotifItem(id, url) {
+    try {
+        await fetch(\`/notifikasi/\${id}/read\`, {
+            method: 'POST',
+            headers: {
+                'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        });
+    } catch (e) {
+        // Abaikan error dan tetap lanjut redirect
+    }
+    window.location.href = url;
+}
+
+async function markAllNotifRead(e) {
+    if (e) e.stopPropagation();
+    try {
+        const res = await fetch('{{ route('notifikasi.read-all') }}', {
+            method: 'POST',
+            headers: {
+                'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        });
+        if (res.ok) {
+            fetchNotifications();
+        }
+    } catch (err) {
+        console.error('Error marking all as read:', err);
+    }
+}
+
+document.addEventListener('click', function(e) {
+    const wrap = document.querySelector('.topbar-notif-wrap');
+    const dropdown = document.getElementById('notif-dropdown');
+    if (dropdown && notifDropdownOpen && wrap && !wrap.contains(e.target)) {
+        notifDropdownOpen = false;
+        dropdown.style.display = 'none';
+    }
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+    fetchNotifications();
+    setInterval(fetchNotifications, 60000);
+});
 </script>
 </body>
 </html>

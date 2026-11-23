@@ -8,6 +8,47 @@
     <h1>{{ $pageTitle ?? 'Proses Gaji Bulanan' }}</h1>
 </div>
 
+@if (($kategori === 'satuan' || empty($kategori)) && !empty($auditCounts))
+    <!-- INFORMASI DATA BELUM DI ENTRI (PERSIS SIMPEG LAMA) -->
+    <div class="stat-grid" style="grid-template-columns: repeat(3, 1fr); gap:12px; margin-bottom:12px;">
+        <a href="{{ route('gaji-proses.audit', ['bulan' => $bulan, 'tahun' => $tahun, 'tab' => 'prestasi']) }}" style="text-decoration:none;">
+            <div class="stat-card" style="border-top:3px solid #EF4444; background:#FFFFFF;">
+                <div class="label" style="font-size:11px; font-weight:700; color:#DC2626;">PRESTASI BELUM MASUK</div>
+                <div class="value" style="font-size:22px; font-weight:800; color:#DC2626; font-family:'IBM Plex Mono',monospace;">
+                    {{ $auditCounts['prestasi'] }} <small style="font-size:12px; font-weight:500; color:#64748B;">Pegawai</small>
+                </div>
+            </div>
+        </a>
+
+        <a href="{{ route('gaji-proses.audit', ['bulan' => $bulan, 'tahun' => $tahun, 'tab' => 'absensi']) }}" style="text-decoration:none;">
+            <div class="stat-card" style="border-top:3px solid #F59E0B; background:#FFFFFF;">
+                <div class="label" style="font-size:11px; font-weight:700; color:#D97706;">ABSENSI BELUM MASUK</div>
+                <div class="value" style="font-size:22px; font-weight:800; color:#D97706; font-family:'IBM Plex Mono',monospace;">
+                    {{ $auditCounts['absensi'] }} <small style="font-size:12px; font-weight:500; color:#64748B;">Pegawai</small>
+                </div>
+            </div>
+        </a>
+
+        <a href="{{ route('gaji-proses.audit', ['bulan' => $bulan, 'tahun' => $tahun, 'tab' => 'potongan']) }}" style="text-decoration:none;">
+            <div class="stat-card" style="border-top:3px solid #10B981; background:#FFFFFF;">
+                <div class="label" style="font-size:11px; font-weight:700; color:#059669;">KEUANGAN BELUM MASUK</div>
+                <div class="value" style="font-size:22px; font-weight:800; color:#059669; font-family:'IBM Plex Mono',monospace;">
+                    {{ $auditCounts['potongan'] }} <small style="font-size:12px; font-weight:500; color:#64748B;">Pegawai</small>
+                </div>
+            </div>
+        </a>
+    </div>
+
+    @if ($auditCounts['prestasi'] > 0 || $auditCounts['absensi'] > 0 || $auditCounts['potongan'] > 0)
+        <div style="background:#FFFBEB; border-left:4px solid #F59E0B; padding:10px 14px; border-radius:6px; margin-bottom:16px; font-size:12px; color:#92400E; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+            <div>
+                <strong>Perhatian:</strong> Data di atas adalah data yang belum di-entri. Jika data di atas nilainya = 0 (nol) artinya sudah di-entri semua dan siap proses cek gaji. Jika belum, jangan di-cek dulu!
+            </div>
+            <a href="{{ route('gaji-proses.audit', ['bulan' => $bulan, 'tahun' => $tahun]) }}" style="font-weight:700; color:#B45309; text-decoration:underline;">Lihat Detail Audit Pra-Payroll &rarr;</a>
+        </div>
+    @endif
+@endif
+
 <div class="toolbar">
     <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
         <form method="GET" action="{{ route('gaji-proses.index') }}" style="display:flex; gap:10px;">
@@ -26,6 +67,17 @@
                 @for ($y = now()->year; $y >= now()->year - 3; $y--)
                     <option value="{{ $y }}" @selected($tahun === $y)>{{ $y }}</option>
                 @endfor
+            </select>
+            @if(!empty($kategori))
+                <input type="hidden" name="kategori" value="{{ $kategori }}">
+            @endif
+            <select name="status" onchange="this.form.submit()" style="padding:9px 12px; border-radius:9px; border:1px solid var(--border); font-size:13px;">
+                <option value="">Semua Status</option>
+                <option value="draft" @selected($status === 'draft')>Draft Kepegawaian</option>
+                <option value="dirum" @selected($status === 'dirum')>Persetujuan Dirum</option>
+                <option value="dirut" @selected($status === 'dirut')>Persetujuan Dirut</option>
+                <option value="terbit" @selected($status === 'terbit')>Terbit (Final)</option>
+                <option value="minus" @selected($status === 'minus')>Gaji Minus</option>
             </select>
         </form>
         <div class="search-box">
@@ -78,7 +130,14 @@
                     <td>{{ \App\Http\Controllers\GajiProsesController::KATEGORI[$g['kategori']] ?? $g['kategori'] }}</td>
                     <td>Rp {{ number_format($g['total_pendapatan'], 0, ',', '.') }}</td>
                     <td>Rp {{ number_format($g['total_potongan'], 0, ',', '.') }}</td>
-                    <td><strong>Rp {{ number_format($g['gaji_bersih'], 0, ',', '.') }}</strong></td>
+                    <td>
+                        @if ($g['gaji_bersih'] < 0)
+                            <strong style="color: #dc2626;">Rp {{ number_format($g['gaji_bersih'], 0, ',', '.') }}</strong>
+                            <span class="badge" style="background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; font-size:10px; margin-left:4px;">MINUS</span>
+                        @else
+                            <strong>Rp {{ number_format($g['gaji_bersih'], 0, ',', '.') }}</strong>
+                        @endif
+                    </td>
                     <td>
                         @if ($g['status'] === 'terbit')
                             <span class="badge badge-PT">Terbit (Final)</span>

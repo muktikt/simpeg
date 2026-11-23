@@ -21,7 +21,7 @@ class DapenmaController extends Controller
         return storage_path('app/dapenma.json');
     }
 
-    protected function all(): array
+    public function all(): array
     {
         $file = $this->storageFile();
         if (file_exists($file)) {
@@ -60,10 +60,10 @@ class DapenmaController extends Controller
 
     protected function withCalculated(array $row): array
     {
-        $p = $this->pegawaiById($row['pegawai_id']);
+        $p = $this->pegawaiById($row['pegawai_id'] ?? null) ?: $this->pegawaiById($row['nik'] ?? null);
         $row['nik'] = $p['nik'] ?? '-';
         $row['nama'] = $p['nama'] ?? '(pegawai tidak ditemukan)';
-        $row['nominal_beban'] = $row['nominal_phdp'] * 0.05;
+        $row['nominal_beban'] = (float) ($row['nominal_phdp'] ?? 0) * 0.05;
         $row['tgl_update'] = $row['tgl_update'] ?? now()->toDateString();
         $row['petugas_entri'] = $row['petugas_entri'] ?? 'Admin';
 

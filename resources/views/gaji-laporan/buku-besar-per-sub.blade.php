@@ -35,4 +35,6 @@
 @empty
     <div class="table-card"><div class="table-empty">Belum ada gaji yang terbit untuk periode ini.</div></div>
 @endforelse
+
+@include('partials.signature-block', ['kodeTtd' => 'gaji'])
 @endsection
