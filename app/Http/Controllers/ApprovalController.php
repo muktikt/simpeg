@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Http\Controllers\Concerns\HasApprovalChain;
+use App\Http\Controllers\AuditLogController;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -557,6 +558,20 @@ class ApprovalController extends Controller
                 return response()->json(['success' => false, 'message' => 'Jenis approval tidak valid.'], 400);
             }
 
+            AuditLogController::record(
+                'APPROVE',
+                'Approval',
+                "Menyetujui {$jenisKey} ID #{$id} - {$msg}",
+                $userNik,
+                session('simpeg_user.nama_peg'),
+                match ($userLevel) {
+                    1 => 'SDM',
+                    2 => 'Keuangan',
+                    7 => 'Direktur (DIRUT)',
+                    default => 'User Web',
+                }
+            );
+
             if ($request->wantsJson() || $request->ajax()) {
                 return response()->json(['success' => true, 'message' => $msg]);
             }
@@ -744,6 +759,20 @@ class ApprovalController extends Controller
             }
 
             $msg = "Sebanyak {$approvedCount} item approval berhasil disetujui.";
+
+            AuditLogController::record(
+                'APPROVE',
+                'Approval',
+                "Menyetujui massal {$approvedCount} item ({$filterJenis})",
+                $userNik,
+                session('simpeg_user.nama_peg'),
+                match ($userLevel) {
+                    1 => 'SDM',
+                    2 => 'Keuangan',
+                    7 => 'Direktur (DIRUT)',
+                    default => 'User Web',
+                }
+            );
 
             if ($request->wantsJson() || $request->ajax()) {
                 return response()->json(['success' => true, 'message' => $msg, 'approved_count' => $approvedCount]);

@@ -3,10 +3,12 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\AuditLogController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Log;
 
 class ApiPegawaiController extends Controller
 {
@@ -188,6 +190,16 @@ class ApiPegawaiController extends Controller
         $b64Sig = rtrim(strtr(base64_encode($signature), '+/', '-_'), '=');
         $token = "$b64Header.$b64Payload.$b64Sig";
 
+        AuditLogController::record(
+            'LOGIN',
+            'Autentikasi (Mobile)',
+            'Pengguna berhasil login melalui aplikasi Mobile SIMPEG',
+            (string) $pegawai->nik,
+            (string) $pegawai->name,
+            $roleKode,
+            $request->header('X-Device-Info') ?: ($request->header('User-Agent') ?: 'SIMPEG Mobile App')
+        );
+
         return response()->json([
             'success' => true,
             'message' => 'Login berhasil',
@@ -280,6 +292,16 @@ class ApiPegawaiController extends Controller
                 'password' => $hashed,
                 'must_change_password' => false,
             ]);
+
+            AuditLogController::record(
+                'UPDATE',
+                'Keamanan (Mobile)',
+                'Pegawai memperbarui kata sandi akun melalui aplikasi mobile',
+                (string) $pegawai->nik,
+                (string) ($pegawai->name ?? $pegawai->nama),
+                $pegawai->role ?? 'Pegawai',
+                $request->header('X-Device-Info') ?: ($request->header('User-Agent') ?: 'SIMPEG Mobile App')
+            );
         } catch (\Throwable $e) {
             Log::warning('ApiPegawaiController gantiPassword error: ' . $e->getMessage());
         }
@@ -897,6 +919,16 @@ class ApiPegawaiController extends Controller
             'created_at' => $now,
         ]);
 
+        AuditLogController::record(
+            'PRESENSI',
+            'Absensi (Mobile)',
+            "Pegawai melakukan presensi check-in ({$status}) melalui mobile",
+            (string) $pegawai->nik,
+            (string) ($pegawai->name ?? $pegawai->nama),
+            $pegawai->role ?? 'Pegawai',
+            $request->header('X-Device-Info') ?: ($request->header('User-Agent') ?: 'SIMPEG Mobile App')
+        );
+
         return response()->json([
             'success' => true,
             'message' => 'Berhasil melakukan absensi masuk.',
@@ -936,6 +968,16 @@ class ApiPegawaiController extends Controller
         DB::table('absensi_harian')->where('id', $absensi->id)->update([
             'jam_pulang' => $now->toDateTimeString(),
         ]);
+
+        AuditLogController::record(
+            'PRESENSI',
+            'Absensi (Mobile)',
+            'Pegawai melakukan presensi check-out pulang melalui mobile',
+            (string) $pegawai->nik,
+            (string) ($pegawai->name ?? $pegawai->nama),
+            $pegawai->role ?? 'Pegawai',
+            $request->header('X-Device-Info') ?: ($request->header('User-Agent') ?: 'SIMPEG Mobile App')
+        );
 
         return response()->json([
             'success' => true,
@@ -1091,6 +1133,16 @@ class ApiPegawaiController extends Controller
             return response()->json(['success' => false, 'message' => 'Pengajuan cuti tidak ditemukan.'], 404);
         }
 
+        AuditLogController::record(
+            'APPROVE',
+            'Cuti (Mobile)',
+            "Memperbarui status pengajuan cuti ID #{$id} menjadi {$normalizedStatus} melalui mobile",
+            (string) $authUser->nik,
+            (string) ($authUser->name ?? $authUser->nama),
+            $authUser->role ?? 'SDM',
+            $request->header('X-Device-Info') ?: ($request->header('User-Agent') ?: 'SIMPEG Mobile App')
+        );
+
         return response()->json([
             'success' => true,
             'message' => "Pengajuan cuti berhasil diubah menjadi {$normalizedStatus}.",
@@ -1146,6 +1198,16 @@ class ApiPegawaiController extends Controller
             'created_at' => $now,
             'updated_at' => $now,
         ]);
+
+        AuditLogController::record(
+            'CREATE',
+            'Cuti (Mobile)',
+            "Pegawai mengajukan cuti {$request->jenis_cuti} ({$request->tgl_mulai} s/d {$request->tgl_selesai}) melalui mobile",
+            (string) $pegawai->nik,
+            (string) ($pegawai->name ?? $pegawai->nama),
+            $pegawai->role ?? 'Pegawai',
+            $request->header('X-Device-Info') ?: ($request->header('User-Agent') ?: 'SIMPEG Mobile App')
+        );
 
         return response()->json([
             'success' => true,
@@ -1354,6 +1416,16 @@ class ApiPegawaiController extends Controller
 
         Cache::forget("api_lembur_{$pegawai->id}");
 
+        AuditLogController::record(
+            'CREATE',
+            'Lembur (Mobile)',
+            "Pegawai mengajukan lembur {$hours} jam pada periode {$periodeStr} melalui mobile",
+            (string) $pegawai->nik,
+            (string) ($pegawai->name ?? $pegawai->nama),
+            $pegawai->role ?? 'Pegawai',
+            $request->header('X-Device-Info') ?: ($request->header('User-Agent') ?: 'SIMPEG Mobile App')
+        );
+
         return response()->json([
             'success' => true,
             'message' => 'Pengajuan lembur berhasil dikirim.',
@@ -1475,6 +1547,16 @@ class ApiPegawaiController extends Controller
             'created_at' => $now,
             'updated_at' => $now,
         ]);
+
+        AuditLogController::record(
+            'CREATE',
+            'Pengaduan (Mobile)',
+            "Mengajukan pengaduan baru: \"{$request->subjek}\" (No: {$nomorPengaduan}) melalui mobile",
+            (string) $pegawai->nik,
+            (string) ($pegawai->name ?? $pegawai->nama),
+            $pegawai->role ?? 'Pegawai',
+            $request->header('X-Device-Info') ?: ($request->header('User-Agent') ?: 'SIMPEG Mobile App')
+        );
 
         return response()->json([
             'success' => true,

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\AuditLogController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -160,11 +161,46 @@ class LoginController extends Controller
         $request->session()->regenerate();
         $request->session()->put('simpeg_user', $user);
 
+        // Catat aktivitas Login ke tabel activity_logs di database PostgreSQL
+        AuditLogController::record(
+            'LOGIN',
+            'Autentikasi',
+            'Pengguna berhasil login ke sistem Web',
+            $user['nik'],
+            $user['nama_peg'],
+            match ((string) $user['userlevel']) {
+                '1' => 'SDM',
+                '2' => 'Keuangan',
+                '5' => 'Pegawai',
+                '7' => 'Direktur (DIRUT)',
+                default => 'User Web',
+            },
+            $request->header('User-Agent') ?? 'Web Browser'
+        );
+
         return redirect()->route($this->redirectRouteFor($user));
     }
 
     public function logout(Request $request)
     {
+        if ($user = session('simpeg_user')) {
+            AuditLogController::record(
+                'LOGOUT',
+                'Autentikasi',
+                'Pengguna logout dari sistem Web',
+                $user['nik'] ?? null,
+                $user['nama_peg'] ?? ($user['nama'] ?? null),
+                match ((string) ($user['userlevel'] ?? '5')) {
+                    '1' => 'SDM',
+                    '2' => 'Keuangan',
+                    '5' => 'Pegawai',
+                    '7' => 'Direktur (DIRUT)',
+                    default => 'User Web',
+                },
+                $request->header('User-Agent') ?? 'Web Browser'
+            );
+        }
+
         $request->session()->forget('simpeg_user');
         $request->session()->regenerateToken();
 

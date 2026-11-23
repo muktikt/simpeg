@@ -11,7 +11,7 @@ class AuditLogController extends Controller
     /**
      * Helper statis untuk mencatat aktivitas pengguna ke tabel activity_logs.
      */
-    public static function record(string $action, string $module, string $description, ?string $nik = null, ?string $name = null, ?string $role = null): void
+    public static function record(string $action, string $module, string $description, ?string $nik = null, ?string $name = null, ?string $role = null, ?string $device = null): void
     {
         try {
             $user = session('simpeg_user') ?? session('user');
@@ -26,10 +26,8 @@ class AuditLogController extends Controller
                 default => 'User Web',
             };
 
-            $deviceInfo = request()->header('User-Agent') ?? 'Web Browser';
-            if (strlen($deviceInfo) > 200) {
-                $deviceInfo = substr($deviceInfo, 0, 197) . '...';
-            }
+            $rawDevice = $device ?? (request()->header('X-Device-Info') ?? request()->header('User-Agent') ?? 'Web Browser');
+            $deviceInfo = static::cleanDeviceInfo($rawDevice);
 
             DB::table('activity_logs')->insert([
                 'id'          => (string) Str::uuid(),
@@ -40,11 +38,43 @@ class AuditLogController extends Controller
                 'module'      => $module,
                 'description' => $description,
                 'device_info' => $deviceInfo,
-                'created_at'  => now(),
+                'created_at'  => now('Asia/Jakarta'),
             ]);
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::warning('Failed recording activity log: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Memformat informasi user-agent mentah menjadi nama perangkat yang mudah dibaca.
+     */
+    public static function cleanDeviceInfo(?string $raw): string
+    {
+        if (empty($raw)) {
+            return 'Perangkat Tidak Terdeteksi';
+        }
+
+        // Jika sudah berbentuk nama rapi (misal dari Flutter Mobile: "POCO ...", "Samsung ...")
+        if (!str_contains($raw, 'Mozilla/') && !str_contains($raw, 'AppleWebKit/')) {
+            return substr($raw, 0, 100);
+        }
+
+        $os = 'Lainnya';
+        if (str_contains($raw, 'Windows NT 10.0')) $os = 'Windows 10/11';
+        elseif (str_contains($raw, 'Windows NT 6.')) $os = 'Windows';
+        elseif (str_contains($raw, 'Android')) $os = 'Android';
+        elseif (str_contains($raw, 'iPhone')) $os = 'iPhone (iOS)';
+        elseif (str_contains($raw, 'iPad')) $os = 'iPad (iPadOS)';
+        elseif (str_contains($raw, 'Macintosh')) $os = 'macOS';
+        elseif (str_contains($raw, 'Linux')) $os = 'Linux';
+
+        $browser = 'Browser';
+        if (str_contains($raw, 'Edg/')) $browser = 'Edge';
+        elseif (str_contains($raw, 'Chrome/')) $browser = 'Chrome';
+        elseif (str_contains($raw, 'Firefox/')) $browser = 'Firefox';
+        elseif (str_contains($raw, 'Safari/')) $browser = 'Safari';
+
+        return "{$browser} ({$os})";
     }
 
     /**

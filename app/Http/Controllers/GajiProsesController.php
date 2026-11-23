@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\HasApprovalChain;
+use App\Http\Controllers\AuditLogController;
 use Illuminate\Http\Request;
 
 class GajiProsesController extends Controller
@@ -1352,6 +1353,20 @@ class GajiProsesController extends Controller
         $localData[] = $validated;
         $this->save($localData);
 
+        AuditLogController::record(
+            'CREATE',
+            'Proses Gaji',
+            "Membuat draf proses gaji pegawai {$validated['nama']} ({$validated['nik']}) periode {$validated['bulan']}/{$validated['tahun']}",
+            session('simpeg_user.nik'),
+            session('simpeg_user.nama_peg'),
+            match ((string) (session('simpeg_user.userlevel') ?? '1')) {
+                '1' => 'SDM',
+                '2' => 'Keuangan',
+                '7' => 'Direktur (DIRUT)',
+                default => 'User Web',
+            }
+        );
+
         return redirect()->route('gaji-proses.index', ['bulan' => $validated['bulan'], 'tahun' => $validated['tahun']])
             ->with('success', 'Proses gaji untuk '.$validated['nama'].' berhasil disimpan dan masuk ke antrean approval.');
     }
@@ -1546,6 +1561,24 @@ class GajiProsesController extends Controller
             $this->save($updated);
         }
 
+        // Catat Audit Trail ke tabel activity_logs di database PostgreSQL
+        $label = self::approvalStatusLabel($nextStatus);
+        $targetNik = $row['nik'] ?? '-';
+        $targetNama = $row['nama'] ?? ($row['nama_peg'] ?? '-');
+        AuditLogController::record(
+            'APPROVE',
+            'Proses Gaji',
+            "Menyetujui proses gaji pegawai {$targetNama} ({$targetNik}) ke tahap: {$label}",
+            session('simpeg_user.nik'),
+            session('simpeg_user.nama_peg'),
+            match ((string) (session('simpeg_user.userlevel') ?? '1')) {
+                '1' => 'SDM',
+                '2' => 'Keuangan',
+                '7' => 'Direktur (DIRUT)',
+                default => 'User Web',
+            }
+        );
+
         return $nextStatus;
     }
 
@@ -1608,6 +1641,20 @@ class GajiProsesController extends Controller
             $filtered = collect($localData)->reject(fn ($r) => (int)($r['id'] ?? 0) === $id)->values()->all();
             $this->save($filtered);
         }
+
+        AuditLogController::record(
+            'DELETE',
+            'Proses Gaji',
+            "Menghapus draf proses gaji pegawai " . ($row['nama'] ?? '') . " (" . ($row['nik'] ?? '') . ")",
+            session('simpeg_user.nik'),
+            session('simpeg_user.nama_peg'),
+            match ((string) (session('simpeg_user.userlevel') ?? '1')) {
+                '1' => 'SDM',
+                '2' => 'Keuangan',
+                '7' => 'Direktur (DIRUT)',
+                default => 'User Web',
+            }
+        );
 
         $params = array_filter(['bulan' => $bulan, 'tahun' => $tahun]);
 
