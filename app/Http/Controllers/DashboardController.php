@@ -308,12 +308,12 @@ class DashboardController extends Controller
                     'highlight' => $count > 0,
                 ];
             } elseif ($userRole === 'kadiv') {
-                $divisiLabel = ($divisiKadiv === 'teknik') ? 'Pelanggaran Teknik' : 'Pelanggaran Administrasi';
+                $categories = ($divisiKadiv === 'teknik') ? ['Pelanggaran Teknik'] : ['Pelanggaran Administrasi', 'Umum'];
                 $count = DB::table('pengaduan_pegawai')
-                    ->where(function ($q) use ($divisiLabel, $divisiKadiv) {
-                        $q->where(function ($sub) use ($divisiLabel) {
-                            $sub->whereIn('status', ['menungguKadiv', 'menungguVerifikasiKadiv'])
-                                ->where('kategori', $divisiLabel);
+                    ->where(function ($q) use ($categories, $divisiKadiv) {
+                        $q->where(function ($sub) use ($categories) {
+                            $sub->whereIn('status', ['menungguKadiv', 'menungguVerifikasiKadiv', 'DIAJUKAN'])
+                                ->whereIn('kategori', $categories);
                         })->orWhere(function ($sub) use ($divisiKadiv) {
                             $sub->where('status', 'investigasiBerjalan')
                                 ->where('eksekutor', 'kadiv')

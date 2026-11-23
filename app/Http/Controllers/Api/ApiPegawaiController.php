@@ -1522,11 +1522,22 @@ class ApiPegawaiController extends Controller
                 );
 
             if ($dbRole === 'kadiv' || $dbRole === 'kadivkategori') {
-                $divisiLabel = ($divisiKadiv === 'teknik') ? 'Pelanggaran Teknik' : 'Pelanggaran Administrasi';
-                $query->where(function ($q) use ($divisiLabel) {
-                    $q->whereIn('status', ['menungguKadiv', 'menungguVerifikasiKadiv'])
-                        ->where('kategori', $divisiLabel)
-                        ->orWhere('status', 'investigasiBerjalan');
+                $categories = ($divisiKadiv === 'teknik')
+                    ? ['Pelanggaran Teknik']
+                    : ['Pelanggaran Administrasi', 'Umum'];
+                $query->where(function ($q) use ($categories, $divisiKadiv) {
+                    $q->where(function ($sub) use ($categories) {
+                        $sub->whereIn('status', ['menungguKadiv', 'menungguVerifikasiKadiv', 'DIAJUKAN'])
+                            ->whereIn('kategori', $categories);
+                    })->orWhere(function ($sub) use ($divisiKadiv) {
+                        $sub->where('status', 'investigasiBerjalan')
+                            ->where('eksekutor', 'kadiv')
+                            ->where('eksekutor_divisi_kadiv', $divisiKadiv);
+                    })->orWhere(function ($sub) use ($divisiKadiv) {
+                        $sub->where('status', 'tindakLanjutBerjalan')
+                            ->where('eksekutor_tindak_lanjut', 'kadiv')
+                            ->where('eksekutor_tindak_lanjut_divisi_kadiv', $divisiKadiv);
+                    });
                 });
             } elseif ($dbRole === 'kspi') {
                 $query->whereIn('status', ['reviewKspi', 'telaahAwalKspi', 'menungguPilihEksekutor', 'hasilInvestigasiMasuk']);
@@ -1599,11 +1610,20 @@ class ApiPegawaiController extends Controller
 
         $now = now();
         $nomorPengaduan = 'PGD-' . date('Ymd') . '-' . rand(1000, 9999);
+        $kategori = $request->input('kategori') ?: 'Pelanggaran Administrasi';
+        $status = 'menungguKadiv';
+        $pihakTerlapor = trim((string) ($request->input('pihak_terlapor') ?? ''));
+        $nikPelaku = trim((string) ($request->input('nik_pelaku') ?? ''));
+        $jabatanPelaku = trim((string) ($request->input('jabatan_pelaku') ?? ''));
+        $anonim = $request->boolean('anonim', false);
+
+        $fotoBukti = $request->input('foto_bukti');
+        $dokumenPendukung = $request->input('dokumen_pendukung');
 
         $id = DB::table('pengaduan_pegawai')->insertGetId([
             'nomor_pengaduan' => $nomorPengaduan,
             'pelapor_id' => $pegawai->id,
-            'kategori' => 'Umum',
+            'kategori' => $kategori,
             'judul' => $request->subjek,
             'deskripsi' => $request->pesan,
             'tanggal_pengaduan' => $now,
@@ -1611,10 +1631,28 @@ class ApiPegawaiController extends Controller
             'nik' => $pegawai->nik,
             'cabang' => $pegawai->unit_kerja ?? 'Kantor Pusat',
             'golongan' => $pegawai->golongan ?? '',
-            'anonim' => false,
-            'status' => 'DIAJUKAN',
+            'pihak_terlapor' => !empty($pihakTerlapor) ? $pihakTerlapor : null,
+            'nik_pelaku' => !empty($nikPelaku) ? $nikPelaku : null,
+            'jabatan_pelaku' => !empty($jabatanPelaku) ? $jabatanPelaku : null,
+            'anonim' => $anonim,
+            'foto_bukti' => !empty($fotoBukti) ? (is_array($fotoBukti) ? json_encode($fotoBukti) : $fotoBukti) : null,
+            'dokumen_pendukung' => !empty($dokumenPendukung) ? (is_array($dokumenPendukung) ? json_encode($dokumenPendukung) : $dokumenPendukung) : null,
+            'status' => $status,
             'created_at' => $now,
             'updated_at' => $now,
+        ]);
+
+        // Catat di Riwayat Status Pengaduan (Audit trail)
+        DB::table('riwayat_status_pengaduan')->insert([
+            'pengaduan_id' => $id,
+            'status' => $status,
+            'status_lama' => null,
+            'oleh' => $anonim ? 'Anonim' : ($pegawai->name ?? $pegawai->nama),
+            'role' => 'pegawai',
+            'aksi' => 'Pengaduan dibuat',
+            'keterangan' => !empty($pihakTerlapor) ? ('Pelaku diadukan: ' . $pihakTerlapor . (!empty($nikPelaku) ? ' · NIK ' . $nikPelaku : '')) : 'Pengaduan berhasil diajukan oleh pelapor',
+            'tanggal' => $now,
+            'created_at' => $now,
         ]);
 
         AuditLogController::record(
@@ -1629,8 +1667,77 @@ class ApiPegawaiController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Pengaduan berhasil dikirim ke SDM.',
-            'data' => ['id' => $id, 'nomor_pengaduan' => $nomorPengaduan],
+            'message' => 'Pengaduan berhasil dikirim dan menunggu verifikasi Kadiv.',
+            'data' => ['id' => $id, 'nomor_pengaduan' => $nomorPengaduan, 'status' => $status],
+        ]);
+    }
+
+    /**
+     * Update Status Pengaduan dari Mobile (Kadiv Aksi, Alihkan Kategori, dll)
+     */
+    public function updateStatusPengaduan(Request $request, $id)
+    {
+        $authUser = $request->attributes->get('auth_user');
+        if (! $authUser) {
+            return response()->json(['success' => false, 'message' => 'Autentikasi gagal.'], 401);
+        }
+
+        $pengaduan = DB::table('pengaduan_pegawai')->where('id', $id)->first();
+        if (! $pengaduan) {
+            return response()->json(['success' => false, 'message' => 'Pengaduan tidak ditemukan.'], 404);
+        }
+
+        $now = now();
+        $statusBaru = $request->input('status');
+        $statusLama = $pengaduan->status;
+        $kategoriBaru = $request->input('kategori');
+        $catatan = $request->input('catatan');
+        $aksi = $request->input('aksi') ?: 'Pembaruan status pengaduan';
+        $roleName = $authUser->role ?? 'pegawai';
+        $oleh = $authUser->name ?? $authUser->nama ?? 'Sistem';
+
+        $updateData = ['updated_at' => $now];
+        if (!empty($statusBaru)) {
+            $updateData['status'] = $statusBaru;
+        }
+        if (!empty($kategoriBaru)) {
+            $updateData['kategori'] = $kategoriBaru;
+        }
+        if ($request->has('keputusan_kadiv')) {
+            $updateData['keputusan_kadiv'] = $request->input('keputusan_kadiv');
+        }
+        if ($request->has('catatan_kadiv')) {
+            $updateData['catatan_kadiv'] = $request->input('catatan_kadiv');
+        }
+
+        DB::table('pengaduan_pegawai')->where('id', $id)->update($updateData);
+
+        DB::table('riwayat_status_pengaduan')->insert([
+            'pengaduan_id' => $id,
+            'status' => $statusBaru ?: $statusLama,
+            'status_lama' => $statusLama,
+            'oleh' => $oleh,
+            'role' => $roleName,
+            'aksi' => $aksi,
+            'keterangan' => $catatan,
+            'tanggal' => $now,
+            'created_at' => $now,
+        ]);
+
+        AuditLogController::record(
+            'UPDATE',
+            'Pengaduan (Mobile)',
+            "{$aksi} pada Pengaduan #{$pengaduan->nomor_pengaduan}: {$catatan}",
+            (string) $authUser->nik,
+            (string) $oleh,
+            $roleName,
+            $request->header('X-Device-Info') ?: ($request->header('User-Agent') ?: 'SIMPEG Mobile App')
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Status pengaduan berhasil diperbarui.',
+            'data' => array_merge((array)$pengaduan, $updateData),
         ]);
     }
 

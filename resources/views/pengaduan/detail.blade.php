@@ -432,7 +432,7 @@
         {{-- ========================================================= --}}
         {{-- 1. PANEL AKSI KADIV --}}
         {{-- ========================================================= --}}
-        @if ($myRole === 'kadiv' && in_array($statusName, ['menungguKadiv', 'menungguVerifikasiKadiv']))
+        @if ($myRole === 'kadiv' && in_array($statusName, ['menungguKadiv', 'menungguVerifikasiKadiv', 'DIAJUKAN']))
             <div class="ribbon-card" style="margin-bottom:20px; border:2px solid #16a085;">
                 <div class="ribbon-head" style="margin-bottom:12px;">
                     <h2 style="font-size:15px; color:#0f766e;">Tindakan Kadiv</h2>

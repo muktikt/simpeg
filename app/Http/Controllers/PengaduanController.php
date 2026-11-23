@@ -109,13 +109,15 @@ class PengaduanController extends Controller
 
             // 2. Ambil data kotak masuk sesuai wewenang role
             if ($myRole === 'kadiv') {
-                $divisiLabel = ($divisiKadiv === 'teknik') ? 'Pelanggaran Teknik' : 'Pelanggaran Administrasi';
+                $categories = ($divisiKadiv === 'teknik')
+                    ? ['Pelanggaran Teknik']
+                    : ['Pelanggaran Administrasi', 'Umum'];
 
                 $query = $baseQuery()
-                    ->where(function ($q) use ($divisiLabel, $divisiKadiv) {
-                        $q->where(function ($sub) use ($divisiLabel) {
-                            $sub->whereIn('status', ['menungguKadiv', 'menungguVerifikasiKadiv'])
-                                ->where('kategori', $divisiLabel);
+                    ->where(function ($q) use ($categories, $divisiKadiv) {
+                        $q->where(function ($sub) use ($categories) {
+                            $sub->whereIn('status', ['menungguKadiv', 'menungguVerifikasiKadiv', 'DIAJUKAN'])
+                                ->whereIn('kategori', $categories);
                         })->orWhere(function ($sub) use ($divisiKadiv) {
                             $sub->where('status', 'investigasiBerjalan')
                                 ->where('eksekutor', 'kadiv')
@@ -131,8 +133,8 @@ class PengaduanController extends Controller
                 $pengaduanMasuk = $query->get()->toArray();
 
                 $pengaduanRiwayat = $baseQuery()
-                    ->where('kategori', $divisiLabel)
-                    ->whereNotIn('status', ['menungguKadiv', 'menungguVerifikasiKadiv'])
+                    ->whereIn('kategori', $categories)
+                    ->whereNotIn('status', ['menungguKadiv', 'menungguVerifikasiKadiv', 'DIAJUKAN'])
                     ->orderByDesc('updated_at')
                     ->limit(50)
                     ->get()
