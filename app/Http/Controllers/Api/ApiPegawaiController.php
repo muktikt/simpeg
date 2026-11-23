@@ -1558,16 +1558,30 @@ class ApiPegawaiController extends Controller
                 $categories = ($divisiKadiv === 'teknik')
                     ? ['Pelanggaran Teknik']
                     : ['Pelanggaran Administrasi', 'Umum'];
-                $query->where(function ($q) use ($categories, $divisiKadiv) {
+                $query->where(function ($q) use ($categories, $divisiKadiv, $authUser) {
                     $q->whereIn('kategori', $categories)
-                        ->orWhere(function ($sub) use ($divisiKadiv) {
+                        ->orWhere(function ($sub) use ($divisiKadiv, $authUser) {
                             $sub->where('status', 'investigasiBerjalan')
-                                ->where('eksekutor', 'kadiv')
-                                ->where('eksekutor_divisi_kadiv', $divisiKadiv);
-                        })->orWhere(function ($sub) use ($divisiKadiv) {
+                                ->where(function ($s) use ($divisiKadiv, $authUser) {
+                                    $s->where(function ($k) use ($divisiKadiv) {
+                                        $k->where('eksekutor', 'kadiv')
+                                          ->whereRaw('LOWER(COALESCE(eksekutor_divisi_kadiv, \'\')) = ?', [strtolower($divisiKadiv)]);
+                                    })
+                                    ->orWhere('executor_id', (string) $authUser->id)
+                                    ->orWhere('executor_id', (string) $authUser->nik)
+                                    ->orWhere('petugas_investigasi', 'ilike', '%' . ($authUser->name ?? $authUser->nama ?? '') . '%');
+                                });
+                        })->orWhere(function ($sub) use ($divisiKadiv, $authUser) {
                             $sub->where('status', 'tindakLanjutBerjalan')
-                                ->where('eksekutor_tindak_lanjut', 'kadiv')
-                                ->where('eksekutor_tindak_lanjut_divisi_kadiv', $divisiKadiv);
+                                ->where(function ($s) use ($divisiKadiv, $authUser) {
+                                    $s->where(function ($k) use ($divisiKadiv) {
+                                        $k->where('eksekutor_tindak_lanjut', 'kadiv')
+                                          ->whereRaw('LOWER(COALESCE(eksekutor_tindak_lanjut_divisi_kadiv, \'\')) = ?', [strtolower($divisiKadiv)]);
+                                    })
+                                    ->orWhere('executor_id', (string) $authUser->id)
+                                    ->orWhere('executor_id', (string) $authUser->nik)
+                                    ->orWhere('petugas_investigasi', 'ilike', '%' . ($authUser->name ?? $authUser->nama ?? '') . '%');
+                                });
                         });
                 });
             } elseif ($dbRole === 'kspi') {
@@ -1585,9 +1599,12 @@ class ApiPegawaiController extends Controller
                     'investigasiBerjalan', 'tindakLanjutBerjalan', 'menungguReviewKspi', 'reviewKspi', 'menungguSdm'
                 ]);
             } elseif ($dbRole === 'tpdpk') {
-                $query->where(function ($q) {
+                $query->where(function ($q) use ($authUser) {
                     $q->where('eksekutor', 'tpdpk')
                         ->orWhere('eksekutor_tindak_lanjut', 'tpdpk')
+                        ->orWhere('executor_id', (string) $authUser->id)
+                        ->orWhere('executor_id', (string) $authUser->nik)
+                        ->orWhere('petugas_investigasi', 'ilike', '%' . ($authUser->name ?? $authUser->nama ?? '') . '%')
                         ->orWhereIn('status', ['menungguInvestigasi', 'investigasiBerjalan', 'revisiInvestigasi', 'tindakLanjutBerjalan', 'selesai', 'arsip']);
                 });
             } elseif ($dbRole === 'sdm' || $userLevel === '1') {
@@ -1758,6 +1775,7 @@ class ApiPegawaiController extends Controller
         }
 
         $allowedExtra = [
+            'executor_id',
             'keputusan_dirut_tahap1', 'catatan_dirut_tahap1',
             'keputusan_dirut_tahap2', 'catatan_dirut_tahap2',
             'eksekutor', 'petugas_investigasi', 'hasil_investigasi',
@@ -1770,7 +1788,11 @@ class ApiPegawaiController extends Controller
         ];
         foreach ($allowedExtra as $col) {
             if ($request->has($col)) {
-                $updateData[$col] = $request->input($col);
+                $val = $request->input($col);
+                if (in_array($col, ['eksekutor', 'eksekutor_divisi_kadiv', 'eksekutor_tindak_lanjut', 'eksekutor_tindak_lanjut_divisi_kadiv']) && is_string($val)) {
+                    $val = strtolower($val);
+                }
+                $updateData[$col] = $val;
             }
         }
 
