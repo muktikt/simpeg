@@ -1513,6 +1513,39 @@ class ApiPegawaiController extends Controller
         $divisiKadiv = $authUser->divisi_kadiv ?? null;
         $isManager = in_array($userLevel, ['1', '7']) || in_array($dbRole, ['sdm', 'admin', 'direktur', 'kspi', 'kadiv', 'kadivkategori', 'tpdpk']);
 
+        $arrayFields = [
+            'foto_bukti', 'dokumen_pendukung', 'video_bukti', 'voice_note',
+            'investigasi_foto', 'investigasi_video', 'investigasi_voice', 'investigasi_dokumen',
+            'hasil_foto', 'hasil_dokumen', 'hasil_voice', 'hasil_video'
+        ];
+        $normalizePengaduanList = function ($rows) use ($arrayFields) {
+            return collect($rows)->map(function ($row) use ($arrayFields) {
+                $arr = (array) $row;
+                foreach ($arrayFields as $f) {
+                    $val = $arr[$f] ?? null;
+                    if (empty($val) || $val === '{}' || $val === '[]' || $val === 'null') {
+                        $arr[$f] = [];
+                    } elseif (is_string($val)) {
+                        $trim = trim($val);
+                        if (str_starts_with($trim, '[') && str_ends_with($trim, ']')) {
+                            $decoded = json_decode($trim, true);
+                            $arr[$f] = is_array($decoded) ? $decoded : [];
+                        } elseif (str_starts_with($trim, '{') && str_ends_with($trim, '}')) {
+                            $inner = trim(substr($trim, 1, -1));
+                            $arr[$f] = empty($inner) ? [] : array_values(array_filter(array_map(function($s) {
+                                return trim(trim($s), '"\'');
+                            }, explode(',', $inner))));
+                        } else {
+                            $arr[$f] = [$trim];
+                        }
+                    } elseif (!is_array($val)) {
+                        $arr[$f] = [];
+                    }
+                }
+                return $arr;
+            })->all();
+        };
+
         // Jika peran manajerial meminta kotak masuk kasus (scope=role atau tab=masuk)
         if ($isManager && ($request->query('scope') === 'role' || $request->query('tab') === 'masuk')) {
             $query = DB::table('pengaduan_pegawai')
@@ -1549,7 +1582,8 @@ class ApiPegawaiController extends Controller
                 $query->whereIn('status', ['sdmPemberianSanksi', 'tindakLanjutSdm', 'selesai', 'menungguSdm']);
             }
 
-            $data = $query->orderByDesc('created_at')->get();
+            $raw = $query->orderByDesc('created_at')->get();
+            $data = $normalizePengaduanList($raw);
 
             return response()->json([
                 'success' => true,
@@ -1563,11 +1597,12 @@ class ApiPegawaiController extends Controller
             return $resp;
         }
 
-        $data = DB::table('pengaduan_pegawai')
+        $raw = DB::table('pengaduan_pegawai')
             ->where('pelapor_id', $pegawai->id)
             ->orWhere('nik', $pegawai->nik)
             ->orderByDesc('created_at')
             ->get();
+        $data = $normalizePengaduanList($raw);
 
         return response()->json([
             'success' => true,
