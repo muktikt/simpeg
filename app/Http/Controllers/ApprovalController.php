@@ -23,7 +23,7 @@ class ApprovalController extends Controller
         $dirutNik    = (string) config('simpeg_approval.dirut', '1711001');
         $keuanganNik = (string) config('simpeg_approval.keuangan', '1711296');
 
-        $isSdm   = ($userLevel === 1 || $userRole === 1 || $userNik === $sdmNik);
+        $isSdm   = ($userNik === $sdmNik);
         $isDirum = ($userNik === $dirumNik);
         $isDirut = ($userNik === $dirutNik);
         $isKeu   = ($userLevel === 2 || $userRole === 2 || $userNik === $keuanganNik);
