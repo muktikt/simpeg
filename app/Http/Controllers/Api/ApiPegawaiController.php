@@ -1566,10 +1566,12 @@ class ApiPegawaiController extends Controller
                                     $s->where(function ($k) use ($divisiKadiv) {
                                         $k->where('eksekutor', 'kadiv')
                                           ->whereRaw('LOWER(COALESCE(eksekutor_divisi_kadiv, \'\')) = ?', [strtolower($divisiKadiv)]);
-                                    })
-                                    ->orWhere('executor_id', (string) $authUser->id)
-                                    ->orWhere('executor_id', (string) $authUser->nik)
-                                    ->orWhere('petugas_investigasi', 'ilike', '%' . ($authUser->name ?? $authUser->nama ?? '') . '%');
+                                    });
+                                    if (!empty($authUser->id) && preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', (string)$authUser->id)) {
+                                        $s->orWhere('executor_id', (string) $authUser->id);
+                                    }
+                                    $s->orWhere('petugas_investigasi', 'ilike', '%' . ($authUser->name ?? $authUser->nama ?? '') . '%')
+                                      ->orWhere('petugas_investigasi', 'ilike', '%' . ($authUser->nik ?? '') . '%');
                                 });
                         })->orWhere(function ($sub) use ($divisiKadiv, $authUser) {
                             $sub->where('status', 'tindakLanjutBerjalan')
@@ -1577,10 +1579,12 @@ class ApiPegawaiController extends Controller
                                     $s->where(function ($k) use ($divisiKadiv) {
                                         $k->where('eksekutor_tindak_lanjut', 'kadiv')
                                           ->whereRaw('LOWER(COALESCE(eksekutor_tindak_lanjut_divisi_kadiv, \'\')) = ?', [strtolower($divisiKadiv)]);
-                                    })
-                                    ->orWhere('executor_id', (string) $authUser->id)
-                                    ->orWhere('executor_id', (string) $authUser->nik)
-                                    ->orWhere('petugas_investigasi', 'ilike', '%' . ($authUser->name ?? $authUser->nama ?? '') . '%');
+                                    });
+                                    if (!empty($authUser->id) && preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', (string)$authUser->id)) {
+                                        $s->orWhere('executor_id', (string) $authUser->id);
+                                    }
+                                    $s->orWhere('petugas_investigasi', 'ilike', '%' . ($authUser->name ?? $authUser->nama ?? '') . '%')
+                                      ->orWhere('petugas_investigasi', 'ilike', '%' . ($authUser->nik ?? '') . '%');
                                 });
                         });
                 });
@@ -1601,11 +1605,13 @@ class ApiPegawaiController extends Controller
             } elseif ($dbRole === 'tpdpk') {
                 $query->where(function ($q) use ($authUser) {
                     $q->where('eksekutor', 'tpdpk')
-                        ->orWhere('eksekutor_tindak_lanjut', 'tpdpk')
-                        ->orWhere('executor_id', (string) $authUser->id)
-                        ->orWhere('executor_id', (string) $authUser->nik)
-                        ->orWhere('petugas_investigasi', 'ilike', '%' . ($authUser->name ?? $authUser->nama ?? '') . '%')
-                        ->orWhereIn('status', ['menungguInvestigasi', 'investigasiBerjalan', 'revisiInvestigasi', 'tindakLanjutBerjalan', 'selesai', 'arsip']);
+                        ->orWhere('eksekutor_tindak_lanjut', 'tpdpk');
+                    if (!empty($authUser->id) && preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', (string)$authUser->id)) {
+                        $q->orWhere('executor_id', (string) $authUser->id);
+                    }
+                    $q->orWhere('petugas_investigasi', 'ilike', '%' . ($authUser->name ?? $authUser->nama ?? '') . '%')
+                      ->orWhere('petugas_investigasi', 'ilike', '%' . ($authUser->nik ?? '') . '%')
+                      ->orWhereIn('status', ['menungguInvestigasi', 'investigasiBerjalan', 'revisiInvestigasi', 'tindakLanjutBerjalan', 'selesai', 'arsip']);
                 });
             } elseif ($dbRole === 'sdm' || $userLevel === '1') {
                 $query->whereIn('status', ['sdmPemberianSanksi', 'tindakLanjutSdm', 'selesai', 'menungguSdm']);
@@ -1791,6 +1797,15 @@ class ApiPegawaiController extends Controller
                 $val = $request->input($col);
                 if (in_array($col, ['eksekutor', 'eksekutor_divisi_kadiv', 'eksekutor_tindak_lanjut', 'eksekutor_tindak_lanjut_divisi_kadiv']) && is_string($val)) {
                     $val = strtolower($val);
+                }
+                if ($col === 'executor_id') {
+                    $valStr = trim((string) $val);
+                    if (!preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $valStr)) {
+                        $peg = DB::table('pegawai')->where('nik', $valStr)->orWhere('name', 'ilike', $valStr)->first(['id']);
+                        $val = $peg ? $peg->id : null;
+                    } else {
+                        $val = $valStr;
+                    }
                 }
                 $updateData[$col] = $val;
             }
