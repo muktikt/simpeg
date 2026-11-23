@@ -1559,25 +1559,37 @@ class ApiPegawaiController extends Controller
                     ? ['Pelanggaran Teknik']
                     : ['Pelanggaran Administrasi', 'Umum'];
                 $query->where(function ($q) use ($categories, $divisiKadiv) {
-                    $q->where(function ($sub) use ($categories) {
-                        $sub->whereIn('status', ['menungguKadiv', 'menungguVerifikasiKadiv', 'DIAJUKAN'])
-                            ->whereIn('kategori', $categories);
-                    })->orWhere(function ($sub) use ($divisiKadiv) {
-                        $sub->where('status', 'investigasiBerjalan')
-                            ->where('eksekutor', 'kadiv')
-                            ->where('eksekutor_divisi_kadiv', $divisiKadiv);
-                    })->orWhere(function ($sub) use ($divisiKadiv) {
-                        $sub->where('status', 'tindakLanjutBerjalan')
-                            ->where('eksekutor_tindak_lanjut', 'kadiv')
-                            ->where('eksekutor_tindak_lanjut_divisi_kadiv', $divisiKadiv);
-                    });
+                    $q->whereIn('kategori', $categories)
+                        ->orWhere(function ($sub) use ($divisiKadiv) {
+                            $sub->where('status', 'investigasiBerjalan')
+                                ->where('eksekutor', 'kadiv')
+                                ->where('eksekutor_divisi_kadiv', $divisiKadiv);
+                        })->orWhere(function ($sub) use ($divisiKadiv) {
+                            $sub->where('status', 'tindakLanjutBerjalan')
+                                ->where('eksekutor_tindak_lanjut', 'kadiv')
+                                ->where('eksekutor_tindak_lanjut_divisi_kadiv', $divisiKadiv);
+                        });
                 });
             } elseif ($dbRole === 'kspi') {
-                $query->whereIn('status', ['reviewKspi', 'telaahAwalKspi', 'menungguPilihEksekutor', 'hasilInvestigasiMasuk']);
+                $query->whereIn('status', [
+                    'reviewKspi', 'telaahAwalKspi', 'menungguReviewKspi', 'menungguPilihEksekutor',
+                    'ditolakDirektur', 'peninjauanKembali', 'menungguInvestigasi', 'investigasiBerjalan',
+                    'revisiInvestigasi', 'hasilInvestigasiMasuk', 'tindakLanjutBerjalan', 'selesai', 'arsip',
+                    'menungguDirutTahap1', 'menungguDirutTahap2', 'menungguPilihEksekutorTindakLanjut',
+                ]);
             } elseif ($dbRole === 'direktur') {
-                $query->whereIn('status', ['disposisiDirutTahap1', 'putusanDirutTahap2']);
+                $query->whereIn('status', [
+                    'menungguDirutTahap1', 'menungguDirutTahap2', 'menungguPilihEksekutorTindakLanjut',
+                    'disposisiDirutTahap1', 'putusanDirutTahap2',
+                    'selesai', 'arsip',
+                    'investigasiBerjalan', 'tindakLanjutBerjalan', 'menungguReviewKspi', 'reviewKspi', 'menungguSdm'
+                ]);
             } elseif ($dbRole === 'tpdpk') {
-                $query->where('status', 'investigasiBerjalan');
+                $query->where(function ($q) {
+                    $q->where('eksekutor', 'tpdpk')
+                        ->orWhere('eksekutor_tindak_lanjut', 'tpdpk')
+                        ->orWhereIn('status', ['menungguInvestigasi', 'investigasiBerjalan', 'revisiInvestigasi', 'tindakLanjutBerjalan', 'selesai', 'arsip']);
+                });
             } elseif ($dbRole === 'sdm' || $userLevel === '1') {
                 $query->whereIn('status', ['sdmPemberianSanksi', 'tindakLanjutSdm', 'selesai', 'menungguSdm']);
             }
@@ -1743,6 +1755,23 @@ class ApiPegawaiController extends Controller
         }
         if ($request->has('catatan_kadiv')) {
             $updateData['catatan_kadiv'] = $request->input('catatan_kadiv');
+        }
+
+        $allowedExtra = [
+            'keputusan_dirut_tahap1', 'catatan_dirut_tahap1',
+            'keputusan_dirut_tahap2', 'catatan_dirut_tahap2',
+            'eksekutor', 'petugas_investigasi', 'hasil_investigasi',
+            'kesimpulan_investigasi', 'catatan_review_kspi',
+            'catatan_review_hasil_kspi', 'eksekutor_tindak_lanjut',
+            'eksekutor_divisi_kadiv', 'eksekutor_tindak_lanjut_divisi_kadiv',
+            'arsip_pada_tahap', 'alasan_arsip', 'catatan_tindak_lanjut_selesai',
+            'catatan_sdm', 'nomor_surat_putusan', 'jenis_sanksi', 'file_surat_putusan',
+            'tanggal_surat_putusan',
+        ];
+        foreach ($allowedExtra as $col) {
+            if ($request->has($col)) {
+                $updateData[$col] = $request->input($col);
+            }
         }
 
         DB::table('pengaduan_pegawai')->where('id', $id)->update($updateData);
