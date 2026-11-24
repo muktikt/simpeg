@@ -1513,6 +1513,39 @@ class ApiPegawaiController extends Controller
         $divisiKadiv = $authUser->divisi_kadiv ?? null;
         $isManager = in_array($userLevel, ['1', '7']) || in_array($dbRole, ['sdm', 'admin', 'direktur', 'kspi', 'kadiv', 'kadivkategori', 'tpdpk']);
 
+        $arrayFields = [
+            'foto_bukti', 'dokumen_pendukung', 'video_bukti', 'voice_note',
+            'investigasi_foto', 'investigasi_video', 'investigasi_voice', 'investigasi_dokumen',
+            'hasil_foto', 'hasil_dokumen', 'hasil_voice', 'hasil_video'
+        ];
+        $normalizePengaduanList = function ($rows) use ($arrayFields) {
+            return collect($rows)->map(function ($row) use ($arrayFields) {
+                $arr = (array) $row;
+                foreach ($arrayFields as $f) {
+                    $val = $arr[$f] ?? null;
+                    if (empty($val) || $val === '{}' || $val === '[]' || $val === 'null') {
+                        $arr[$f] = [];
+                    } elseif (is_string($val)) {
+                        $trim = trim($val);
+                        if (str_starts_with($trim, '[') && str_ends_with($trim, ']')) {
+                            $decoded = json_decode($trim, true);
+                            $arr[$f] = is_array($decoded) ? $decoded : [];
+                        } elseif (str_starts_with($trim, '{') && str_ends_with($trim, '}')) {
+                            $inner = trim(substr($trim, 1, -1));
+                            $arr[$f] = empty($inner) ? [] : array_values(array_filter(array_map(function($s) {
+                                return trim(trim($s), '"\'');
+                            }, explode(',', $inner))));
+                        } else {
+                            $arr[$f] = [$trim];
+                        }
+                    } elseif (!is_array($val)) {
+                        $arr[$f] = [];
+                    }
+                }
+                return $arr;
+            })->all();
+        };
+
         // Jika peran manajerial meminta kotak masuk kasus (scope=role atau tab=masuk)
         if ($isManager && ($request->query('scope') === 'role' || $request->query('tab') === 'masuk')) {
             $query = DB::table('pengaduan_pegawai')
@@ -1522,23 +1555,70 @@ class ApiPegawaiController extends Controller
                 );
 
             if ($dbRole === 'kadiv' || $dbRole === 'kadivkategori') {
-                $divisiLabel = ($divisiKadiv === 'teknik') ? 'Pelanggaran Teknik' : 'Pelanggaran Administrasi';
-                $query->where(function ($q) use ($divisiLabel) {
-                    $q->whereIn('status', ['menungguKadiv', 'menungguVerifikasiKadiv'])
-                        ->where('kategori', $divisiLabel)
-                        ->orWhere('status', 'investigasiBerjalan');
+                $categories = ($divisiKadiv === 'teknik')
+                    ? ['Pelanggaran Teknik']
+                    : ['Pelanggaran Administrasi', 'Umum'];
+                $query->where(function ($q) use ($categories, $divisiKadiv, $authUser) {
+                    $q->whereIn('kategori', $categories)
+                        ->orWhere(function ($sub) use ($divisiKadiv, $authUser) {
+                            $sub->where('status', 'investigasiBerjalan')
+                                ->where(function ($s) use ($divisiKadiv, $authUser) {
+                                    $s->where(function ($k) use ($divisiKadiv) {
+                                        $k->where('eksekutor', 'kadiv')
+                                          ->whereRaw('LOWER(COALESCE(eksekutor_divisi_kadiv, \'\')) = ?', [strtolower($divisiKadiv)]);
+                                    });
+                                    if (!empty($authUser->id) && preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', (string)$authUser->id)) {
+                                        $s->orWhere('executor_id', (string) $authUser->id);
+                                    }
+                                    $s->orWhere('petugas_investigasi', 'ilike', '%' . ($authUser->name ?? $authUser->nama ?? '') . '%')
+                                      ->orWhere('petugas_investigasi', 'ilike', '%' . ($authUser->nik ?? '') . '%');
+                                });
+                        })->orWhere(function ($sub) use ($divisiKadiv, $authUser) {
+                            $sub->where('status', 'tindakLanjutBerjalan')
+                                ->where(function ($s) use ($divisiKadiv, $authUser) {
+                                    $s->where(function ($k) use ($divisiKadiv) {
+                                        $k->where('eksekutor_tindak_lanjut', 'kadiv')
+                                          ->whereRaw('LOWER(COALESCE(eksekutor_tindak_lanjut_divisi_kadiv, \'\')) = ?', [strtolower($divisiKadiv)]);
+                                    });
+                                    if (!empty($authUser->id) && preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', (string)$authUser->id)) {
+                                        $s->orWhere('executor_id', (string) $authUser->id);
+                                    }
+                                    $s->orWhere('petugas_investigasi', 'ilike', '%' . ($authUser->name ?? $authUser->nama ?? '') . '%')
+                                      ->orWhere('petugas_investigasi', 'ilike', '%' . ($authUser->nik ?? '') . '%');
+                                });
+                        });
                 });
             } elseif ($dbRole === 'kspi') {
-                $query->whereIn('status', ['reviewKspi', 'telaahAwalKspi', 'menungguPilihEksekutor', 'hasilInvestigasiMasuk']);
+                $query->whereIn('status', [
+                    'reviewKspi', 'telaahAwalKspi', 'menungguReviewKspi', 'menungguPilihEksekutor',
+                    'ditolakDirektur', 'peninjauanKembali', 'menungguInvestigasi', 'investigasiBerjalan',
+                    'revisiInvestigasi', 'hasilInvestigasiMasuk', 'tindakLanjutBerjalan', 'selesai', 'arsip',
+                    'menungguDirutTahap1', 'menungguDirutTahap2', 'menungguPilihEksekutorTindakLanjut',
+                ]);
             } elseif ($dbRole === 'direktur') {
-                $query->whereIn('status', ['disposisiDirutTahap1', 'putusanDirutTahap2']);
+                $query->whereIn('status', [
+                    'menungguDirutTahap1', 'menungguDirutTahap2', 'menungguPilihEksekutorTindakLanjut',
+                    'disposisiDirutTahap1', 'putusanDirutTahap2',
+                    'selesai', 'arsip',
+                    'investigasiBerjalan', 'tindakLanjutBerjalan', 'menungguReviewKspi', 'reviewKspi', 'menungguSdm'
+                ]);
             } elseif ($dbRole === 'tpdpk') {
-                $query->where('status', 'investigasiBerjalan');
+                $query->where(function ($q) use ($authUser) {
+                    $q->where('eksekutor', 'tpdpk')
+                        ->orWhere('eksekutor_tindak_lanjut', 'tpdpk');
+                    if (!empty($authUser->id) && preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', (string)$authUser->id)) {
+                        $q->orWhere('executor_id', (string) $authUser->id);
+                    }
+                    $q->orWhere('petugas_investigasi', 'ilike', '%' . ($authUser->name ?? $authUser->nama ?? '') . '%')
+                      ->orWhere('petugas_investigasi', 'ilike', '%' . ($authUser->nik ?? '') . '%')
+                      ->orWhereIn('status', ['menungguInvestigasi', 'investigasiBerjalan', 'revisiInvestigasi', 'tindakLanjutBerjalan', 'selesai', 'arsip']);
+                });
             } elseif ($dbRole === 'sdm' || $userLevel === '1') {
                 $query->whereIn('status', ['sdmPemberianSanksi', 'tindakLanjutSdm', 'selesai', 'menungguSdm']);
             }
 
-            $data = $query->orderByDesc('created_at')->get();
+            $raw = $query->orderByDesc('created_at')->get();
+            $data = $normalizePengaduanList($raw);
 
             return response()->json([
                 'success' => true,
@@ -1552,11 +1632,12 @@ class ApiPegawaiController extends Controller
             return $resp;
         }
 
-        $data = DB::table('pengaduan_pegawai')
+        $raw = DB::table('pengaduan_pegawai')
             ->where('pelapor_id', $pegawai->id)
             ->orWhere('nik', $pegawai->nik)
             ->orderByDesc('created_at')
             ->get();
+        $data = $normalizePengaduanList($raw);
 
         return response()->json([
             'success' => true,
@@ -1599,11 +1680,20 @@ class ApiPegawaiController extends Controller
 
         $now = now();
         $nomorPengaduan = 'PGD-' . date('Ymd') . '-' . rand(1000, 9999);
+        $kategori = $request->input('kategori') ?: 'Pelanggaran Administrasi';
+        $status = 'menungguKadiv';
+        $pihakTerlapor = trim((string) ($request->input('pihak_terlapor') ?? ''));
+        $nikPelaku = trim((string) ($request->input('nik_pelaku') ?? ''));
+        $jabatanPelaku = trim((string) ($request->input('jabatan_pelaku') ?? ''));
+        $anonim = $request->boolean('anonim', false);
+
+        $fotoBukti = $request->input('foto_bukti');
+        $dokumenPendukung = $request->input('dokumen_pendukung');
 
         $id = DB::table('pengaduan_pegawai')->insertGetId([
             'nomor_pengaduan' => $nomorPengaduan,
             'pelapor_id' => $pegawai->id,
-            'kategori' => 'Umum',
+            'kategori' => $kategori,
             'judul' => $request->subjek,
             'deskripsi' => $request->pesan,
             'tanggal_pengaduan' => $now,
@@ -1611,10 +1701,28 @@ class ApiPegawaiController extends Controller
             'nik' => $pegawai->nik,
             'cabang' => $pegawai->unit_kerja ?? 'Kantor Pusat',
             'golongan' => $pegawai->golongan ?? '',
-            'anonim' => false,
-            'status' => 'DIAJUKAN',
+            'pihak_terlapor' => !empty($pihakTerlapor) ? $pihakTerlapor : null,
+            'nik_pelaku' => !empty($nikPelaku) ? $nikPelaku : null,
+            'jabatan_pelaku' => !empty($jabatanPelaku) ? $jabatanPelaku : null,
+            'anonim' => $anonim,
+            'foto_bukti' => !empty($fotoBukti) ? (is_array($fotoBukti) ? json_encode($fotoBukti) : $fotoBukti) : null,
+            'dokumen_pendukung' => !empty($dokumenPendukung) ? (is_array($dokumenPendukung) ? json_encode($dokumenPendukung) : $dokumenPendukung) : null,
+            'status' => $status,
             'created_at' => $now,
             'updated_at' => $now,
+        ]);
+
+        // Catat di Riwayat Status Pengaduan (Audit trail)
+        DB::table('riwayat_status_pengaduan')->insert([
+            'pengaduan_id' => $id,
+            'status' => $status,
+            'status_lama' => null,
+            'oleh' => $anonim ? 'Anonim' : ($pegawai->name ?? $pegawai->nama),
+            'role' => 'pegawai',
+            'aksi' => 'Pengaduan dibuat',
+            'keterangan' => !empty($pihakTerlapor) ? ('Pelaku diadukan: ' . $pihakTerlapor . (!empty($nikPelaku) ? ' · NIK ' . $nikPelaku : '')) : 'Pengaduan berhasil diajukan oleh pelapor',
+            'tanggal' => $now,
+            'created_at' => $now,
         ]);
 
         AuditLogController::record(
@@ -1629,8 +1737,108 @@ class ApiPegawaiController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Pengaduan berhasil dikirim ke SDM.',
-            'data' => ['id' => $id, 'nomor_pengaduan' => $nomorPengaduan],
+            'message' => 'Pengaduan berhasil dikirim dan menunggu verifikasi Kadiv.',
+            'data' => ['id' => $id, 'nomor_pengaduan' => $nomorPengaduan, 'status' => $status],
+        ]);
+    }
+
+    /**
+     * Update Status Pengaduan dari Mobile (Kadiv Aksi, Alihkan Kategori, dll)
+     */
+    public function updateStatusPengaduan(Request $request, $id)
+    {
+        $authUser = $request->attributes->get('auth_user');
+        if (! $authUser) {
+            return response()->json(['success' => false, 'message' => 'Autentikasi gagal.'], 401);
+        }
+
+        $pengaduan = DB::table('pengaduan_pegawai')->where('id', $id)->first();
+        if (! $pengaduan) {
+            return response()->json(['success' => false, 'message' => 'Pengaduan tidak ditemukan.'], 404);
+        }
+
+        $now = now();
+        $statusBaru = $request->input('status');
+        $statusLama = $pengaduan->status;
+        $kategoriBaru = $request->input('kategori');
+        $catatan = $request->input('catatan');
+        $aksi = $request->input('aksi') ?: 'Pembaruan status pengaduan';
+        $roleName = $authUser->role ?? 'pegawai';
+        $oleh = $authUser->name ?? $authUser->nama ?? 'Sistem';
+
+        $updateData = ['updated_at' => $now];
+        if (!empty($statusBaru)) {
+            $updateData['status'] = $statusBaru;
+        }
+        if (!empty($kategoriBaru)) {
+            $updateData['kategori'] = $kategoriBaru;
+        }
+        if ($request->has('keputusan_kadiv')) {
+            $updateData['keputusan_kadiv'] = $request->input('keputusan_kadiv');
+        }
+        if ($request->has('catatan_kadiv')) {
+            $updateData['catatan_kadiv'] = $request->input('catatan_kadiv');
+        }
+
+        $allowedExtra = [
+            'executor_id',
+            'keputusan_dirut_tahap1', 'catatan_dirut_tahap1',
+            'keputusan_dirut_tahap2', 'catatan_dirut_tahap2',
+            'eksekutor', 'petugas_investigasi', 'hasil_investigasi',
+            'kesimpulan_investigasi', 'catatan_review_kspi',
+            'catatan_review_hasil_kspi', 'eksekutor_tindak_lanjut',
+            'eksekutor_divisi_kadiv', 'eksekutor_tindak_lanjut_divisi_kadiv',
+            'arsip_pada_tahap', 'alasan_arsip', 'catatan_tindak_lanjut_selesai',
+            'catatan_sdm', 'nomor_surat_putusan', 'jenis_sanksi', 'file_surat_putusan',
+            'tanggal_surat_putusan',
+        ];
+        foreach ($allowedExtra as $col) {
+            if ($request->has($col)) {
+                $val = $request->input($col);
+                if (in_array($col, ['eksekutor', 'eksekutor_divisi_kadiv', 'eksekutor_tindak_lanjut', 'eksekutor_tindak_lanjut_divisi_kadiv']) && is_string($val)) {
+                    $val = strtolower($val);
+                }
+                if ($col === 'executor_id') {
+                    $valStr = trim((string) $val);
+                    if (!preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $valStr)) {
+                        $peg = DB::table('pegawai')->where('nik', $valStr)->orWhere('name', 'ilike', $valStr)->first(['id']);
+                        $val = $peg ? $peg->id : null;
+                    } else {
+                        $val = $valStr;
+                    }
+                }
+                $updateData[$col] = $val;
+            }
+        }
+
+        DB::table('pengaduan_pegawai')->where('id', $id)->update($updateData);
+
+        DB::table('riwayat_status_pengaduan')->insert([
+            'pengaduan_id' => $id,
+            'status' => $statusBaru ?: $statusLama,
+            'status_lama' => $statusLama,
+            'oleh' => $oleh,
+            'role' => $roleName,
+            'aksi' => $aksi,
+            'keterangan' => $catatan,
+            'tanggal' => $now,
+            'created_at' => $now,
+        ]);
+
+        AuditLogController::record(
+            'UPDATE',
+            'Pengaduan (Mobile)',
+            "{$aksi} pada Pengaduan #{$pengaduan->nomor_pengaduan}: {$catatan}",
+            (string) $authUser->nik,
+            (string) $oleh,
+            $roleName,
+            $request->header('X-Device-Info') ?: ($request->header('User-Agent') ?: 'SIMPEG Mobile App')
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Status pengaduan berhasil diperbarui.',
+            'data' => array_merge((array)$pengaduan, $updateData),
         ]);
     }
 

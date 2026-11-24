@@ -49,6 +49,7 @@ Route::prefix('v1')->group(function () {
         // Pengaduan Pegawai
         Route::get('/pengaduan', [ApiPegawaiController::class, 'pengaduan']);
         Route::post('/pengaduan', [ApiPegawaiController::class, 'storePengaduan']);
+        Route::post('/pengaduan/{id}/status', [ApiPegawaiController::class, 'updateStatusPengaduan']);
 
         // Dokumen Resmi Kepegawaian (SK & Diklat dari SDM)
         Route::get('/dokumen', [ApiPegawaiController::class, 'dokumenResmi']);
