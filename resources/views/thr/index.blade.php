@@ -24,6 +24,13 @@
                     <option value="{{ $y }}" @selected($tahun === $y)>{{ $y }}</option>
                 @endfor
             </select>
+            @php
+                $hasCustomThr = ($tahun !== (int) now()->year || !empty($status));
+                $resetThrUrl = route('thr.index', !empty($kategori) ? ['kategori' => $kategori] : []);
+            @endphp
+            @if ($hasCustomThr)
+                <a href="{{ $resetThrUrl }}" class="btn btn-outline btn-sm" style="height:36px; display:inline-flex; align-items:center; color:#DC2626; border-color:#FECACA; padding:0 10px;" title="Reset Filter">Reset</a>
+            @endif
         </form>
         <div class="search-box">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>

@@ -11,40 +11,31 @@
 @if (($kategori === 'satuan' || empty($kategori)) && !empty($auditCounts))
     <!-- INFORMASI DATA BELUM DI ENTRI (PERSIS SIMPEG LAMA) -->
     <div class="stat-grid" style="grid-template-columns: repeat(3, 1fr); gap:12px; margin-bottom:12px;">
-        <a href="{{ route('gaji-proses.audit', ['bulan' => $bulan, 'tahun' => $tahun, 'tab' => 'prestasi']) }}" style="text-decoration:none;">
-            <div class="stat-card" style="border-top:3px solid #EF4444; background:#FFFFFF;">
-                <div class="label" style="font-size:11px; font-weight:700; color:#DC2626;">PRESTASI BELUM MASUK</div>
-                <div class="value" style="font-size:22px; font-weight:800; color:#DC2626; font-family:'IBM Plex Mono',monospace;">
-                    {{ $auditCounts['prestasi'] }} <small style="font-size:12px; font-weight:500; color:#64748B;">Pegawai</small>
-                </div>
+        <div class="stat-card" style="border-top:3px solid #EF4444; background:#FFFFFF;">
+            <div class="label" style="font-size:11px; font-weight:700; color:#DC2626;">PRESTASI BELUM MASUK</div>
+            <div class="value" style="font-size:22px; font-weight:800; color:#DC2626; font-family:'IBM Plex Mono',monospace;">
+                {{ $auditCounts['prestasi'] }} <small style="font-size:12px; font-weight:500; color:#64748B;">Pegawai</small>
             </div>
-        </a>
+        </div>
 
-        <a href="{{ route('gaji-proses.audit', ['bulan' => $bulan, 'tahun' => $tahun, 'tab' => 'absensi']) }}" style="text-decoration:none;">
-            <div class="stat-card" style="border-top:3px solid #F59E0B; background:#FFFFFF;">
-                <div class="label" style="font-size:11px; font-weight:700; color:#D97706;">ABSENSI BELUM MASUK</div>
-                <div class="value" style="font-size:22px; font-weight:800; color:#D97706; font-family:'IBM Plex Mono',monospace;">
-                    {{ $auditCounts['absensi'] }} <small style="font-size:12px; font-weight:500; color:#64748B;">Pegawai</small>
-                </div>
+        <div class="stat-card" style="border-top:3px solid #F59E0B; background:#FFFFFF;">
+            <div class="label" style="font-size:11px; font-weight:700; color:#D97706;">ABSENSI BELUM MASUK</div>
+            <div class="value" style="font-size:22px; font-weight:800; color:#D97706; font-family:'IBM Plex Mono',monospace;">
+                {{ $auditCounts['absensi'] }} <small style="font-size:12px; font-weight:500; color:#64748B;">Pegawai</small>
             </div>
-        </a>
+        </div>
 
-        <a href="{{ route('gaji-proses.audit', ['bulan' => $bulan, 'tahun' => $tahun, 'tab' => 'potongan']) }}" style="text-decoration:none;">
-            <div class="stat-card" style="border-top:3px solid #10B981; background:#FFFFFF;">
-                <div class="label" style="font-size:11px; font-weight:700; color:#059669;">KEUANGAN BELUM MASUK</div>
-                <div class="value" style="font-size:22px; font-weight:800; color:#059669; font-family:'IBM Plex Mono',monospace;">
-                    {{ $auditCounts['potongan'] }} <small style="font-size:12px; font-weight:500; color:#64748B;">Pegawai</small>
-                </div>
+        <div class="stat-card" style="border-top:3px solid #10B981; background:#FFFFFF;">
+            <div class="label" style="font-size:11px; font-weight:700; color:#059669;">KEUANGAN BELUM MASUK</div>
+            <div class="value" style="font-size:22px; font-weight:800; color:#059669; font-family:'IBM Plex Mono',monospace;">
+                {{ $auditCounts['potongan'] }} <small style="font-size:12px; font-weight:500; color:#64748B;">Pegawai</small>
             </div>
-        </a>
+        </div>
     </div>
 
     @if ($auditCounts['prestasi'] > 0 || $auditCounts['absensi'] > 0 || $auditCounts['potongan'] > 0)
-        <div style="background:#FFFBEB; border-left:4px solid #F59E0B; padding:10px 14px; border-radius:6px; margin-bottom:16px; font-size:12px; color:#92400E; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-            <div>
-                <strong>Perhatian:</strong> Data di atas adalah data yang belum di-entri. Jika data di atas nilainya = 0 (nol) artinya sudah di-entri semua dan siap proses cek gaji. Jika belum, jangan di-cek dulu!
-            </div>
-            <a href="{{ route('gaji-proses.audit', ['bulan' => $bulan, 'tahun' => $tahun]) }}" style="font-weight:700; color:#B45309; text-decoration:underline;">Lihat Detail Audit Pra-Payroll &rarr;</a>
+        <div style="background:#FFFBEB; border-left:4px solid #F59E0B; padding:10px 14px; border-radius:6px; margin-bottom:16px; font-size:12px; color:#92400E;">
+            <strong>Perhatian:</strong> Data di atas adalah data yang belum di-entri. Jika data di atas nilainya = 0 (nol) artinya sudah di-entri semua dan siap proses cek gaji. Jika belum, jangan di-cek dulu!
         </div>
     @endif
 @endif
@@ -79,6 +70,17 @@
                 <option value="terbit" @selected($status === 'terbit')>Terbit (Final)</option>
                 <option value="minus" @selected($status === 'minus')>Gaji Minus</option>
             </select>
+            @php
+                $hasCustomGajiProses = (
+                    $bulan !== (int) now()->month ||
+                    $tahun !== (int) now()->year ||
+                    !empty($status)
+                );
+                $resetGajiUrl = route('gaji-proses.index', !empty($kategori) ? ['kategori' => $kategori] : []);
+            @endphp
+            @if ($hasCustomGajiProses)
+                <a href="{{ $resetGajiUrl }}" class="btn btn-outline btn-sm" style="height:36px; display:inline-flex; align-items:center; color:#DC2626; border-color:#FECACA; padding:0 10px;" title="Reset Filter">Reset</a>
+            @endif
         </form>
         <div class="search-box">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>

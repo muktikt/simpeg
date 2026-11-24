@@ -179,7 +179,14 @@
 
             <div style="display:flex; gap:8px;">
                 <button type="submit" class="btn btn-primary" style="height:38px;">Terapkan</button>
-                <a href="{{ route('cek-nik.bulan-ini') }}" class="btn btn-outline" style="height:38px; display:inline-flex; align-items:center;">Reset</a>
+                @php
+                    $hasCustomFilter = (
+                        !empty($search) ||
+                        (int)$bulan !== (int)now()->month ||
+                        (int)$tahun !== (int)now()->year
+                    );
+                @endphp
+                <a id="btn-reset-bulan-ini" href="{{ route('cek-nik.bulan-ini') }}" class="btn btn-outline" style="height:38px; display:{{ $hasCustomFilter ? 'inline-flex' : 'none' }}; align-items:center; color:#DC2626; border-color:#FECACA;">Reset</a>
             </div>
         </div>
     </form>
@@ -364,6 +371,29 @@ function closeRincianModal() {
 
 window.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') closeRincianModal();
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+    var form = document.querySelector('form[action*="cek-nik/bulan-ini"]');
+    var btnReset = document.getElementById('btn-reset-bulan-ini');
+    if (form && btnReset) {
+        var defBulan = '{{ now()->month }}';
+        var defTahun = '{{ now()->year }}';
+
+        function checkBulanIniFilter() {
+            var b = form.querySelector('[name="bulan"]')?.value || defBulan;
+            var t = form.querySelector('[name="tahun"]')?.value || defTahun;
+            var s = form.querySelector('[name="search"]')?.value?.trim() || '';
+
+            var isChanged = (b != defBulan) || (t != defTahun) || (s !== '');
+            btnReset.style.display = isChanged ? 'inline-flex' : 'none';
+        }
+
+        form.querySelectorAll('select, input').forEach(function(el) {
+            el.addEventListener('change', checkBulanIniFilter);
+            el.addEventListener('input', checkBulanIniFilter);
+        });
+    }
 });
 </script>
 @endsection

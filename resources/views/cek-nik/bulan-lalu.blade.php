@@ -176,7 +176,16 @@
 
             <div style="display:flex; gap:8px;">
                 <button type="submit" class="btn btn-primary" style="height:38px;">Terapkan</button>
-                <a href="{{ route('cek-nik.bulan-lalu') }}" class="btn btn-outline" style="height:38px; display:inline-flex; align-items:center;">Reset</a>
+                @php
+                    $targetBulan = (int) now()->subMonth()->month;
+                    $targetTahun = (int) now()->subMonth()->year;
+                    $hasCustomFilter = (
+                        !empty($search) ||
+                        (int)$bulan !== $targetBulan ||
+                        (int)$tahun !== $targetTahun
+                    );
+                @endphp
+                <a id="btn-reset-bulan-lalu" href="{{ route('cek-nik.bulan-lalu') }}" class="btn btn-outline" style="height:38px; display:{{ $hasCustomFilter ? 'inline-flex' : 'none' }}; align-items:center; color:#DC2626; border-color:#FECACA;">Reset</a>
             </div>
         </div>
     </form>
@@ -361,6 +370,29 @@ function closeRincianModal() {
 
 window.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') closeRincianModal();
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+    var form = document.querySelector('form[action*="cek-nik/bulan-lalu"]');
+    var btnReset = document.getElementById('btn-reset-bulan-lalu');
+    if (form && btnReset) {
+        var defBulan = '{{ now()->subMonth()->month }}';
+        var defTahun = '{{ now()->subMonth()->year }}';
+
+        function checkBulanLaluFilter() {
+            var b = form.querySelector('[name="bulan"]')?.value || defBulan;
+            var t = form.querySelector('[name="tahun"]')?.value || defTahun;
+            var s = form.querySelector('[name="search"]')?.value?.trim() || '';
+
+            var isChanged = (b != defBulan) || (t != defTahun) || (s !== '');
+            btnReset.style.display = isChanged ? 'inline-flex' : 'none';
+        }
+
+        form.querySelectorAll('select, input').forEach(function(el) {
+            el.addEventListener('change', checkBulanLaluFilter);
+            el.addEventListener('input', checkBulanLaluFilter);
+        });
+    }
 });
 </script>
 @endsection

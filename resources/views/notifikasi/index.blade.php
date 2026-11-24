@@ -251,9 +251,10 @@
 
             <div style="display:flex; align-items:center; gap:8px; flex:1; max-width:380px;">
                 <input type="text" name="search" value="{{ $search }}" placeholder="Cari cuti, gaji, SK..." style="width:100%; height:36px; padding:6px 12px; border-radius:8px; border:1px solid #CBD5E1; font-size:13px;">
-                @if (!empty($search))
-                    <a href="{{ route('notifikasi.index') }}" class="btn btn-sm btn-outline" style="padding:6px 10px; font-size:12px;">Reset</a>
-                @endif
+                @php
+                    $hasCustomNotif = !empty($search) || ($filterStatus ?? 'all') !== 'all';
+                @endphp
+                <a id="btn-reset-notif" href="{{ route('notifikasi.index') }}" class="btn btn-sm btn-outline" style="padding:6px 10px; font-size:12px; display:{{ $hasCustomNotif ? 'inline-flex' : 'none' }}; align-items:center; color:#DC2626; border-color:#FECACA;">Reset</a>
                 <button type="submit" class="btn btn-sm btn-primary" style="padding:6px 12px; font-size:12px;">Cari</button>
             </div>
         </form>
@@ -346,5 +347,25 @@
         {{ $notifikasi->links() }}
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var form = document.querySelector('.notif-filter-card form');
+    var btnReset = document.getElementById('btn-reset-notif');
+    if (form && btnReset) {
+        function checkNotifFilter() {
+            var st = form.querySelector('[name="status"]')?.value || 'all';
+            var s = form.querySelector('[name="search"]')?.value?.trim() || '';
+            var isChanged = (st !== 'all') || (s !== '');
+            btnReset.style.display = isChanged ? 'inline-flex' : 'none';
+        }
+
+        form.querySelectorAll('select, input').forEach(function(el) {
+            el.addEventListener('change', checkNotifFilter);
+            el.addEventListener('input', checkNotifFilter);
+        });
+    }
+});
+</script>
 @endsection
 

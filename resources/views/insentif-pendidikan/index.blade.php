@@ -63,9 +63,10 @@
             <input type="text" name="q" value="{{ $search }}" placeholder="Cari NIK atau Nama..." style="border:none; outline:none; font-size:13px; width:200px;">
         </div>
         <button type="submit" class="btn btn-outline btn-sm">Filter</button>
-        @if (!empty($search) || ($periode !== ('JULI ' . now()->year) && $periode !== 'all'))
-            <a href="{{ route('insentif-pendidikan.index') }}" class="btn btn-outline btn-sm">Reset</a>
-        @endif
+        @php
+            $hasCustomFilter = (!empty($search) || $periode !== ('JULI ' . now()->year));
+        @endphp
+        <a id="btn-reset-insentif-pend" href="{{ route('insentif-pendidikan.index') }}" class="btn btn-outline btn-sm" style="display:{{ $hasCustomFilter ? 'inline-flex' : 'none' }}; align-items:center; color:#DC2626; border-color:#FECACA;">Reset</a>
     </form>
 </div>
 
@@ -130,4 +131,26 @@
         </tbody>
     </table>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var form = document.querySelector('.toolbar form');
+    var btnReset = document.getElementById('btn-reset-insentif-pend');
+    if (form && btnReset) {
+        var defPeriode = 'JULI {{ now()->year }}';
+
+        function checkInsentifFilter() {
+            var p = form.querySelector('[name="periode"]')?.value || defPeriode;
+            var q = form.querySelector('[name="q"]')?.value?.trim() || '';
+            var isChanged = (p !== defPeriode) || (q !== '');
+            btnReset.style.display = isChanged ? 'inline-flex' : 'none';
+        }
+
+        form.querySelectorAll('select, input').forEach(function(el) {
+            el.addEventListener('change', checkInsentifFilter);
+            el.addEventListener('input', checkInsentifFilter);
+        });
+    }
+});
+</script>
 @endsection

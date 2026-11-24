@@ -24,14 +24,14 @@ class ApprovalController extends Controller
         $dirutNik    = (string) config('simpeg_approval.dirut', '1711001');
         $keuanganNik = (string) config('simpeg_approval.keuangan', '1711296');
 
-        $isSdm   = ($userNik === $sdmNik);
+        $isSdm   = ($userLevel === 1 || $userRole === 1 || $userNik === $sdmNik);
         $isDirum = ($userNik === $dirumNik);
         $isDirut = ($userNik === $dirutNik);
         $isKeu   = ($userLevel === 2 || $userRole === 2 || $userNik === $keuanganNik);
 
         $selectedStatus = strtolower(trim((string) $request->query('status', '')));
         if ($selectedStatus === '') {
-            $selectedStatus = $isKeu ? 'all' : 'pending';
+            $selectedStatus = 'all';
         }
         $pending = [];
 
@@ -49,8 +49,9 @@ class ApprovalController extends Controller
 
                 if ($selectedStatus === 'pending' && !$match) continue;
                 if ($selectedStatus === 'final' && !$isFinal) continue;
-                if (!$match && !$isFinal && $selectedStatus !== 'all') continue;
-                if (!$match && !$isFinal) continue;
+                if ($selectedStatus === 'draft' && !in_array($itemSt, ['draft', 'n', ''], true)) continue;
+                if ($selectedStatus === 'kepegawaian' && $itemSt !== 'kepegawaian') continue;
+                if ($selectedStatus === 'dirum' && $itemSt !== 'dirum') continue;
 
                 $gapok = (float) ($item['gapok'] ?? ($item['gaji_pokok'] ?? 0));
                 $totalPendapatan = (float) ($item['total_pendapatan'] ?? 0);
@@ -58,7 +59,13 @@ class ApprovalController extends Controller
                 $gajiBersih = (float) ($item['gaji_bersih'] ?? ($totalPendapatan - $totalPotongan));
                 $totalTunjangan = max(0, $totalPendapatan - $gapok);
 
-                $lbl = $isFinal ? 'Terbit Final' : 'Menunggu Persetujuan Anda';
+                $lbl = match (true) {
+                    $isFinal => 'Terbit Final',
+                    $match => 'Menunggu Persetujuan Anda',
+                    $itemSt === 'kepegawaian' => 'Disetujui SDM (Menunggu Dirum)',
+                    $itemSt === 'dirum' => 'Disetujui Dirum (Menunggu Dirut)',
+                    default => 'Draft (Menunggu SDM)',
+                };
 
                 $item['jenis'] = 'Gaji Bulanan';
                 $item['jenis_key'] = 'gaji';
@@ -94,8 +101,9 @@ class ApprovalController extends Controller
 
                 if ($selectedStatus === 'pending' && !$match) continue;
                 if ($selectedStatus === 'final' && !$isFinal) continue;
-                if (!$match && !$isFinal && $selectedStatus !== 'all') continue;
-                if (!$match && !$isFinal) continue;
+                if ($selectedStatus === 'draft' && !in_array($itemSt, ['draft', 'n', ''], true)) continue;
+                if ($selectedStatus === 'kepegawaian' && $itemSt !== 'kepegawaian') continue;
+                if ($selectedStatus === 'dirum' && $itemSt !== 'dirum') continue;
 
                 $gapok = (float) ($item['gapok'] ?? ($item['gaji_pokok'] ?? 0));
                 $totalPendapatan = (float) ($item['total_pendapatan'] ?? 0);
@@ -103,7 +111,13 @@ class ApprovalController extends Controller
                 $thrDiterima = (float) ($item['thr_diterima'] ?? ($totalPendapatan - $totalPotongan));
                 $totalTunjangan = max(0, $totalPendapatan - $gapok);
 
-                $lbl = $isFinal ? 'Terbit Final' : 'Menunggu Persetujuan Anda';
+                $lbl = match (true) {
+                    $isFinal => 'Terbit Final',
+                    $match => 'Menunggu Persetujuan Anda',
+                    $itemSt === 'kepegawaian' => 'Disetujui SDM (Menunggu Dirum)',
+                    $itemSt === 'dirum' => 'Disetujui Dirum (Menunggu Dirut)',
+                    default => 'Draft (Menunggu SDM)',
+                };
 
                 $item['jenis'] = 'THR';
                 $item['jenis_key'] = 'thr';
@@ -140,8 +154,9 @@ class ApprovalController extends Controller
 
                 if ($selectedStatus === 'pending' && !$match) continue;
                 if ($selectedStatus === 'final' && !$isFinal) continue;
-                if (!$match && !$isFinal && $selectedStatus !== 'all') continue;
-                if (!$match && !$isFinal) continue;
+                if ($selectedStatus === 'draft' && !in_array($itemSt, ['draft', 'n', ''], true)) continue;
+                if ($selectedStatus === 'kepegawaian' && $itemSt !== 'kepegawaian') continue;
+                if ($selectedStatus === 'dirum' && $itemSt !== 'dirum') continue;
 
                 $gapok = (float) ($item['gapok'] ?? ($item['gaji_pokok'] ?? 0));
                 $totalPendapatan = (float) ($item['total_pendapatan'] ?? 0);
@@ -149,7 +164,13 @@ class ApprovalController extends Controller
                 $g13Diterima = (float) ($item['gaji13_diterima'] ?? ($totalPendapatan - $totalPotongan));
                 $totalTunjangan = max(0, $totalPendapatan - $gapok);
 
-                $lbl = $isFinal ? 'Terbit Final' : 'Menunggu Persetujuan Anda';
+                $lbl = match (true) {
+                    $isFinal => 'Terbit Final',
+                    $match => 'Menunggu Persetujuan Anda',
+                    $itemSt === 'kepegawaian' => 'Disetujui SDM (Menunggu Dirum)',
+                    $itemSt === 'dirum' => 'Disetujui Dirum (Menunggu Dirut)',
+                    default => 'Draft (Menunggu SDM)',
+                };
 
                 $item['jenis'] = 'Gaji 13';
                 $item['jenis_key'] = 'gaji13';
@@ -290,13 +311,19 @@ class ApprovalController extends Controller
             Log::warning('Approval potongan_keu query failed: ' . $e->getMessage());
         }
 
-        // 5. Pengajuan Cuti (Khusus SDM)
-        if ($isSdm) {
+        // 5. Pengajuan Cuti (SDM, Dirum, Dirut)
+        if ($isSdm || $isDirum || $isDirut) {
             try {
-                $cutiPending = DB::table('pengajuan_cuti')
-                    ->leftJoin('pegawai', 'pengajuan_cuti.pegawai_id', '=', 'pegawai.id')
-                    ->whereRaw("LOWER(pengajuan_cuti.status) = 'pending'")
-                    ->select(
+                $cutiQuery = DB::table('pengajuan_cuti')
+                    ->leftJoin('pegawai', 'pengajuan_cuti.pegawai_id', '=', 'pegawai.id');
+
+                if ($selectedStatus === 'pending') {
+                    $cutiQuery->whereRaw("LOWER(pengajuan_cuti.status) = 'pending'");
+                } elseif ($selectedStatus === 'final' || $selectedStatus === 'terbit') {
+                    $cutiQuery->whereIn(DB::raw('LOWER(pengajuan_cuti.status)'), ['approved', 'disetujui', 'final', 'terbit']);
+                }
+
+                $cutiItems = $cutiQuery->select(
                         'pengajuan_cuti.*',
                         'pegawai.nik as p_nik',
                         'pegawai.name as p_name',
@@ -306,11 +333,16 @@ class ApprovalController extends Controller
                     ->orderByDesc('pengajuan_cuti.created_at')
                     ->get();
 
-                foreach ($cutiPending as $c) {
+                foreach ($cutiItems as $c) {
                     $cTime = $c->created_at ? strtotime($c->created_at) : time();
                     $tMulai = $c->tanggal_mulai ? date('d/m/Y', strtotime($c->tanggal_mulai)) : '';
                     $tSelesai = $c->tanggal_selesai ? date('d/m/Y', strtotime($c->tanggal_selesai)) : '';
                     $tglRange = ($tMulai && $tSelesai) ? "$tMulai s/d $tSelesai" : ($c->alasan ?? '-');
+
+                    $cutiSt = strtolower($c->status ?? 'pending');
+                    $isCutiPending = in_array($cutiSt, ['pending', 'draft', '']);
+                    $isCutiApproved = in_array($cutiSt, ['approved', 'disetujui', 'final', 'terbit']);
+                    $lblCuti = $isCutiPending ? 'Menunggu Persetujuan SDM' : ($isCutiApproved ? 'Terbit Final' : 'Ditolak');
 
                     $pending[] = [
                         'id' => $c->id,
@@ -330,8 +362,9 @@ class ApprovalController extends Controller
                             'Tanggal Selesai' => $tSelesai,
                             'Alasan' => $c->alasan ?? '-',
                         ],
-                        'status' => 'PENDING',
-                        'status_label' => 'Menunggu Persetujuan SDM',
+                        'status' => $isCutiApproved ? 'terbit' : ($isCutiPending ? 'draft' : 'ditolak'),
+                        'status_label' => $lblCuti,
+                        'can_approve' => $isSdm && $isCutiPending,
                         'route' => route('cuti.index', ['tahun' => (int) date('Y', $cTime)]),
                     ];
                 }
@@ -694,7 +727,9 @@ class ApprovalController extends Controller
                 if (in_array($filterJenis, ['all', 'gaji'], true)) {
                     $gajiProses = app(GajiProsesController::class)->all();
                     foreach ($gajiProses as $g) {
-                        if ($this->nextStageFor($g['status'] ?? '') === 'kepegawaian' && $isSdm) {
+                        $stage = $this->nextStageFor($g['status'] ?? '');
+                        $match = ($stage === 'kepegawaian' && $isSdm) || ($stage === 'dirum' && $isDirum) || ($stage === 'dirut' && $isDirut);
+                        if ($match) {
                             app(GajiProsesController::class)->terbitkanDirect($g['id']);
                             $approvedCount++;
                         }
@@ -703,7 +738,9 @@ class ApprovalController extends Controller
                 if (in_array($filterJenis, ['all', 'thr'], true)) {
                     $thrItems = app(ThrController::class)->all();
                     foreach ($thrItems as $t) {
-                        if ($this->nextStageFor($t['status'] ?? '') === 'kepegawaian' && $isSdm) {
+                        $stage = $this->nextStageFor($t['status'] ?? '');
+                        $match = ($stage === 'kepegawaian' && $isSdm) || ($stage === 'dirum' && $isDirum) || ($stage === 'dirut' && $isDirut);
+                        if ($match) {
                             app(ThrController::class)->terbitkanDirect($t['id']);
                             $approvedCount++;
                         }
@@ -712,7 +749,9 @@ class ApprovalController extends Controller
                 if (in_array($filterJenis, ['all', 'gaji13'], true)) {
                     $g13Items = app(GajiTigabelasController::class)->all();
                     foreach ($g13Items as $g) {
-                        if ($this->nextStageFor($g['status'] ?? '') === 'kepegawaian' && $isSdm) {
+                        $stage = $this->nextStageFor($g['status'] ?? '');
+                        $match = ($stage === 'kepegawaian' && $isSdm) || ($stage === 'dirum' && $isDirum) || ($stage === 'dirut' && $isDirut);
+                        if ($match) {
                             app(GajiTigabelasController::class)->terbitkanDirect($g['id']);
                             $approvedCount++;
                         }

@@ -611,11 +611,12 @@ class GajiTigabelasController extends Controller
         $insertedToDb = false;
         if ($dbPegawaiId) {
             try {
-                $newId = \Illuminate\Support\Facades\DB::table('gaji_13')->insertGetId([
+                $payload = [
                     'pegawai_id' => $dbPegawaiId,
                     'tahun' => (int) $validated['tahun'],
                     'jumlah' => (int) $gaji13Diterima,
                     'status' => 'draft',
+                    'disetujui_oleh' => null,
                     'kategori' => $validated['kategori'],
                     'kode_ptkp' => $validated['kode_ptkp'],
                     'total_pendapatan' => (int) $totalPendapatan,
@@ -663,21 +664,50 @@ class GajiTigabelasController extends Controller
                     'potongan_bank_btn' => (int) ($validated['potongan_btn'] ?? 0),
                     'potongan_bank_bpr' => (int) ($validated['potongan_bpr'] ?? 0),
                     'potongan_zakat' => (int) ($validated['potongan_zakat'] ?? 0),
-                ]);
+                    'updated_at' => now(),
+                ];
+
+                $existing13 = \Illuminate\Support\Facades\DB::table('gaji_13')
+                    ->where('pegawai_id', $dbPegawaiId)
+                    ->where('tahun', (int) $validated['tahun'])
+                    ->first();
+
+                if ($existing13) {
+                    \Illuminate\Support\Facades\DB::table('gaji_13')
+                        ->where('id', $existing13->id)
+                        ->update($payload);
+                    $newId = $existing13->id;
+                } else {
+                    $payload['created_at'] = now();
+                    $newId = \Illuminate\Support\Facades\DB::table('gaji_13')->insertGetId($payload);
+                }
 
                 $insertedToDb = true;
                 $validated['id'] = $newId;
             } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::warning('DB gaji_13 insert failed: ' . $e->getMessage());
+                \Illuminate\Support\Facades\Log::warning('DB gaji_13 insert/update failed: ' . $e->getMessage());
             }
         }
 
         $localData = $this->getLocalData();
-        if (! $insertedToDb) {
-            $newId = $localData ? max(array_column($localData, 'id')) + 1 : 1;
-            $validated['id'] = $newId;
+        $foundLocal = false;
+        foreach ($localData as &$item) {
+            if (($insertedToDb && ($item['id'] ?? null) === $newId) ||
+                (($item['nik'] ?? '') === $validated['nik'] && (int)($item['tahun'] ?? 0) === (int)$validated['tahun'])) {
+                $validated['id'] = $insertedToDb ? $newId : ($item['id'] ?? ($localData ? max(array_column($localData, 'id')) + 1 : 1));
+                $item = $validated;
+                $foundLocal = true;
+                break;
+            }
         }
-        $localData[] = $validated;
+        unset($item);
+        if (! $foundLocal) {
+            if (! $insertedToDb) {
+                $newId = $localData ? max(array_column($localData, 'id')) + 1 : 1;
+                $validated['id'] = $newId;
+            }
+            $localData[] = $validated;
+        }
         $this->save($localData);
 
         return redirect()->route('gaji-tigabelas.index', ['tahun' => $validated['tahun']])
@@ -716,6 +746,16 @@ class GajiTigabelasController extends Controller
      * Lihat trait HasApprovalChain untuk detail alurnya.
      */
     public function terbitkan(int $id)
+    {
+        $this->terbitkanDirect($id);
+        return redirect()->back()->with('success', 'Gaji 13 berhasil disetujui dan tersimpan di database.');
+    }
+
+    /**
+     * Eksekusi langsung proses persetujuan / penerbitan Gaji 13 tanpa HTTP redirect.
+     * Digunakan oleh ApprovalController (approval tunggal & massal).
+     */
+    public function terbitkanDirect(int $id): string
     {
         $row = collect($this->all())->firstWhere('id', $id);
         abort_if(! $row, 404);
@@ -767,7 +807,7 @@ class GajiTigabelasController extends Controller
             $this->save($updated);
         }
 
-        return redirect()->back()->with('success', 'Gaji 13 berhasil disetujui dan tersimpan di database.');
+        return $nextStatus;
     }
 
     public function destroy(int $id)

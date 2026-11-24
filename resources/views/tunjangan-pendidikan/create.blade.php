@@ -29,7 +29,7 @@
         <div class="form-grid">
             <div class="form-group span-2">
                 <label for="pegawai_select" style="font-weight:600;">Pilih Pegawai <span style="color:#DC2626;">*</span></label>
-                <select id="pegawai_select" name="pegawai_nik" class="form-control" required onchange="onPegawaiSelected(this.value)">
+                <select id="pegawai_select" name="pegawai_nik" class="form-control searchable-pegawai" data-searchable="pegawai" required onchange="onPegawaiSelected(this.value)">
                     <option value="">-- Pilih Pegawai (Ketik NIK / Nama) --</option>
                     @foreach ($pegawaiList as $p)
                         <option value="{{ $p['nik'] }}" data-id="{{ $p['id'] ?? '' }}" @selected(old('pegawai_nik') === $p['nik'])>

@@ -238,6 +238,15 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             Terapkan Filter
         </button>
+        @php
+            $hasCustomSanksi = (
+                (int)$tahun !== (int)now()->year ||
+                (string)$bulan !== 'all' ||
+                $unitKerja !== 'all' ||
+                (!empty($nik) && $nik !== 'all')
+            );
+        @endphp
+        <a id="btn-reset-sanksi" href="{{ route('sanksi.laporan') }}" class="btn btn-outline" style="height:38px; padding:0 12px; font-size:13px; color:#DC2626; border-color:#FECACA; display:{{ $hasCustomSanksi ? 'inline-flex' : 'none' }}; align-items:center;">Reset</a>
     </form>
 </div>
 
@@ -314,4 +323,28 @@
 
 @include('partials.signature-block', ['kodeTtd' => 'gaji'])
 
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var form = document.querySelector('.filter-form');
+    var btnReset = document.getElementById('btn-reset-sanksi');
+    if (form && btnReset) {
+        var defTahun = '{{ now()->year }}';
+
+        function checkSanksiFilter() {
+            var th = form.querySelector('[name="tahun"]')?.value || defTahun;
+            var bl = form.querySelector('[name="bulan"]')?.value || 'all';
+            var uk = form.querySelector('[name="unit_kerja"]')?.value || 'all';
+            var nk = form.querySelector('[name="nik"]')?.value || 'all';
+
+            var isChanged = (th != defTahun) || (bl !== 'all') || (uk !== 'all') || (nk !== 'all' && nk !== '');
+            btnReset.style.display = isChanged ? 'inline-flex' : 'none';
+        }
+
+        form.querySelectorAll('select, input').forEach(function(el) {
+            el.addEventListener('change', checkSanksiFilter);
+            el.addEventListener('input', checkSanksiFilter);
+        });
+    }
+});
+</script>
 @endsection

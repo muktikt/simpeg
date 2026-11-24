@@ -11,6 +11,13 @@
                 <option value="{{ $y }}" @selected($tahun === $y)>{{ $y }}</option>
             @endfor
         </select>
+        @php
+            $hasCustomLaporan = ($bulan !== (int) now()->month || $tahun !== (int) now()->year);
+            $resetUrlLaporan = url()->current() . (request('my') ? '?my=1' : '');
+        @endphp
+        @if ($hasCustomLaporan)
+            <a href="{{ $resetUrlLaporan }}" class="btn btn-outline btn-sm" style="height:36px; display:inline-flex; align-items:center; color:#DC2626; border-color:#FECACA; padding:0 10px;" title="Kembali ke Periode Saat Ini">Reset</a>
+        @endif
     </form>
 
     <button type="button" class="btn btn-outline" onclick="window.print()">

@@ -207,7 +207,7 @@
         <div style="min-width:160px;">
             <label style="display:block; font-size:11.5px; font-weight:700; color:#475569; margin-bottom:4px; text-transform:uppercase;">Status</label>
             <select name="status" class="form-control" style="height:38px; font-size:13px; font-weight:600; width:100%; border-radius:8px; border:1px solid #CBD5E1; background:#ffffff;" onchange="this.form.submit()">
-                <option value="all" {{ ($selectedStatus ?? 'all') === 'all' ? 'selected' : '' }}>Semua Status</option>
+                <option value="all" {{ ($selectedStatus ?? 'all') === 'all' ? 'selected' : '' }}>Semua Status ({{ $totalAll }})</option>
                 @if (!$isKeu)
                     <option value="pending" {{ ($selectedStatus ?? '') === 'pending' ? 'selected' : '' }}>Menunggu Persetujuan ({{ $totalPending ?? 0 }})</option>
                 @endif
@@ -272,16 +272,23 @@
                 Terapkan
             </button>
             @php
+                $defaultStatus = 'all';
+                $defaultJenis = $isKeu ? 'potongan_gaji' : 'all';
+                $hasCustomFilter = (
+                    ($selectedBulan !== 'all' && !empty($selectedBulan)) ||
+                    ($selectedTahun !== 'all' && !empty($selectedTahun)) ||
+                    ($selectedStatus !== $defaultStatus && !empty($selectedStatus)) ||
+                    !empty($searchQuery) ||
+                    ($selectedJenis !== $defaultJenis && !empty($selectedJenis)) ||
+                    ($sort !== 'terbaru' && !empty($sort))
+                );
                 $resetUrl = ($isKeu || $isPotonganPage)
                     ? route('approval.index', ['jenis' => ($selectedJenis !== 'all' ? $selectedJenis : 'potongan_gaji')])
                     : route('approval.index');
-                $hasCustomFilter = ($selectedBulan !== 'all' || $selectedTahun !== 'all' || ($selectedStatus ?? 'all') !== 'all' || !empty($searchQuery) || (!$isKeu && $selectedJenis !== 'all'));
             @endphp
-            @if ($hasCustomFilter)
-                <a href="{{ $resetUrl }}" class="btn btn-outline" style="height:38px; padding:0 12px; font-size:13px; color:#DC2626; border-color:#FECACA; display:inline-flex; align-items:center;" title="Reset Semua Filter">
-                    Reset
-                </a>
-            @endif
+            <a id="btn-reset-filter" href="{{ $resetUrl }}" class="btn btn-outline" style="height:38px; padding:0 12px; font-size:13px; color:#DC2626; border-color:#FECACA; display:{{ $hasCustomFilter ? 'inline-flex' : 'none' }}; align-items:center;" title="Reset Semua Filter">
+                Reset
+            </a>
         </div>
     </form>
 </div>
@@ -408,8 +415,8 @@
                     </td>
                     <td style="text-align:center;" id="status-cell-{{ $p['id'] }}-{{ $p['jenis_key'] }}">
                         @php
-                            $st = $p['status'] ?? '';
-                            $isFin = in_array($st, ['Y', 'terbit', 'disetujui', 'approved'], true);
+                            $st = strtolower($p['status'] ?? '');
+                            $isFin = in_array($st, ['y', 'terbit', 'disetujui', 'approved', 'final', 'selesai'], true);
                             $isSdmSt = ($st === 'kepegawaian');
                             $isDirumSt = ($st === 'dirum');
                         @endphp
@@ -458,7 +465,7 @@
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="40" height="40" style="margin:0 auto 12px; color:#94A3B8; display:block;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
                             <div style="font-weight:700; color:#334155; font-size:15px; margin-bottom:4px;">Tidak Ada Item yang Menunggu Approval</div>
                             <div style="font-size:13px; color:#64748B; max-width:440px; margin:0 auto;">
-                                @if ($selectedJenis !== 'all' || $selectedBulan !== 'all' || $selectedTahun !== 'all' || !empty($searchQuery))
+                                @if ($hasCustomFilter)
                                     Tidak ada data yang cocok dengan kriteria filter yang Anda pilih. Silakan sesuaikan filter atau reset untuk melihat semua data.
                                 @else
                                     Semua pengajuan gaji, potongan, cuti, atau THR pada tahap Anda sudah diproses dan disetujui.
@@ -678,6 +685,7 @@ function approveDirect(id, jenisKey, btnEl) {
                     if (actionCell) {
                         actionCell.innerHTML = `<span style="font-size:12px; color:#16A34A; font-weight:700;">✓ Selesai</span>`;
                     }
+                    setTimeout(() => window.location.reload(), 1000);
                 } else {
                     showToast(data.message || 'Gagal menyetujui.', true);
                     if (btnEl) {
@@ -988,5 +996,35 @@ document.addEventListener('keydown', function(e) {
         closeDetailModal();
     }
 });
+
+// Dynamic toggle Reset button when filter changes
+(function() {
+    const filterForm = document.querySelector('.approval-filter-card form');
+    const btnReset = document.getElementById('btn-reset-filter');
+    if (!filterForm || !btnReset) return;
+
+    const defJenis = '{{ $defaultJenis }}';
+    const defStatus = '{{ $defaultStatus }}';
+    const defBulan = 'all';
+    const defTahun = 'all';
+    const defSort = 'terbaru';
+
+    function evaluateFilterState() {
+        const j = filterForm.querySelector('[name="jenis"]')?.value || defJenis;
+        const s = filterForm.querySelector('[name="status"]')?.value || defStatus;
+        const b = filterForm.querySelector('[name="bulan"]')?.value || defBulan;
+        const t = filterForm.querySelector('[name="tahun"]')?.value || defTahun;
+        const so = filterForm.querySelector('[name="sort"]')?.value || defSort;
+        const q = filterForm.querySelector('[name="q"]')?.value?.trim() || '';
+
+        const isFiltered = (j !== defJenis) || (s !== defStatus) || (b !== defBulan) || (t !== defTahun) || (so !== defSort) || (q !== '');
+        btnReset.style.display = isFiltered ? 'inline-flex' : 'none';
+    }
+
+    filterForm.querySelectorAll('select, input').forEach(el => {
+        el.addEventListener('change', evaluateFilterState);
+        el.addEventListener('input', evaluateFilterState);
+    });
+})();
 </script>
 @endsection

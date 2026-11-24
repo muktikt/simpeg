@@ -410,7 +410,21 @@
                 <button type="submit" class="btn btn-primary" style="height:38px; padding:0 18px;">
                     Bandingkan
                 </button>
-                <a href="{{ route('cek-nik.komparasi') }}" class="btn btn-outline" style="height:38px; padding:0 14px; display:inline-flex; align-items:center;">
+                @php
+                    $defBulanA = (int) now()->month;
+                    $defTahunA = (int) now()->year;
+                    $defBulanB = (int) now()->subMonth()->month;
+                    $defTahunB = (int) now()->subMonth()->year;
+                    $hasCustomFilter = (
+                        !empty($search) ||
+                        ($filter ?? 'all') !== 'all' ||
+                        (int)$bulanA !== $defBulanA ||
+                        (int)$tahunA !== $defTahunA ||
+                        (int)$bulanB !== $defBulanB ||
+                        (int)$tahunB !== $defTahunB
+                    );
+                @endphp
+                <a id="btn-reset-komparasi" href="{{ route('cek-nik.komparasi') }}" class="btn btn-outline" style="height:38px; padding:0 14px; display:{{ $hasCustomFilter ? 'inline-flex' : 'none' }}; align-items:center; color:#DC2626; border-color:#FECACA;">
                     Reset
                 </a>
             </div>
@@ -744,6 +758,33 @@ function closeDetailModal() {
 // Close modal on Escape
 window.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') closeDetailModal();
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+    var form = document.querySelector('form[action*="cek-nik/komparasi"]');
+    var btnReset = document.getElementById('btn-reset-komparasi');
+    if (form && btnReset) {
+        var defBulanA = '{{ now()->month }}';
+        var defTahunA = '{{ now()->year }}';
+        var defBulanB = '{{ now()->subMonth()->month }}';
+        var defTahunB = '{{ now()->subMonth()->year }}';
+
+        function checkKomparasiFilter() {
+            var bA = form.querySelector('[name="bulan_a"]')?.value || defBulanA;
+            var tA = form.querySelector('[name="tahun_a"]')?.value || defTahunA;
+            var bB = form.querySelector('[name="bulan_b"]')?.value || defBulanB;
+            var tB = form.querySelector('[name="tahun_b"]')?.value || defTahunB;
+            var s = form.querySelector('[name="search"]')?.value?.trim() || '';
+
+            var isChanged = (bA != defBulanA) || (tA != defTahunA) || (bB != defBulanB) || (tB != defTahunB) || (s !== '');
+            btnReset.style.display = isChanged ? 'inline-flex' : 'none';
+        }
+
+        form.querySelectorAll('select, input').forEach(function(el) {
+            el.addEventListener('change', checkKomparasiFilter);
+            el.addEventListener('input', checkKomparasiFilter);
+        });
+    }
 });
 </script>
 @endsection

@@ -603,9 +603,10 @@
             <option value="diklat_only" {{ $filterJenis === 'diklat_only' ? 'selected' : '' }}>Hanya yang Memiliki Diklat</option>
         </select>
         <button type="submit" class="ds-btn-action ds-btn-view" style="padding:10px 16px;">Cari</button>
-        @if ($keyword !== '' || $filterJenis !== 'all')
-            <a href="{{ route('dokumen-surat.index') }}" class="ds-btn-action ds-btn-delete-sm" style="padding:10px 14px;">Reset</a>
-        @endif
+        @php
+            $hasCustomDs = ($keyword !== '' || $filterJenis !== 'all');
+        @endphp
+        <a id="btn-reset-ds" href="{{ route('dokumen-surat.index') }}" class="ds-btn-action ds-btn-delete-sm" style="padding:10px 14px; display:{{ $hasCustomDs ? 'inline-flex' : 'none' }}; align-items:center;">Reset</a>
     </form>
 </div>
 
@@ -1129,6 +1130,24 @@ document.getElementById('ds-modal-upload').addEventListener('click', function(e)
 });
 document.getElementById('ds-modal-view-file').addEventListener('click', function(e) {
     if (e.target === this) closeViewModal();
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+    var form = document.querySelector('.ds-search-form');
+    var btnReset = document.getElementById('btn-reset-ds');
+    if (form && btnReset) {
+        function checkDsFilter() {
+            var f = form.querySelector('[name="filter"]')?.value || 'all';
+            var q = form.querySelector('[name="q"]')?.value?.trim() || '';
+            var isChanged = (f !== 'all') || (q !== '');
+            btnReset.style.display = isChanged ? 'inline-flex' : 'none';
+        }
+
+        form.querySelectorAll('select, input').forEach(function(el) {
+            el.addEventListener('change', checkDsFilter);
+            el.addEventListener('input', checkDsFilter);
+        });
+    }
 });
 </script>
 @endsection

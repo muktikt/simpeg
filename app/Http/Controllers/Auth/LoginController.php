@@ -202,6 +202,7 @@ class LoginController extends Controller
         }
 
         $request->session()->forget('simpeg_user');
+        $request->session()->invalidate();
         $request->session()->regenerateToken();
 
         return redirect()->route('login');

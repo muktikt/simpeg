@@ -238,9 +238,15 @@
             <input type="text" name="q" value="{{ $keyword }}" placeholder="Cari NIK, nama pegawai, jabatan..." class="form-control table-search-input" style="padding-left:36px; height:40px; border-radius:8px; width:100%; border:1px solid #CBD5E1; font-size:13px;">
         </div>
         <button type="submit" class="btn btn-outline" style="height:40px; padding:0 16px; font-weight:600; font-size:13px;">Cari</button>
-        @if ($keyword !== '' || (string)$bulan === 'all' || (int)$bulan !== (int)now()->month || (int)$tahun !== (int)now()->year || ($sort ?? 'terbaru') !== 'terbaru')
-            <a href="{{ route('potongan-keu.index', $tipe) }}" class="btn btn-outline" style="height:40px; padding:0 12px; color:#DC2626; border-color:#FECACA; font-size:13px; display:inline-flex; align-items:center;" title="Reset Filter">Reset</a>
-        @endif
+        @php
+            $hasCustomFilter = (
+                !empty($keyword) ||
+                (string)$bulan !== (string)now()->month ||
+                (int)$tahun !== (int)now()->year ||
+                ($sort ?? 'terlama') !== 'terlama'
+            );
+        @endphp
+        <a id="btn-reset-potongan" href="{{ route('potongan-keu.index', $tipe) }}" class="btn btn-outline" style="height:40px; padding:0 12px; color:#DC2626; border-color:#FECACA; font-size:13px; display:{{ $hasCustomFilter ? 'inline-flex' : 'none' }}; align-items:center;" title="Reset Filter">Reset</a>
     </form>
 
     <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
@@ -513,6 +519,30 @@ document.addEventListener('DOMContentLoaded', function() {
     if (modal) {
         modal.addEventListener('click', function(e) {
             if (e.target === this) closeImportModal();
+        });
+    }
+
+    // Dynamic toggle Reset button
+    var filterForm = document.querySelector('form[action*="potongan-keu"]');
+    var btnReset = document.getElementById('btn-reset-potongan');
+    if (filterForm && btnReset) {
+        var defBulan = '{{ now()->month }}';
+        var defTahun = '{{ now()->year }}';
+        var defSort = 'terlama';
+
+        function checkPotonganFilter() {
+            var b = filterForm.querySelector('[name="bulan"]')?.value || defBulan;
+            var t = filterForm.querySelector('[name="tahun"]')?.value || defTahun;
+            var s = filterForm.querySelector('[name="sort"]')?.value || defSort;
+            var q = filterForm.querySelector('[name="q"]')?.value?.trim() || '';
+
+            var isChanged = (b !== defBulan) || (t !== defTahun) || (s !== defSort) || (q !== '');
+            btnReset.style.display = isChanged ? 'inline-flex' : 'none';
+        }
+
+        filterForm.querySelectorAll('select, input').forEach(function(el) {
+            el.addEventListener('change', checkPotonganFilter);
+            el.addEventListener('input', checkPotonganFilter);
         });
     }
 });

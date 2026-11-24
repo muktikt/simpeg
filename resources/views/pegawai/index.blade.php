@@ -36,11 +36,12 @@
         <button type="submit" class="btn btn-primary" style="height:38px; padding:0 16px; font-size:13px; font-weight:600; border-radius:8px;">
             Cari
         </button>
-        @if ($keyword !== '' || ($sort ?? 'nama_asc') !== 'nama_asc')
-            <a href="{{ route('pegawai.index') }}" class="btn btn-outline" style="height:38px; padding:0 12px; font-size:13px; color:#DC2626; border-color:#FECACA; border-radius:8px; display:inline-flex; align-items:center;" title="Reset Filter">
-                Reset
-            </a>
-        @endif
+        @php
+            $hasCustomFilter = ($keyword !== '' || ($sort ?? 'nama_asc') !== 'nama_asc');
+        @endphp
+        <a id="btn-reset-pegawai" href="{{ route('pegawai.index') }}" class="btn btn-outline" style="height:38px; padding:0 12px; font-size:13px; color:#DC2626; border-color:#FECACA; border-radius:8px; display:{{ $hasCustomFilter ? 'inline-flex' : 'none' }}; align-items:center;" title="Reset Filter">
+            Reset
+        </a>
     </form>
 
     @if ($myRole === '1')
@@ -196,4 +197,26 @@
         </div>
     </div>
 @endif
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var form = document.querySelector('form[action*="pegawai"]');
+    var btnReset = document.getElementById('btn-reset-pegawai');
+    if (form && btnReset) {
+        var defSort = 'nama_asc';
+
+        function checkPegawaiFilter() {
+            var q = form.querySelector('[name="q"]')?.value?.trim() || '';
+            var s = form.querySelector('[name="sort"]')?.value || defSort;
+            var isChanged = (q !== '') || (s !== defSort);
+            btnReset.style.display = isChanged ? 'inline-flex' : 'none';
+        }
+
+        form.querySelectorAll('select, input').forEach(function(el) {
+            el.addEventListener('change', checkPegawaiFilter);
+            el.addEventListener('input', checkPegawaiFilter);
+        });
+    }
+});
+</script>
 @endsection

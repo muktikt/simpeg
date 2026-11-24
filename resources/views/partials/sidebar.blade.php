@@ -30,10 +30,22 @@
 
     $currentRouteName = request()->route() ? request()->route()->getName() : '';
 
-    $isItemActive = function($item) use ($slugify, $currentRouteName) {
+    // Kumpulkan seluruh route_name yang terdaftar secara eksplisit di menu sidebar
+    $allMenuRouteNames = [];
+    foreach ($menu['single'] as $sItem) {
+        if (!empty($sItem['route_name'])) $allMenuRouteNames[] = $sItem['route_name'];
+    }
+    foreach ($menu['groups'] as $gItem) {
+        foreach ($gItem['items'] as $cItem) {
+            if (!empty($cItem['route_name'])) $allMenuRouteNames[] = $cItem['route_name'];
+        }
+    }
+
+    $isItemActive = function($item) use ($slugify, $currentRouteName, $allMenuRouteNames) {
         if (!empty($item['route_name'])) {
             $isRouteMatch = ($currentRouteName === $item['route_name']);
-            if (!$isRouteMatch && str_ends_with($item['route_name'], '.index')) {
+            // Hanya aktifkan fallback prefix .index jika route saat ini BUKAN route spesifik item menu lain
+            if (!$isRouteMatch && str_ends_with($item['route_name'], '.index') && !in_array($currentRouteName, $allMenuRouteNames, true)) {
                 $baseName = substr($item['route_name'], 0, -6);
                 $isRouteMatch = str_starts_with($currentRouteName, $baseName . '.');
             }
@@ -92,9 +104,13 @@
         @foreach ($menu['groups'] as $groupIdx => $group)
             @continue(! $canSee($group))
             @php
+                $visibleItems = array_filter($group['items'], fn($it) => $canSee($it));
+                if (empty($visibleItems)) {
+                    continue;
+                }
                 $hasActiveChild = false;
-                foreach ($group['items'] as $it) {
-                    if ($canSee($it) && $isItemActive($it)) {
+                foreach ($visibleItems as $it) {
+                    if ($isItemActive($it)) {
                         $hasActiveChild = true;
                         break;
                     }
@@ -121,6 +137,8 @@
                 </div>
             </div>
         @endforeach
+
+
 
     </nav>
 </aside>

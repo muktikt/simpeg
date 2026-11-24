@@ -39,7 +39,7 @@ use App\Http\Controllers\NotifikasiController;
 Route::get('/', [LoginController::class, 'showLoginForm'])->name('login');
 Route::get('/login', [LoginController::class, 'showLoginForm']);
 Route::post('/login', [LoginController::class, 'login'])->middleware('throttle:5,1')->name('login.attempt');
-Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
+Route::match(['get', 'post'], '/logout', [LoginController::class, 'logout'])->name('logout');
 
 Route::middleware(['simpeg.auth'])->group(function () {
     Route::get('/beranda', [DashboardController::class, 'index'])->middleware(['simpeg.auth:1,2,7,kspi,kadiv'])->name('dashboard');
@@ -150,7 +150,7 @@ Route::middleware(['simpeg.auth'])->group(function () {
 
         Route::middleware(['simpeg.auth:1,7'])->group(function () {
             Route::get('/', [GajiProsesController::class, 'index'])->name('index');
-            Route::get('/audit', [GajiProsesController::class, 'audit'])->name('audit');
+            // Route::get('/audit', [GajiProsesController::class, 'audit'])->name('audit'); // Dinonaktifkan sesuai permintaan user
             Route::post('/terbitkan-semua', [GajiProsesController::class, 'terbitkanSemua'])->name('terbitkan-semua');
             Route::post('/{id}/terbitkan', [GajiProsesController::class, 'terbitkan'])->whereNumber('id')->name('terbitkan');
         });
@@ -264,12 +264,12 @@ Route::middleware(['simpeg.auth'])->group(function () {
         Route::put('/', [SettingAplikasiController::class, 'update'])->name('update');
     });
 
-    // SET Pejabat Penandatangan Laporan Dinamis (tbl_ttd) - Admin SDM (1), Keuangan (2), Direksi (7)
-    Route::prefix('pejabat-ttd')->name('pejabat-ttd.')->middleware(['simpeg.auth:1,2,7'])->group(function () {
-        Route::get('/', [PejabatTtdController::class, 'index'])->name('index');
-        Route::get('/{id}/edit', [PejabatTtdController::class, 'edit'])->whereNumber('id')->name('edit');
-        Route::post('/{id}', [PejabatTtdController::class, 'update'])->whereNumber('id')->name('update');
-    });
+    // SET Pejabat Penandatangan Laporan Dinamis (tbl_ttd) - Dinonaktifkan sesuai permintaan user
+    // Route::prefix('pejabat-ttd')->name('pejabat-ttd.')->middleware(['simpeg.auth:1,2,7'])->group(function () {
+    //     Route::get('/', [PejabatTtdController::class, 'index'])->name('index');
+    //     Route::get('/{id}/edit', [PejabatTtdController::class, 'edit'])->whereNumber('id')->name('edit');
+    //     Route::post('/{id}', [PejabatTtdController::class, 'update'])->whereNumber('id')->name('update');
+    // });
 
     // Dokumen Surat Pegawai (Unggah & Kelola untuk Admin SDM, Unduh untuk semua user)
     Route::prefix('dokumen-surat')->name('dokumen-surat.')->group(function () {
@@ -322,11 +322,11 @@ Route::middleware(['simpeg.auth'])->group(function () {
         Route::delete('/{id}', [UserAksesController::class, 'destroy'])->whereNumber('id')->name('destroy');
     });
 
-    // Audit Trail & Log Aktivitas Pengguna - Role 1 (SDM) & Role 7 (Direksi)
-    Route::prefix('audit-log')->name('audit-log.')->middleware(['simpeg.auth:1,7'])->group(function () {
-        Route::get('/', [AuditLogController::class, 'index'])->name('index');
-        Route::get('/cetak', [AuditLogController::class, 'cetak'])->name('cetak');
-    });
+    // Audit Trail & Log Aktivitas Pengguna - Dinonaktifkan sesuai permintaan user
+    // Route::prefix('audit-log')->name('audit-log.')->middleware(['simpeg.auth:1,7'])->group(function () {
+    //     Route::get('/', [AuditLogController::class, 'index'])->name('index');
+    //     Route::get('/cetak', [AuditLogController::class, 'cetak'])->name('cetak');
+    // });
 
     // Pusat Notifikasi In-App & Status Tracking (Semua Role: 1, 2, 5, 7)
     Route::prefix('notifikasi')->name('notifikasi.')->middleware(['simpeg.auth:1,2,5,7'])->group(function () {

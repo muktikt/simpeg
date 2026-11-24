@@ -63,9 +63,10 @@
             <input type="text" name="q" value="{{ $search }}" placeholder="Cari NIK atau Nama..." style="border:none; outline:none; font-size:13px; width:200px;">
         </div>
         <button type="submit" class="btn btn-outline btn-sm">Filter</button>
-        @if (!empty($search) || ($bulanLabel !== ('JULI ' . now()->year) && $bulanLabel !== 'all'))
-            <a href="{{ route('tunjangan-pendidikan.index') }}" class="btn btn-outline btn-sm">Reset</a>
-        @endif
+        @php
+            $hasCustomFilter = (!empty($search) || $bulanLabel !== ('JULI ' . now()->year));
+        @endphp
+        <a id="btn-reset-tunj-pend" href="{{ route('tunjangan-pendidikan.index') }}" class="btn btn-outline btn-sm" style="display:{{ $hasCustomFilter ? 'inline-flex' : 'none' }}; align-items:center; color:#DC2626; border-color:#FECACA;">Reset</a>
     </form>
 </div>
 
@@ -132,4 +133,26 @@
         </tbody>
     </table>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var form = document.querySelector('.toolbar form');
+    var btnReset = document.getElementById('btn-reset-tunj-pend');
+    if (form && btnReset) {
+        var defBulan = 'JULI {{ now()->year }}';
+
+        function checkTunjanganFilter() {
+            var b = form.querySelector('[name="bulan_label"]')?.value || defBulan;
+            var q = form.querySelector('[name="q"]')?.value?.trim() || '';
+            var isChanged = (b !== defBulan) || (q !== '');
+            btnReset.style.display = isChanged ? 'inline-flex' : 'none';
+        }
+
+        form.querySelectorAll('select, input').forEach(function(el) {
+            el.addEventListener('change', checkTunjanganFilter);
+            el.addEventListener('input', checkTunjanganFilter);
+        });
+    }
+});
+</script>
 @endsection

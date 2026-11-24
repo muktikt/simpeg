@@ -29,10 +29,6 @@ class SimpegAuth
         // otomatis perbaiki ke level yang berhak agar tidak terblokir 403.
         $masterRoles = [
             '1711254' => '1', // Heddy Kelana (SDM)
-            '1711157' => '1', // Cahrudin (SDM)
-            '1711444' => '1', // Suwanto (SDM)
-            '1711590' => '1', // Riko Prahtama (SDM)
-            '1711567' => '1', // Asep Kurnadi (SDM)
             '1711001' => '7', // Nurpan (Dirut)
             '1711002' => '7', // Dr. Sunaryo (Dirum)
             '1711003' => '7', // Jojo Sutarjo (Dirtek)

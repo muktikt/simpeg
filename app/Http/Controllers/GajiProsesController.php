@@ -1286,12 +1286,13 @@ class GajiProsesController extends Controller
         $insertedToDb = false;
         if ($dbPegawaiId) {
             try {
-                $newId = \Illuminate\Support\Facades\DB::table('payroll')->insertGetId([
+                $payload = [
                     'pegawai_id' => $dbPegawaiId,
                     'periode' => $periode,
                     'tahun' => (int) $validated['tahun'],
                     'bulan' => (int) $validated['bulan'],
                     'status' => 'draft',
+                    'disetujui_oleh' => null,
                     'kategori' => $validated['kategori'],
                     'kode_ptkp' => $validated['kode_ptkp'],
                     'total_pendapatan' => (int) $totalPendapatan,
@@ -1335,22 +1336,52 @@ class GajiProsesController extends Controller
                     'potongan_bank_btn' => (int) ($validated['potongan_btn'] ?? 0),
                     'potongan_bank_bpr' => (int) ($validated['potongan_bpr'] ?? 0),
                     'potongan_zakat_profesi' => (int) ($validated['potongan_zakat'] ?? 0),
-                ]);
+                    'updated_at' => now(),
+                ];
+
+                $existingPayroll = \Illuminate\Support\Facades\DB::table('payroll')
+                    ->where('pegawai_id', $dbPegawaiId)
+                    ->where('tahun', (int) $validated['tahun'])
+                    ->where('bulan', (int) $validated['bulan'])
+                    ->first();
+
+                if ($existingPayroll) {
+                    \Illuminate\Support\Facades\DB::table('payroll')
+                        ->where('id', $existingPayroll->id)
+                        ->update($payload);
+                    $newId = $existingPayroll->id;
+                } else {
+                    $payload['created_at'] = now();
+                    $newId = \Illuminate\Support\Facades\DB::table('payroll')->insertGetId($payload);
+                }
 
                 $insertedToDb = true;
                 $validated['id'] = $newId;
             } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::warning('DB payroll insert failed: ' . $e->getMessage());
+                \Illuminate\Support\Facades\Log::warning('DB payroll insert/update failed: ' . $e->getMessage());
             }
         }
 
         // Simpan juga ke file lokal sebagai fallback
         $localData = $this->getLocalData();
-        if (! $insertedToDb) {
-            $newId = $localData ? max(array_column($localData, 'id')) + 1 : 1;
-            $validated['id'] = $newId;
+        $foundLocal = false;
+        foreach ($localData as &$item) {
+            if (($insertedToDb && ($item['id'] ?? null) === $newId) ||
+                (($item['nik'] ?? '') === $validated['nik'] && (int)($item['bulan'] ?? 0) === (int)$validated['bulan'] && (int)($item['tahun'] ?? 0) === (int)$validated['tahun'])) {
+                $validated['id'] = $insertedToDb ? $newId : ($item['id'] ?? ($localData ? max(array_column($localData, 'id')) + 1 : 1));
+                $item = $validated;
+                $foundLocal = true;
+                break;
+            }
         }
-        $localData[] = $validated;
+        unset($item);
+        if (! $foundLocal) {
+            if (! $insertedToDb) {
+                $newId = $localData ? max(array_column($localData, 'id')) + 1 : 1;
+                $validated['id'] = $newId;
+            }
+            $localData[] = $validated;
+        }
         $this->save($localData);
 
         AuditLogController::record(

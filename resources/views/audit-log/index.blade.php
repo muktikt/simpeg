@@ -266,7 +266,17 @@
             Filter
         </button>
 
-        <a href="{{ route('audit-log.index') }}" class="btn-reset">
+        @php
+            $hasCustomFilter = (
+                !empty($q) ||
+                ($action !== 'all' && !empty($action)) ||
+                ($module !== 'all' && !empty($module)) ||
+                ($role !== 'all' && !empty($role)) ||
+                !empty($dateStart) ||
+                !empty($dateEnd)
+            );
+        @endphp
+        <a id="btn-reset-audit" href="{{ route('audit-log.index') }}" class="btn-reset" style="display:{{ $hasCustomFilter ? 'inline-flex' : 'none' }}; align-items:center; justify-content:center;">
             Reset
         </a>
     </form>
@@ -361,5 +371,29 @@
     @endif
 </div>
 
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var form = document.querySelector('.filter-form');
+    var btnReset = document.getElementById('btn-reset-audit');
+    if (form && btnReset) {
+        function checkAuditFilter() {
+            var q = form.querySelector('[name="q"]')?.value?.trim() || '';
+            var action = form.querySelector('[name="action"]')?.value || 'all';
+            var module = form.querySelector('[name="module"]')?.value || 'all';
+            var role = form.querySelector('[name="role"]')?.value || 'all';
+            var ds = form.querySelector('[name="date_start"]')?.value || '';
+            var de = form.querySelector('[name="date_end"]')?.value || '';
+
+            var isChanged = (q !== '') || (action !== 'all') || (module !== 'all') || (role !== 'all') || (ds !== '') || (de !== '');
+            btnReset.style.display = isChanged ? 'inline-flex' : 'none';
+        }
+
+        form.querySelectorAll('select, input').forEach(function(el) {
+            el.addEventListener('change', checkAuditFilter);
+            el.addEventListener('input', checkAuditFilter);
+        });
+    }
+});
+</script>
 @endsection
 

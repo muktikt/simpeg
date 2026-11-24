@@ -16,6 +16,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'api/*',
             'login',
             '/',
+            'logout',
         ]);
         $middleware->alias([
             'simpeg.auth' => \App\Http\Middleware\SimpegAuth::class,

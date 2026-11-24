@@ -435,10 +435,11 @@ class ThrController extends Controller
         $insertedToDb = false;
         if ($dbPegawaiId) {
             try {
-                $newId = \Illuminate\Support\Facades\DB::table('thr')->insertGetId([
+                $payload = [
                     'pegawai_id' => $dbPegawaiId,
                     'tahun' => (int) $validated['tahun'],
                     'status' => 'draft',
+                    'disetujui_oleh' => null,
                     'kategori' => $validated['kategori'],
                     'kode_ptkp' => $validated['kode_ptkp'],
                     'total_pendapatan' => (int) $totalPendapatan,
@@ -485,21 +486,50 @@ class ThrController extends Controller
                     'potongan_bank_btn' => (int) ($validated['potongan_btn'] ?? 0),
                     'potongan_bank_bpr' => (int) ($validated['potongan_bpr'] ?? 0),
                     'potongan_zakat_ramadhan' => (int) ($validated['potongan_zakat'] ?? 0),
-                ]);
+                    'updated_at' => now(),
+                ];
+
+                $existingThr = \Illuminate\Support\Facades\DB::table('thr')
+                    ->where('pegawai_id', $dbPegawaiId)
+                    ->where('tahun', (int) $validated['tahun'])
+                    ->first();
+
+                if ($existingThr) {
+                    \Illuminate\Support\Facades\DB::table('thr')
+                        ->where('id', $existingThr->id)
+                        ->update($payload);
+                    $newId = $existingThr->id;
+                } else {
+                    $payload['created_at'] = now();
+                    $newId = \Illuminate\Support\Facades\DB::table('thr')->insertGetId($payload);
+                }
 
                 $insertedToDb = true;
                 $validated['id'] = $newId;
             } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::warning('DB thr insert failed: ' . $e->getMessage());
+                \Illuminate\Support\Facades\Log::warning('DB thr insert/update failed: ' . $e->getMessage());
             }
         }
 
         $localData = $this->getLocalData();
-        if (! $insertedToDb) {
-            $newId = $localData ? max(array_column($localData, 'id')) + 1 : 1;
-            $validated['id'] = $newId;
+        $foundLocal = false;
+        foreach ($localData as &$item) {
+            if (($insertedToDb && ($item['id'] ?? null) === $newId) ||
+                (($item['nik'] ?? '') === $validated['nik'] && (int)($item['tahun'] ?? 0) === (int)$validated['tahun'])) {
+                $validated['id'] = $insertedToDb ? $newId : ($item['id'] ?? ($localData ? max(array_column($localData, 'id')) + 1 : 1));
+                $item = $validated;
+                $foundLocal = true;
+                break;
+            }
         }
-        $localData[] = $validated;
+        unset($item);
+        if (! $foundLocal) {
+            if (! $insertedToDb) {
+                $newId = $localData ? max(array_column($localData, 'id')) + 1 : 1;
+                $validated['id'] = $newId;
+            }
+            $localData[] = $validated;
+        }
         $this->save($localData);
 
         return redirect()->route('thr.index', ['tahun' => $validated['tahun']])
@@ -534,6 +564,16 @@ class ThrController extends Controller
      * Lihat trait HasApprovalChain untuk detail alurnya.
      */
     public function terbitkan(int $id)
+    {
+        $this->terbitkanDirect($id);
+        return redirect()->back()->with('success', 'THR berhasil disetujui dan tersimpan di database.');
+    }
+
+    /**
+     * Eksekusi langsung proses persetujuan / penerbitan THR tanpa HTTP redirect.
+     * Digunakan oleh ApprovalController (approval tunggal & massal).
+     */
+    public function terbitkanDirect(int $id): string
     {
         $row = collect($this->all())->firstWhere('id', $id);
         abort_if(! $row, 404);
@@ -585,7 +625,7 @@ class ThrController extends Controller
             $this->save($updated);
         }
 
-        return redirect()->back()->with('success', 'THR berhasil disetujui dan tersimpan di database.');
+        return $nextStatus;
     }
 
     public function destroy(int $id)

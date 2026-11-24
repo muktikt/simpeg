@@ -1,5 +1,4 @@
 {{-- Dashboard Statistik Khusus Eksekutif Direksi (Role 7) --}}
-@push('styles')
 <style>
 .exec-header {
     background: linear-gradient(135deg, #0b253a 0%, #103b5c 50%, #164e63 100%);
@@ -200,7 +199,6 @@
     flex-shrink: 0;
 }
 </style>
-@endpush
 
 <div class="exec-header">
     <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:16px;">
@@ -480,22 +478,10 @@
                 </div>
                 <span>&rarr;</span>
             </a>
-
-            <a href="{{ route('pejabat-ttd.index') }}" class="exec-quick-btn">
-                <div class="exec-quick-icon" style="background:#f1f5f9; color:#334155;">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-                </div>
-                <div style="flex:1;">
-                    <div>Pejabat Penandatangan (tbl_ttd)</div>
-                    <div style="font-size:11.5px; font-weight:400; color:#64748b;">Konfigurasi Pejabat Penandatangan Laporan</div>
-                </div>
-                <span>&rarr;</span>
-            </a>
         </div>
     </div>
 </div>
 
-@push('scripts')
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
@@ -610,5 +596,4 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 });
 </script>
-@endpush
 
