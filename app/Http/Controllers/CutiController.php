@@ -223,8 +223,7 @@ class CutiController extends Controller
             return back()->withInput()->withErrors(['pegawai_nik' => 'Pegawai dengan NIK tersebut tidak ditemukan.']);
         }
 
-        $user = DB::table('auth.users')->where('email', 'like', $targetNik . '@%')->first();
-        $pegawaiUserId = $user ? $user->id : $pegawai->id;
+        $pegawaiUserId = $pegawai->id;
 
         $tglMulai = Carbon::parse($validated['tanggal_mulai']);
         $thn = $tglMulai->year;

@@ -69,6 +69,9 @@ class PotonganKeuController extends Controller
             return $rows->map(fn ($r) => (array) $r)->all();
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::warning('DB potongan_keu read failed: ' . $e->getMessage());
+            if (function_exists('session') && session()) {
+                session()->now('error', 'Koneksi ke database server terputus atau timeout: data belum dapat dimuat. Silakan muat ulang (refresh) halaman.');
+            }
         }
 
         return [];
