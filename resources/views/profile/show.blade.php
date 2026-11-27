@@ -316,18 +316,18 @@
                 {{-- Sidebar: preview & aksi Lihat/Download CV --}}
                 <div class="cv-side-card">
                     <h3>Curriculum Vitae (CV)</h3>
-                    <p class="muted">CV disusun otomatis dari Data Pribadi, Pendidikan, Jabatan, Diklat, Sertifikasi, Kompetensi, dan Prestasi yang Anda isi di bawah.</p>
+                    <p class="muted">CV disusun otomatis dari Data Pribadi, Pendidikan, Jabatan, Golongan, Diklat, Sertifikasi, Kompetensi, Prestasi, dan Keluarga.</p>
  
                     <a href="{{ route('profile.cv.cetak') }}" target="_blank" class="cv-btn-link">
                         Lihat CV
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
                     </a>
-                    <a href="{{ route('profile.cv.cetak') }}" target="_blank" class="cv-btn-link primary">
+                    <a href="{{ route('profile.cv.cetak', ['print' => 1]) }}" target="_blank" class="cv-btn-link primary">
                         Download CV
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                     </a>
  
-                    <div class="cv-updated">Isi semua form di sebelah kanan, lalu klik Lihat/Download CV untuk melihat hasilnya.</div>
+                    <div class="cv-updated">Seluruh riwayat dari SDM (Golongan, Jabatan, Pendidikan, Prestasi, Keluarga, Dokumen) otomatis terhubung ke CV Anda.</div>
                 </div>
  
                 {{-- Form-form input CV --}}
@@ -382,10 +382,19 @@
                         </form>
                     </div>
  
-                    {{-- 2 & 3. Pendidikan & Jabatan: read-only reminder, sudah diisi di tab lain --}}
+                    {{-- 2 & 3. Pendidikan, Jabatan & Golongan: ringkasan data dari SDM --}}
                     <div class="cv-section">
-                        <h3>2 &amp; 3. Riwayat Pendidikan &amp; Jabatan</h3>
-                        <p class="muted" style="font-size:13px; color:#64748B;">Data ini otomatis tampil di CV dari tab <b>Pendidikan</b> dan <b>Jabatan</b>. Silakan lengkapi di tab tersebut jika belum sesuai.</p>
+                        <h3>2 &amp; 3. Riwayat Pendidikan, Jabatan &amp; Golongan (Data SDM)</h3>
+                        <p class="muted" style="font-size:13px; color:#64748B; margin-bottom:10px;">
+                            Data ini ditarik otomatis dari database SDM dan langsung tampil saat <b>Lihat / Download CV</b>:
+                        </p>
+                        <div style="display:flex; flex-wrap:wrap; gap:8px; font-size:12.5px;">
+                            <span style="padding:5px 10px; border-radius:8px; background:#EFF6FF; color:#1E40AF; font-weight:600;">Pendidikan: {{ count($pegawai['pendidikan'] ?? []) }} data</span>
+                            <span style="padding:5px 10px; border-radius:8px; background:#F0FDF4; color:#166534; font-weight:600;">Riwayat Jabatan: {{ count($pegawai['jabatan_riwayat'] ?? []) }} data</span>
+                            <span style="padding:5px 10px; border-radius:8px; background:#FDF2F8; color:#9D174D; font-weight:600;">Riwayat Golongan: {{ count($pegawai['golongan'] ?? []) }} data</span>
+                            <span style="padding:5px 10px; border-radius:8px; background:#FFFBEB; color:#92400E; font-weight:600;">Prestasi: {{ count($pegawai['prestasi'] ?? []) }} data</span>
+                            <span style="padding:5px 10px; border-radius:8px; background:#F5F3FF; color:#5B21B6; font-weight:600;">Keluarga: {{ count($pegawai['keluarga'] ?? []) }} data</span>
+                        </div>
                     </div>
  
                     {{-- 4. Diklat & Pelatihan --}}

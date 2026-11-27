@@ -90,15 +90,30 @@
     <div class="sheet">
         <div class="cv-header">
             <div class="wave"></div>
-            <div class="cv-photo-slot">Foto 3x4</div>
+            @if (!empty($pegawai['foto_url']))
+                <div class="cv-photo-slot" style="padding:0; overflow:hidden;">
+                    <img src="{{ $pegawai['foto_url'] }}" alt="Foto {{ $pegawai['nama'] }}" style="width:100%; height:100%; object-fit:cover;">
+                </div>
+            @else
+                <div class="cv-photo-slot">Foto 3x4</div>
+            @endif
+            @php
+                $badgeLabel = [
+                    'PT' => 'Pegawai Tetap', 'DI' => 'Direksi', 'CP' => 'Calon Pegawai',
+                    'PH' => 'Honorer', 'TK' => 'Tenaga Kontrak', 'PN' => 'Pensiun',
+                ];
+                $statusTeks = $badgeLabel[$pegawai['status_peg'] ?? ''] ?? ($pegawai['status_peg'] ?? '-');
+                $latestGol = $pegawai['golongan'][0]['golongan'] ?? ($pegawai['golongan_utama'] ?? '-');
+            @endphp
             <div class="cv-header-text">
                 <div class="label">CURRICULUM VITAE</div>
-                <h1>{{ strtoupper($pegawai['nama']) }}</h1>
+                <h1>{{ strtoupper($pegawai['nama']) }}{{ !empty($pegawai['gelar']) && !str_contains($pegawai['nama'], $pegawai['gelar']) ? ', ' . $pegawai['gelar'] : '' }}</h1>
                 <div class="jabatan">{{ $pegawai['jabatan'] }}</div>
                 <div class="unit">{{ $pegawai['unit_kerja'] ?? 'Kantor Pusat' }}</div>
                 <div class="cv-header-meta">
                     <div><span class="k">NIK</span>: {{ $pegawai['nik'] }}</div>
-                    <div><span class="k">Status</span>: {{ $pegawai['status_peg'] ?? '-' }}</div>
+                    <div><span class="k">Golongan</span>: {{ $latestGol ?: '-' }}</div>
+                    <div><span class="k">Status</span>: {{ $statusTeks }}</div>
                     <div><span class="k">Tgl. Masuk</span>: {{ formatTglIndo($pegawai['tgl_masuk'] ?? null) }}</div>
                 </div>
             </div>
@@ -112,13 +127,20 @@
             {{-- 1. Data Pribadi --}}
             <div class="cv-section">
                 <div class="cv-section-title">1. DATA PRIBADI</div>
-                @php $bio = $pegawai['biodata'] ?? []; @endphp
-                <div class="cv-kv"><div>Tempat, Tanggal Lahir</div><div>:</div><div>{{ ($bio['tempat_lahir'] ?? '-') . ', ' . formatTglIndo($bio['tgl_lahir'] ?? null) }}</div></div>
-                <div class="cv-kv"><div>Jenis Kelamin</div><div>:</div><div>{{ $bio['jenis_kelamin'] ?? '-' }}</div></div>
-                <div class="cv-kv"><div>Alamat</div><div>:</div><div>{{ $bio['alamat'] ?? ($pegawai['alamat'] ?? '-') }}</div></div>
-                <div class="cv-kv"><div>No. Telepon</div><div>:</div><div>{{ $bio['telp'] ?? ($pegawai['telp'] ?? '-') }}</div></div>
-                <div class="cv-kv"><div>Email</div><div>:</div><div>{{ $bio['email'] ?? '-' }}</div></div>
-                <div class="cv-kv"><div>Status Perkawinan</div><div>:</div><div>{{ $bio['status_kawin'] ?? '-' }}</div></div>
+                @php
+                    $bio = $pegawai['biodata'] ?? [];
+                    $tempatLahir = !empty($bio['tempat_lahir']) ? $bio['tempat_lahir'] : '-';
+                    $tglLahirFmt = !empty($bio['tgl_lahir']) ? formatTglIndo($bio['tgl_lahir']) : '-';
+                    $ttlGabung = ($tempatLahir !== '-' && $tglLahirFmt !== '-')
+                        ? ($tempatLahir . ', ' . $tglLahirFmt)
+                        : ($tempatLahir !== '-' ? $tempatLahir : $tglLahirFmt);
+                @endphp
+                <div class="cv-kv"><div>Tempat, Tanggal Lahir</div><div>:</div><div>{{ $ttlGabung }}</div></div>
+                <div class="cv-kv"><div>Jenis Kelamin</div><div>:</div><div>{{ !empty($bio['jenis_kelamin']) ? $bio['jenis_kelamin'] : '-' }}</div></div>
+                <div class="cv-kv"><div>Alamat</div><div>:</div><div>{{ !empty($bio['alamat']) ? $bio['alamat'] : ($pegawai['alamat'] ?? '-') }}</div></div>
+                <div class="cv-kv"><div>No. Telepon</div><div>:</div><div>{{ !empty($bio['telp']) ? $bio['telp'] : ($pegawai['telp'] ?? '-') }}</div></div>
+                <div class="cv-kv"><div>Email</div><div>:</div><div>{{ !empty($bio['email']) ? $bio['email'] : ($pegawai['email'] ?? '-') }}</div></div>
+                <div class="cv-kv"><div>Status Perkawinan</div><div>:</div><div>{{ !empty($bio['status_kawin']) ? $bio['status_kawin'] : '-' }}</div></div>
             </div>
  
             {{-- 2. Riwayat Pendidikan --}}
@@ -129,7 +151,7 @@
                         <thead><tr><th>Tahun</th><th>Pendidikan</th><th>Institusi</th></tr></thead>
                         <tbody>
                             @foreach ($pegawai['pendidikan'] as $p)
-                                <tr><td>{{ $p['tahun_lulus'] ?? '-' }}</td><td>{{ $p['jenjang'] ?? '-' }} {{ $p['jurusan'] ?? '' }}</td><td>{{ $p['institusi'] ?? '-' }}</td></tr>
+                                <tr><td>{{ $p['tahun_lulus'] ?? '-' }}</td><td>{{ $p['jenjang'] ?? '-' }}{{ !empty($p['jurusan']) ? ' - ' . $p['jurusan'] : '' }}</td><td>{{ $p['institusi'] ?? ($p['nama_sekolah'] ?? '-') }}</td></tr>
                             @endforeach
                         </tbody>
                     </table>
@@ -154,10 +176,42 @@
                     <div class="cv-empty">Belum ada data riwayat jabatan.</div>
                 @endif
             </div>
+
+            {{-- 4. Riwayat Golongan / Pangkat --}}
+            <div class="cv-section">
+                <div class="cv-section-title">4. RIWAYAT GOLONGAN / PANGKAT</div>
+                @if (count($pegawai['golongan'] ?? []))
+                    <table class="cv-table">
+                        <thead><tr><th>TMT</th><th>Golongan / Pangkat</th><th>No. SK</th></tr></thead>
+                        <tbody>
+                            @foreach ($pegawai['golongan'] as $g)
+                                <tr>
+                                    <td>{{ formatTglIndo($g['tmt'] ?? null) }}</td>
+                                    <td>{{ $g['golongan'] ?? '-' }}{{ !empty($g['pangkat']) && ($g['pangkat'] !== ($g['golongan'] ?? '')) ? ' (' . $g['pangkat'] . ')' : '' }}</td>
+                                    <td>{{ $g['no_sk'] ?? '-' }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                @elseif (!empty($pegawai['golongan_utama']))
+                    <table class="cv-table">
+                        <thead><tr><th>TMT</th><th>Golongan / Pangkat</th><th>Keterangan</th></tr></thead>
+                        <tbody>
+                            <tr>
+                                <td>-</td>
+                                <td>{{ $pegawai['golongan_utama'] }}{{ !empty($pegawai['golongan_detail']) ? ' (' . $pegawai['golongan_detail'] . ')' : '' }}</td>
+                                <td>Golongan Aktif</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                @else
+                    <div class="cv-empty">Belum ada data riwayat golongan.</div>
+                @endif
+            </div>
  
-            {{-- 4. Diklat & Pelatihan --}}
+            {{-- 5. Diklat & Pelatihan --}}
             <div class="cv-section half">
-                <div class="cv-section-title">4. DIKLAT &amp; PELATIHAN</div>
+                <div class="cv-section-title">5. DIKLAT &amp; PELATIHAN</div>
                 @if (count($pegawai['diklat'] ?? []))
                     <table class="cv-table">
                         <thead><tr><th>Nama Pelatihan / Diklat</th><th>Penyelenggara</th><th>Tahun</th></tr></thead>
@@ -172,9 +226,9 @@
                 @endif
             </div>
  
-            {{-- 5. Sertifikasi --}}
+            {{-- 6. Sertifikasi --}}
             <div class="cv-section half">
-                <div class="cv-section-title">5. SERTIFIKASI</div>
+                <div class="cv-section-title">6. SERTIFIKASI</div>
                 @if (count($pegawai['sertifikasi'] ?? []))
                     <table class="cv-table">
                         <thead><tr><th>Nama Sertifikat</th><th>Penyelenggara</th><th>Tahun</th></tr></thead>
@@ -189,9 +243,9 @@
                 @endif
             </div>
  
-            {{-- 6. Kompetensi --}}
+            {{-- 7. Kompetensi --}}
             <div class="cv-section half">
-                <div class="cv-section-title">6. KOMPETENSI / KEAHLIAN</div>
+                <div class="cv-section-title">7. KOMPETENSI / KEAHLIAN</div>
                 @if (count($pegawai['kompetensi'] ?? []))
                     <ul class="cv-list">
                         @foreach ($pegawai['kompetensi'] as $k)
@@ -203,15 +257,23 @@
                 @endif
             </div>
  
-            {{-- 7. Prestasi --}}
+            {{-- 8. Prestasi --}}
             <div class="cv-section half">
-                <div class="cv-section-title">7. PRESTASI / PENGHARGAAN</div>
+                <div class="cv-section-title">8. PRESTASI / PENGHARGAAN</div>
                 @if (count($pegawai['prestasi'] ?? []))
                     <table class="cv-table">
-                        <thead><tr><th>Nama Penghargaan</th><th>Tahun</th></tr></thead>
+                        <thead><tr><th>Nama Penghargaan / Prestasi</th><th>Tahun</th></tr></thead>
                         <tbody>
                             @foreach ($pegawai['prestasi'] as $pr)
-                                <tr><td>{{ $pr['judul'] ?? '-' }}</td><td>{{ formatTglIndo($pr['tanggal'] ?? null, 'Y') }}</td></tr>
+                                <tr>
+                                    <td>
+                                        <div>{{ $pr['judul'] ?? '-' }}</div>
+                                        @if (!empty($pr['keterangan']) && $pr['keterangan'] !== '-')
+                                            <div style="font-size:11px; color:#64748B;">{{ $pr['keterangan'] }}</div>
+                                        @endif
+                                    </td>
+                                    <td>{{ formatTglIndo($pr['tanggal'] ?? null, 'Y') }}</td>
+                                </tr>
                             @endforeach
                         </tbody>
                     </table>
@@ -219,9 +281,38 @@
                     <div class="cv-empty">Belum ada data prestasi.</div>
                 @endif
             </div>
+
+            {{-- 9. Data Keluarga --}}
+            <div class="cv-section">
+                <div class="cv-section-title">9. DATA KELUARGA</div>
+                @if (count($pegawai['keluarga'] ?? []))
+                    <table class="cv-table">
+                        <thead><tr><th>Nama Anggota Keluarga</th><th>Hubungan</th><th>Tanggal Lahir</th><th>Keterangan</th></tr></thead>
+                        <tbody>
+                            @foreach ($pegawai['keluarga'] as $kel)
+                                <tr>
+                                    <td>{{ $kel['nama'] ?? '-' }}</td>
+                                    <td>{{ $kel['hubungan'] ?? '-' }}</td>
+                                    <td>{{ formatTglIndo($kel['tgl_lahir'] ?? ($kel['tanggal_lahir'] ?? null)) }}</td>
+                                    <td>{{ $kel['keterangan'] ?? ($kel['pekerjaan'] ?? '-') }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                @else
+                    <div class="cv-empty">Belum ada data keluarga.</div>
+                @endif
+            </div>
         </div>
     </div>
- 
+
+    @if (request()->boolean('print'))
+        <script>
+            window.addEventListener('load', function () {
+                setTimeout(function () { window.print(); }, 300);
+            });
+        </script>
+    @endif
 </body>
 </html>
  

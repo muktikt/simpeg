@@ -28,12 +28,40 @@ class PegawaiController extends Controller
         $list = [];
         try {
             $dbPegawai = \Illuminate\Support\Facades\DB::table('pegawai')
-                ->select('id', 'nik', 'name', 'gelar', 'jabatan', 'unit_kerja', 'status', 'no_telp', 'alamat')
+                ->select(
+                    'id',
+                    'nik',
+                    'name',
+                    'gelar',
+                    'jabatan',
+                    'unit_kerja',
+                    'golongan',
+                    'golongan_detail',
+                    'status',
+                    'tempat_tanggal_lahir',
+                    'status_pernikahan',
+                    'no_telp',
+                    'alamat',
+                    'email',
+                    'foto_url',
+                    'created_at'
+                )
                 ->orderBy('nik', 'asc')
                 ->get();
             if ($dbPegawai->isNotEmpty()) {
                 $index = 1;
                 foreach ($dbPegawai as $sp) {
+                    $rawNik = preg_replace('/\s+/', '', trim((string) $sp->nik));
+                    $tglMasuk = ! empty($sp->created_at) ? substr((string) $sp->created_at, 0, 10) : date('Y-m-d');
+                    if (strlen($rawNik) >= 4 && ctype_digit(substr($rawNik, 0, 4))) {
+                        $yy = (int) substr($rawNik, 0, 2);
+                        $mm = (int) substr($rawNik, 2, 2);
+                        $year = ($yy > 50) ? (1900 + $yy) : (2000 + $yy);
+                        if ($mm >= 1 && $mm <= 12 && $year <= (int) date('Y')) {
+                            $tglMasuk = sprintf('%04d-%02d-01', $year, $mm);
+                        }
+                    }
+
                     $list[] = [
                         'id' => $index++,
                         'db_id' => $sp->id,
@@ -42,10 +70,17 @@ class PegawaiController extends Controller
                         'gelar' => $sp->gelar ?? '',
                         'jabatan' => $sp->jabatan ?? 'Staf',
                         'unit_kerja' => $sp->unit_kerja ?? 'Kantor Pusat',
+                        'golongan_utama' => $sp->golongan ?? '',
+                        'golongan_detail' => $sp->golongan_detail ?? '',
                         'status_peg' => $sp->status ?? 'PT',
-                        'tgl_masuk' => date('Y-m-d'),
+                        'tempat_tanggal_lahir' => $sp->tempat_tanggal_lahir ?? '',
+                        'status_pernikahan' => $sp->status_pernikahan ?? '',
+                        'tgl_masuk' => $tglMasuk,
                         'telp' => $sp->no_telp ?? '-',
                         'alamat' => $sp->alamat ?? '-',
+                        'email' => $sp->email ?? '',
+                        'foto_url' => $sp->foto_url ?? null,
+                        'created_at' => $sp->created_at ?? null,
                         'keluarga' => [],
                         'golongan' => [],
                         'jabatan_riwayat' => [],
@@ -96,6 +131,8 @@ class PegawaiController extends Controller
 
                     $pegawai['pendidikan'] = \Illuminate\Support\Facades\DB::table('pendidikan')
                         ->where('pegawai_id', $pegawai['db_id'])
+                        ->orderByDesc('tahun_lulus')
+                        ->orderByDesc('id')
                         ->get()
                         ->map(function ($r) {
                             $arr = (array) $r;
@@ -107,6 +144,8 @@ class PegawaiController extends Controller
 
                     $pegawai['golongan'] = \Illuminate\Support\Facades\DB::table('riwayat_golongan')
                         ->where('pegawai_id', $pegawai['db_id'])
+                        ->orderByDesc('tmt')
+                        ->orderByDesc('id')
                         ->get()
                         ->map(function ($r) {
                             $arr = (array) $r;
@@ -117,6 +156,8 @@ class PegawaiController extends Controller
 
                     $pegawai['jabatan_riwayat'] = \Illuminate\Support\Facades\DB::table('riwayat_jabatan')
                         ->where('pegawai_id', $pegawai['db_id'])
+                        ->orderByDesc('tmt')
+                        ->orderByDesc('id')
                         ->get()
                         ->map(function ($r) {
                             $arr = (array) $r;

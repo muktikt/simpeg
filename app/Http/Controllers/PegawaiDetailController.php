@@ -121,6 +121,7 @@ class PegawaiDetailController extends Controller
                         'no_sk' => $validated['no_sk'] ?? '-',
                         'created_at' => now(),
                     ]);
+                    $this->syncPegawaiCurrentGolongan($dbPegawaiId);
                 } elseif ($type === 'jabatan_riwayat') {
                     $insertedDbId = \Illuminate\Support\Facades\DB::table('riwayat_jabatan')->insertGetId([
                         'pegawai_id' => $dbPegawaiId,
@@ -130,6 +131,7 @@ class PegawaiDetailController extends Controller
                         'no_sk' => $validated['no_sk'] ?? '-',
                         'created_at' => now(),
                     ]);
+                    $this->syncPegawaiCurrentJabatan($dbPegawaiId);
                 } elseif ($type === 'pendidikan') {
                     $insertedDbId = \Illuminate\Support\Facades\DB::table('pendidikan')->insertGetId([
                         'pegawai_id' => $dbPegawaiId,
@@ -161,10 +163,61 @@ class PegawaiDetailController extends Controller
         return redirect()->route('pegawai.show', $pegawaiId)->with('success', self::fieldConfig($type)['title'].' berhasil ditambahkan.');
     }
 
+    protected function syncPegawaiCurrentGolongan(?string $dbPegawaiId): void
+    {
+        if (! $dbPegawaiId) {
+            return;
+        }
+
+        try {
+            $latest = \Illuminate\Support\Facades\DB::table('riwayat_golongan')
+                ->where('pegawai_id', $dbPegawaiId)
+                ->orderByDesc('tmt')
+                ->orderByDesc('id')
+                ->first();
+
+            if ($latest && ! empty($latest->golongan)) {
+                \Illuminate\Support\Facades\DB::table('pegawai')
+                    ->where('id', $dbPegawaiId)
+                    ->update(['golongan' => $latest->golongan]);
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Sync golongan pegawai failed: ' . $e->getMessage());
+        }
+    }
+
+    protected function syncPegawaiCurrentJabatan(?string $dbPegawaiId): void
+    {
+        if (! $dbPegawaiId) {
+            return;
+        }
+
+        try {
+            $latest = \Illuminate\Support\Facades\DB::table('riwayat_jabatan')
+                ->where('pegawai_id', $dbPegawaiId)
+                ->orderByDesc('tmt')
+                ->orderByDesc('id')
+                ->first();
+
+            if ($latest && ! empty($latest->jabatan)) {
+                $updates = ['jabatan' => $latest->jabatan];
+                if (! empty($latest->unit_kerja) && $latest->unit_kerja !== '-') {
+                    $updates['unit_kerja'] = $latest->unit_kerja;
+                }
+                \Illuminate\Support\Facades\DB::table('pegawai')
+                    ->where('id', $dbPegawaiId)
+                    ->update($updates);
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Sync jabatan pegawai failed: ' . $e->getMessage());
+        }
+    }
+
     public function update(Request $request, int $pegawaiId, string $type, int $itemId)
     {
         $this->validateType($type);
         $validated = $request->validate($this->rules($type));
+        $dbPegawaiId = $this->getDbPegawaiId($pegawaiId);
 
         try {
             if ($type === 'keluarga') {
@@ -180,12 +233,14 @@ class PegawaiDetailController extends Controller
                     'pangkat' => $validated['pangkat'] ?? $validated['golongan'],
                     'tmt' => $validated['tmt'],
                 ]);
+                $this->syncPegawaiCurrentGolongan($dbPegawaiId);
             } elseif ($type === 'jabatan_riwayat') {
                 \Illuminate\Support\Facades\DB::table('riwayat_jabatan')->where('id', $itemId)->update([
                     'jabatan' => $validated['jabatan'],
                     'unit_kerja' => $validated['unit_kerja'] ?? '-',
                     'tmt' => $validated['tmt'],
                 ]);
+                $this->syncPegawaiCurrentJabatan($dbPegawaiId);
             } elseif ($type === 'pendidikan') {
                 \Illuminate\Support\Facades\DB::table('pendidikan')->where('id', $itemId)->update([
                     'jenjang' => $validated['jenjang'],
@@ -214,6 +269,7 @@ class PegawaiDetailController extends Controller
     public function destroy(int $pegawaiId, string $type, int $itemId)
     {
         $this->validateType($type);
+        $dbPegawaiId = $this->getDbPegawaiId($pegawaiId);
 
         $table = match ($type) {
             'keluarga' => 'keluarga',
@@ -227,6 +283,11 @@ class PegawaiDetailController extends Controller
         if ($table) {
             try {
                 \Illuminate\Support\Facades\DB::table($table)->where('id', $itemId)->delete();
+                if ($type === 'golongan') {
+                    $this->syncPegawaiCurrentGolongan($dbPegawaiId);
+                } elseif ($type === 'jabatan_riwayat') {
+                    $this->syncPegawaiCurrentJabatan($dbPegawaiId);
+                }
             } catch (\Throwable $e) {
                 \Illuminate\Support\Facades\Log::warning("DB destroy detail $type failed: " . $e->getMessage());
             }

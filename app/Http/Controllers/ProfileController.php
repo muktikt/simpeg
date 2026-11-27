@@ -130,7 +130,7 @@ class ProfileController extends Controller
         $pegawai['surat_diklat'] = $pegawai['surat_diklat'] ?? null;
  
         $cv = $this->getPegawaiCv($pegawai['db_id'] ?? $pegawai['nik']);
-        $pegawai['biodata'] = $cv['biodata'] ?? [];
+        $pegawai['biodata'] = $this->mergeBiodataDefaults($pegawai, $cv['biodata'] ?? []);
         $pegawai['diklat'] = $cv['diklat'] ?? [];
         $pegawai['sertifikasi'] = $cv['sertifikasi'] ?? [];
         $pegawai['kompetensi'] = $cv['kompetensi'] ?? [];
@@ -146,14 +146,57 @@ class ProfileController extends Controller
     protected function currentPegawai(): array
     {
         $userLogin = session('simpeg_user');
-        $allPegawai = app(PegawaiController::class)->all();
+        $pegawaiCtrl = app(PegawaiController::class);
+        $allPegawai = $pegawaiCtrl->all();
         $pegawai = collect($allPegawai)->firstWhere('nik', $userLogin['nik'] ?? '');
  
         if (! $pegawai) {
             abort(404, 'Data pegawai tidak ditemukan.');
         }
+
+        // Muat relasi lengkap dari database PostgreSQL (keluarga, golongan, jabatan_riwayat, pendidikan, prestasi, dokumen)
+        $detailData = $pegawaiCtrl->find($pegawai['id']);
+        if ($detailData) {
+            $pegawai = array_merge($pegawai, $detailData);
+        }
  
         return $pegawai;
+    }
+
+    protected function mergeBiodataDefaults(array $pegawai, array $biodata): array
+    {
+        $ttl = trim((string) ($pegawai['tempat_tanggal_lahir'] ?? ''));
+        $defaultTempat = '';
+        $defaultTgl = '';
+        if ($ttl !== '' && $ttl !== '-') {
+            if (str_contains($ttl, ',')) {
+                [$tempatPart, $tglPart] = array_map('trim', explode(',', $ttl, 2));
+                $defaultTempat = $tempatPart;
+                $defaultTgl = $tglPart;
+            } else {
+                $defaultTempat = $ttl;
+            }
+        }
+
+        $defaultKawin = trim((string) ($pegawai['status_pernikahan'] ?? ''));
+        if ($defaultKawin === '') {
+            $hasPasangan = collect($pegawai['keluarga'] ?? [])->contains(function ($k) {
+                return in_array(strtolower(trim((string) ($k['hubungan'] ?? ''))), ['istri/suami', 'istri', 'suami'], true);
+            });
+            if ($hasPasangan) {
+                $defaultKawin = 'Menikah';
+            }
+        }
+
+        return [
+            'tempat_lahir'  => ! empty($biodata['tempat_lahir']) ? $biodata['tempat_lahir'] : $defaultTempat,
+            'tgl_lahir'     => ! empty($biodata['tgl_lahir']) ? $biodata['tgl_lahir'] : $defaultTgl,
+            'jenis_kelamin' => $biodata['jenis_kelamin'] ?? '',
+            'status_kawin'  => ! empty($biodata['status_kawin']) ? $biodata['status_kawin'] : $defaultKawin,
+            'alamat'        => ! empty($biodata['alamat']) ? $biodata['alamat'] : (($pegawai['alamat'] ?? '-') !== '-' ? $pegawai['alamat'] : ''),
+            'telp'          => ! empty($biodata['telp']) ? $biodata['telp'] : (($pegawai['telp'] ?? '-') !== '-' ? $pegawai['telp'] : ''),
+            'email'         => ! empty($biodata['email']) ? $biodata['email'] : ($pegawai['email'] ?? ''),
+        ];
     }
 
     protected function cvStoragePath(mixed $key): string
@@ -518,13 +561,32 @@ class ProfileController extends Controller
     public function cvCetak()
     {
         $pegawai = $this->currentPegawai();
+        $pegawai = $this->attachDokumenResmi($pegawai);
+
         $cvKey = $pegawai['db_id'] ?? $pegawai['nik'];
         $cv = $this->getPegawaiCv($cvKey);
  
-        $pegawai['biodata'] = $cv['biodata'] ?? [];
+        $pegawai['biodata'] = $this->mergeBiodataDefaults($pegawai, $cv['biodata'] ?? []);
+        $pegawai['keluarga'] = $pegawai['keluarga'] ?? [];
+        $pegawai['golongan'] = $pegawai['golongan'] ?? [];
         $pegawai['pendidikan'] = $pegawai['pendidikan'] ?? [];
         $pegawai['jabatan_riwayat'] = $pegawai['jabatan_riwayat'] ?? [];
-        $pegawai['diklat'] = $cv['diklat'] ?? [];
+
+        // Gabungkan Diklat mandiri pegawai dengan Surat Diklat resmi dari Admin SDM jika ada
+        $diklatList = $cv['diklat'] ?? [];
+        if (! empty($pegawai['surat_diklat'])) {
+            $sdmJudul = trim((string) ($pegawai['surat_diklat']['judul'] ?? ''));
+            $alreadyExists = collect($diklatList)->contains(fn ($d) => strtolower(trim((string) ($d['nama'] ?? ''))) === strtolower($sdmJudul));
+            if ($sdmJudul !== '' && ! $alreadyExists) {
+                array_unshift($diklatList, [
+                    'nama' => $sdmJudul,
+                    'penyelenggara' => 'PERUMDAM Tirta Darma Ayu (No: ' . ($pegawai['surat_diklat']['nomor'] ?? '-') . ')',
+                    'tahun' => ! empty($pegawai['surat_diklat']['tgl_terbit']) ? substr((string) $pegawai['surat_diklat']['tgl_terbit'], 0, 4) : '-',
+                ]);
+            }
+        }
+
+        $pegawai['diklat'] = $diklatList;
         $pegawai['sertifikasi'] = $cv['sertifikasi'] ?? [];
         $pegawai['kompetensi'] = $cv['kompetensi'] ?? [];
         $pegawai['prestasi'] = $pegawai['prestasi'] ?? [];

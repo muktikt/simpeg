@@ -369,10 +369,24 @@ class ApiPegawaiController extends Controller
             return $resp;
         }
 
-        $keluarga = DB::table('keluarga')->where('pegawai_id', $pegawai->id)->get();
-        $pendidikan = DB::table('pendidikan')->where('pegawai_id', $pegawai->id)->get();
-        $riwayatGol = DB::table('riwayat_golongan')->where('pegawai_id', $pegawai->id)->get();
-        $riwayatJab = DB::table('riwayat_jabatan')->where('pegawai_id', $pegawai->id)->get();
+        $keluarga = DB::table('keluarga')->where('pegawai_id', $pegawai->id)->orderByDesc('id')->get();
+        $pendidikan = DB::table('pendidikan')->where('pegawai_id', $pegawai->id)->orderByDesc('tahun_lulus')->orderByDesc('id')->get();
+        $riwayatGol = DB::table('riwayat_golongan')->where('pegawai_id', $pegawai->id)->orderByDesc('tmt')->orderByDesc('id')->get();
+        $riwayatJab = DB::table('riwayat_jabatan')->where('pegawai_id', $pegawai->id)->orderByDesc('tmt')->orderByDesc('id')->get();
+
+        // Muat data CV tambahan (diklat, sertifikasi, kompetensi, biodata) jika sudah diisi pegawai di web
+        $cvExtra = ['biodata' => [], 'diklat' => [], 'sertifikasi' => [], 'kompetensi' => []];
+        $cvPathById = storage_path('app/cv_pegawai_' . $pegawai->id . '.json');
+        $cvPathByNik = storage_path('app/cv_pegawai_' . $pegawai->nik . '.json');
+        $cvPath = file_exists($cvPathById) ? $cvPathById : (file_exists($cvPathByNik) ? $cvPathByNik : null);
+        if ($cvPath) {
+            $decoded = json_decode(file_get_contents($cvPath), true);
+            if (is_array($decoded)) {
+                $cvExtra = array_merge($cvExtra, $decoded);
+            }
+        }
+
+        $latestGolText = $riwayatGol->first()->golongan ?? ($pegawai->golongan ?? null);
 
         return response()->json([
             'success' => true,
@@ -381,21 +395,27 @@ class ApiPegawaiController extends Controller
                 'id' => $pegawai->id,
                 'nik' => $pegawai->nik,
                 'nama' => $pegawai->name,
+                'name' => $pegawai->name,
                 'gelar' => $pegawai->gelar,
                 'jabatan' => $pegawai->jabatan,
                 'unit_kerja' => $pegawai->unit_kerja ?? 'PDAM Tirta Darma Ayu',
                 'branch_id' => $pegawai->branch_id ?? null,
-                'golongan' => $pegawai->golongan,
+                'golongan' => $latestGolText,
+                'golongan_master' => $pegawai->golongan,
                 'status' => $pegawai->status ?? 'Pegawai Tetap',
                 'tempat_tanggal_lahir' => $pegawai->tempat_tanggal_lahir,
                 'status_pernikahan' => $pegawai->status_pernikahan,
                 'alamat' => $pegawai->alamat,
                 'no_telp' => $pegawai->no_telp,
+                'email' => $pegawai->email ?? ($cvExtra['biodata']['email'] ?? null),
                 'foto_url' => $pegawai->foto_url,
                 'keluarga' => $keluarga,
                 'pendidikan' => $pendidikan,
                 'riwayat_golongan' => $riwayatGol,
                 'riwayat_jabatan' => $riwayatJab,
+                'diklat' => $cvExtra['diklat'] ?? [],
+                'sertifikasi' => $cvExtra['sertifikasi'] ?? [],
+                'kompetensi' => $cvExtra['kompetensi'] ?? [],
             ],
         ]);
     }
