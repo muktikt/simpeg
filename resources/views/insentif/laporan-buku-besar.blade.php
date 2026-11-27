@@ -12,6 +12,7 @@
     <form method="GET" action="{{ route('insentif.laporan-buku-besar') }}" style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
         <select name="sumber" onchange="this.form.submit()" style="padding:9px 12px; border-radius:9px; border:1px solid var(--border); font-size:13px; background:var(--surface); color:var(--text);">
             <option value="gaji_bulanan" @selected($sumber === 'gaji_bulanan')>Dari Gaji Bulanan (Permen)</option>
+            <option value="insentif_pendidikan" @selected($sumber === 'insentif_pendidikan')>Insentif Pendidikan (Regulasi 2026)</option>
             <option value="gaji13" @selected($sumber === 'gaji13')>Dari Gaji 13</option>
         </select>
         @if ($sumber === 'gaji_bulanan')
@@ -90,7 +91,7 @@
                         Rp {{ number_format($d[$nominalKey] ?? 0, 0, ',', '.') }}
                     </td>
                     <td class="no-print" style="text-align:center;">
-                        <a href="{{ route('insentif.show', $d['id']) }}" target="_blank" class="btn btn-outline" style="padding:4px 8px; font-size:11px;" title="Cetak Slip">
+                        <a href="{{ route('insentif.show', ['id' => $d['id'], 'sumber' => $sumber]) }}" target="_blank" class="btn btn-outline" style="padding:4px 8px; font-size:11px;" title="Cetak Slip">
                             Slip
                         </a>
                     </td>

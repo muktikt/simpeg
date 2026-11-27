@@ -19,45 +19,47 @@ class PegawaiController extends Controller
             return static::$memoryCache;
         }
 
-        $list = \Illuminate\Support\Facades\Cache::remember('simpeg_all_pegawai_list', 120, function () {
-            try {
-                $dbPegawai = \Illuminate\Support\Facades\DB::table('pegawai')
-                    ->select('id', 'nik', 'name', 'gelar', 'jabatan', 'unit_kerja', 'status', 'no_telp', 'alamat')
-                    ->orderBy('nik', 'asc')
-                    ->get();
-                if ($dbPegawai->isNotEmpty()) {
-                    $res = [];
-                    $index = 1;
-                    foreach ($dbPegawai as $sp) {
-                        $res[] = [
-                            'id' => $index++,
-                            'db_id' => $sp->id,
-                            'nik' => (string) $sp->nik,
-                            'nama' => $sp->name ?? 'Pegawai',
-                            'gelar' => $sp->gelar ?? '',
-                            'jabatan' => $sp->jabatan ?? 'Staf',
-                            'unit_kerja' => $sp->unit_kerja ?? 'Kantor Pusat',
-                            'status_peg' => $sp->status ?? 'PT',
-                            'tgl_masuk' => date('Y-m-d'),
-                            'telp' => $sp->no_telp ?? '-',
-                            'alamat' => $sp->alamat ?? '-',
-                            'keluarga' => [],
-                            'golongan' => [],
-                            'jabatan_riwayat' => [],
-                            'pendidikan' => [],
-                            'prestasi' => [],
-                        ];
-                    }
-                    return $res;
+        $cached = \Illuminate\Support\Facades\Cache::get('simpeg_all_pegawai_list');
+        if (is_array($cached) && ! empty($cached)) {
+            static::$memoryCache = $cached;
+            return static::$memoryCache;
+        }
+
+        $list = [];
+        try {
+            $dbPegawai = \Illuminate\Support\Facades\DB::table('pegawai')
+                ->select('id', 'nik', 'name', 'gelar', 'jabatan', 'unit_kerja', 'status', 'no_telp', 'alamat')
+                ->orderBy('nik', 'asc')
+                ->get();
+            if ($dbPegawai->isNotEmpty()) {
+                $index = 1;
+                foreach ($dbPegawai as $sp) {
+                    $list[] = [
+                        'id' => $index++,
+                        'db_id' => $sp->id,
+                        'nik' => (string) $sp->nik,
+                        'nama' => $sp->name ?? 'Pegawai',
+                        'gelar' => $sp->gelar ?? '',
+                        'jabatan' => $sp->jabatan ?? 'Staf',
+                        'unit_kerja' => $sp->unit_kerja ?? 'Kantor Pusat',
+                        'status_peg' => $sp->status ?? 'PT',
+                        'tgl_masuk' => date('Y-m-d'),
+                        'telp' => $sp->no_telp ?? '-',
+                        'alamat' => $sp->alamat ?? '-',
+                        'keluarga' => [],
+                        'golongan' => [],
+                        'jabatan_riwayat' => [],
+                        'pendidikan' => [],
+                        'prestasi' => [],
+                    ];
                 }
-            } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::warning('DB pegawai read failed: ' . $e->getMessage());
+                \Illuminate\Support\Facades\Cache::put('simpeg_all_pegawai_list', $list, 120);
             }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('DB pegawai read failed: ' . $e->getMessage());
+        }
 
-            return [];
-        });
-
-        static::$memoryCache = $list ?? [];
+        static::$memoryCache = $list;
         return static::$memoryCache;
     }
 

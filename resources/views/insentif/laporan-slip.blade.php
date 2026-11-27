@@ -52,18 +52,86 @@
     </div>
 </div>
 
+@php
+    $buildSlipRows = function (array $item): array {
+        $insPendapatan = [
+            ['label' => 'TUNJANGAN JABATAN', 'value' => $item['insentif_jabatan'] ?? 0],
+            ['label' => 'TUNJANGAN PRESTASI', 'value' => $item['insentif_prestasi'] ?? 0],
+            ['label' => 'TUNJANGAN TRANSPORTASI', 'value' => $item['insentif_transportasi'] ?? 0],
+            ['label' => 'TUNJANGAN PANGAN', 'value' => $item['insentif_pangan'] ?? 0],
+            ['label' => 'TUNJANGAN BPJS KESEHATAN', 'value' => $item['insentif_bpjs_kesehatan'] ?? 0],
+            ['label' => 'TUNJANGAN PERUMAHAN', 'value' => $item['insentif_perumahan'] ?? 0],
+            ['label' => 'TUNJANGAN BPJS TENAGA KERJA', 'value' => $item['insentif_bpjs_tenaga_kerja'] ?? 0],
+            ['label' => 'TUNJANGAN PERUSAHAAN', 'value' => $item['insentif_perusahaan'] ?? 0],
+            ['label' => 'LEMBUR', 'value' => $item['lembur'] ?? 0],
+            ['label' => 'TUNJANGAN PAJAK', 'value' => $item['insentif_pajak'] ?? 0],
+            ['label' => 'TUNJANGAN AIR MINUM', 'value' => $item['insentif_air_minum'] ?? 0],
+            ['label' => 'TUNJANGAN KOMUNIKASI', 'value' => $item['insentif_komunikasi'] ?? 0],
+        ];
+        $insPotonganPend = [
+            ['label' => 'POTONGAN SANKSI', 'value' => $item['potongan_sanksi_perusahaan'] ?? 0],
+            ['label' => 'POTONGAN PMI / LAIN-LAIN', 'value' => $item['potongan_pmi_lain'] ?? 0],
+            ['label' => 'POTONGAN DAPENMA', 'value' => $item['potongan_dapenma'] ?? 0],
+            ['label' => 'POTONGAN BPJS TENAGA KERJA', 'value' => $item['potongan_bpjs_tenaga_kerja'] ?? 0],
+            ['label' => 'POTONGAN PERUMAHAN', 'value' => $item['potongan_perumahan'] ?? 0],
+            ['label' => 'POTONGAN TUNJANGAN PERUSAHAAN', 'value' => $item['potongan_insentif_perusahaan'] ?? 0],
+            ['label' => 'POTONGAN KORPRI', 'value' => $item['potongan_korpri'] ?? 0],
+            ['label' => 'POTONGAN PAJAK', 'value' => $item['potongan_pajak'] ?? 0],
+            ['label' => 'POTONGAN BPJS KESEHATAN', 'value' => $item['potongan_bpjs_kesehatan'] ?? 0],
+        ];
+        $insPotonganNon = [
+            ['label' => 'POTONGAN KOPERASI', 'value' => $item['potongan_koperasi'] ?? 0],
+            ['label' => 'POTONGAN DARMA WANITA', 'value' => $item['potongan_darma_wanita'] ?? 0],
+            ['label' => 'POTONGAN REKENING AIR MINUM', 'value' => $item['potongan_rekening_air_minum'] ?? 0],
+            ['label' => 'POTONGAN KAS', 'value' => $item['potongan_kas'] ?? 0],
+            ['label' => 'POTONGAN BANK BJB', 'value' => $item['potongan_bank_bjb'] ?? 0],
+            ['label' => 'POTONGAN BANK BJBS', 'value' => $item['potongan_bank_bjbs'] ?? 0],
+            ['label' => 'POTONGAN BANK BTN', 'value' => $item['potongan_bank_btn'] ?? 0],
+            ['label' => 'POTONGAN BANK BPR', 'value' => $item['potongan_bank_bpr'] ?? 0],
+            ['label' => 'POTONGAN ASURANSI/LAINNYA', 'value' => $item['potongan_asuransi'] ?? 0],
+            ['label' => 'POTONGAN ZAKAT', 'value' => $item['potongan_zakat_profesi'] ?? 0],
+        ];
+        return [$insPendapatan, $insPotonganPend, $insPotonganNon];
+    };
+
+    $resolveSlipTitle = function (array $item) use ($sumber, $bulan, $tahun): string {
+        if ($sumber === 'insentif_pendidikan' && !empty($item['judul'])) {
+            return strtoupper($item['judul']);
+        }
+        if ($sumber === 'gaji13') {
+            return 'DAFTAR INSENTIF PENDIDIKAN & POTONGAN TAHUN : ' . ($item['tahun'] ?? $tahun);
+        }
+        $bNama = \App\Http\Controllers\AbsensiController::BULAN[$item['bulan'] ?? $bulan] ?? ('Bulan ' . ($item['bulan'] ?? $bulan));
+        $periodeStr = !empty($item['periode']) ? $item['periode'] : ($bNama . ' ' . ($item['tahun'] ?? $tahun));
+        return 'DAFTAR INSENTIF & POTONGAN BULAN : ' . strtoupper($periodeStr);
+    };
+@endphp
+
 @if ($isPegawai)
     {{-- TAMPILAN UNTUK PEGAWAI --}}
+    @if (!empty($insentifPendidikanLatest) && $sumber !== 'insentif_pendidikan')
+        <div class="no-print" style="margin-bottom:18px; background:#F5F3FF; border:1px solid #DDD6FE; border-radius:12px; padding:14px 18px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+            <div>
+                <div style="font-weight:700; color:#5B21B6; font-size:14px;">Slip Insentif Pendidikan (Regulasi 2026) Tersedia</div>
+                <div style="font-size:12.5px; color:#6D28D9;">Periode: <strong>{{ $insentifPendidikanLatest['periode'] }}</strong> &middot; Diterima: <strong>Rp {{ number_format($insentifPendidikanLatest['nominal'], 0, ',', '.') }}</strong></div>
+            </div>
+            <a href="{{ route('insentif.laporan-slip', ['my' => 1, 'sumber' => 'insentif_pendidikan', 'tahun' => $insentifPendidikanLatest['tahun'], 'id' => $insentifPendidikanLatest['id']]) }}" class="btn btn-primary btn-sm" style="font-weight:600; background:#7C3AED; border-color:#7C3AED;">
+                Lihat Slip Insentif Pendidikan
+            </a>
+        </div>
+    @endif
+
     @if ($selectedSlip)
         @php
             $item = $selectedSlip;
-            $bulanNama = \App\Http\Controllers\AbsensiController::BULAN[$bulan] ?? ('Bulan ' . $bulan);
+            $periodeLabel = $item['periode'] ?? ((\App\Http\Controllers\AbsensiController::BULAN[$bulan] ?? ('Bulan ' . $bulan)) . ' ' . $tahun);
+            [$insPendapatan, $insPotonganPend, $insPotonganNon] = $buildSlipRows($item);
         @endphp
 
         <!-- Banner Ringkasan Insentif (Navy - Sky Blue) -->
         <div class="no-print" style="background: linear-gradient(135deg, #0F2A3D 0%, #1A4968 50%, #0284C7 100%); color: white; padding: 24px 28px; border-radius: 16px; margin-bottom: 24px; box-shadow: 0 4px 15px rgba(15, 42, 61, 0.15); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
             <div>
-                <div style="font-size: 13.5px; font-weight: 500; opacity: 0.85; margin-bottom: 4px;">Insentif &middot; {{ $bulanNama }} {{ $tahun }}</div>
+                <div style="font-size: 13.5px; font-weight: 500; opacity: 0.85; margin-bottom: 4px;">Insentif &middot; {{ $periodeLabel }}</div>
                 <div style="font-size: 32px; font-weight: 700; font-family: 'Space Grotesk', sans-serif;">
                     Rp {{ number_format($item['insentif_diterima'], 0, ',', '.') }}
                 </div>
@@ -79,48 +147,8 @@
             </div>
         </div>
 
-                @php
-            $insPendapatan = [
-                ['label' => 'TUNJANGAN JABATAN', 'value' => $item['insentif_jabatan'] ?? 0],
-                ['label' => 'TUNJANGAN PRESTASI', 'value' => $item['insentif_prestasi'] ?? 0],
-                ['label' => 'TUNJANGAN TRANSPORTASI', 'value' => $item['insentif_transportasi'] ?? 0],
-                ['label' => 'TUNJANGAN PANGAN', 'value' => $item['insentif_pangan'] ?? 0],
-                ['label' => 'TUNJANGAN BPJS KESEHATAN', 'value' => $item['insentif_bpjs_kesehatan'] ?? 0],
-                ['label' => 'TUNJANGAN PERUMAHAN', 'value' => $item['insentif_perumahan'] ?? 0],
-                ['label' => 'TUNJANGAN BPJS TENAGA KERJA', 'value' => $item['insentif_bpjs_tenaga_kerja'] ?? 0],
-                ['label' => 'TUNJANGAN PERUSAHAAN', 'value' => $item['insentif_perusahaan'] ?? 0],
-                ['label' => 'LEMBUR', 'value' => $item['lembur'] ?? 0],
-                ['label' => 'TUNJANGAN PAJAK', 'value' => $item['insentif_pajak'] ?? 0],
-                ['label' => 'TUNJANGAN AIR MINUM', 'value' => $item['insentif_air_minum'] ?? 0],
-                ['label' => 'TUNJANGAN KOMUNIKASI', 'value' => $item['insentif_komunikasi'] ?? 0],
-            ];
-            $insPotonganPend = [
-                ['label' => 'POTONGAN SANKSI', 'value' => $item['potongan_sanksi_perusahaan'] ?? 0],
-                ['label' => 'POTONGAN PMI / LAIN-LAIN', 'value' => $item['potongan_pmi_lain'] ?? 0],
-                ['label' => 'POTONGAN DAPENMA', 'value' => $item['potongan_dapenma'] ?? 0],
-                ['label' => 'POTONGAN BPJS TENAGA KERJA', 'value' => $item['potongan_bpjs_tenaga_kerja'] ?? 0],
-                ['label' => 'POTONGAN PERUMAHAN', 'value' => $item['potongan_perumahan'] ?? 0],
-                ['label' => 'POTONGAN TUNJANGAN PERUSAHAAN', 'value' => $item['potongan_insentif_perusahaan'] ?? 0],
-                ['label' => 'POTONGAN KORPRI', 'value' => $item['potongan_korpri'] ?? 0],
-                ['label' => 'POTONGAN PAJAK', 'value' => $item['potongan_pajak'] ?? 0],
-                ['label' => 'POTONGAN BPJS KESEHATAN', 'value' => $item['potongan_bpjs_kesehatan'] ?? 0],
-            ];
-            $insPotonganNon = [
-                ['label' => 'POTONGAN KOPERASI', 'value' => $item['potongan_koperasi'] ?? 0],
-                ['label' => 'POTONGAN DARMA WANITA', 'value' => $item['potongan_darma_wanita'] ?? 0],
-                ['label' => 'POTONGAN REKENING AIR MINUM', 'value' => $item['potongan_rekening_air_minum'] ?? 0],
-                ['label' => 'POTONGAN KAS', 'value' => $item['potongan_kas'] ?? 0],
-                ['label' => 'POTONGAN BANK BJB', 'value' => $item['potongan_bank_bjb'] ?? 0],
-                ['label' => 'POTONGAN BANK BJBS', 'value' => $item['potongan_bank_bjbs'] ?? 0],
-                ['label' => 'POTONGAN BANK BTN', 'value' => $item['potongan_bank_btn'] ?? 0],
-                ['label' => 'POTONGAN BANK BPR', 'value' => $item['potongan_bank_bpr'] ?? 0],
-                ['label' => 'POTONGAN ASURANSI/LAINNYA', 'value' => $item['potongan_asuransi'] ?? 0],
-                ['label' => 'POTONGAN ZAKAT', 'value' => $item['potongan_zakat_profesi'] ?? 0],
-            ];
-        @endphp
-
         @include('partials.official-slip', [
-            'judul' => 'DAFTAR INSENTIF & POTONGAN BULAN : ' . strtoupper($bulanNama) . ' ' . ($item['tahun'] ?? $tahun),
+            'judul' => $resolveSlipTitle($item),
             'data' => $item,
             'pendapatanRows' => $insPendapatan,
             'potonganPendapatanRows' => $insPotonganPend,
@@ -128,38 +156,43 @@
             'totalPendapatan' => $item['total_insentif'] ?? null,
             'pendapatanDiterima' => $item['insentif_diterima'] ?? null,
         ])
-
-        <!-- Card Riwayat Insentif -->
-        @if (!empty($riwayatInsentif))
-            <div class="no-print" style="background: white; border-radius: 16px; border: 1px solid #e2e8f0; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); margin-top: 24px;">
-                <div style="font-size: 13px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px; border-bottom: 1px solid #f1f5f9; padding-bottom: 8px;">
-                    RIWAYAT INSENTIF SEBELUMNYA
-                </div>
-
-                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px;">
-                    @foreach ($riwayatInsentif as $rw)
-                        <a href="{{ route('insentif.laporan-slip', ['my' => 1, 'sumber' => 'gaji_bulanan', 'bulan' => $rw['bulan'], 'tahun' => $rw['tahun']]) }}" style="display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; text-decoration: none; transition: all 0.2s ease;" onmouseover="this.style.background='#f1f5f9'; this.style.borderColor='#cbd5e1';" onmouseout="this.style.background='#f8fafc'; this.style.borderColor='#e2e8f0';">
-                            <div style="display: flex; align-items: center; gap: 12px;">
-                                <div style="font-size: 18px; width: 36px; height: 36px; background: #e0f2fe; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
-                                    {!! $rw['icon'] !!}
-                                </div>
-                                <div>
-                                    <div style="font-weight: 700; color: #0f172a; font-size: 14px;">{{ $rw['judul'] }}</div>
-                                    <div style="font-size: 12px; color: #64748b; margin-top: 2px;">{{ $rw['periode'] }}</div>
-                                </div>
-                            </div>
-                            <div style="font-weight: 700; color: #0284c7; font-size: 15px;">
-                                Rp {{ number_format($rw['nominal'], 0, ',', '.') }}
-                            </div>
-                        </a>
-                    @endforeach
-                </div>
-            </div>
-        @endif
-
     @else
         <div class="table-card" style="padding: 40px; text-align: center; margin-top: 16px;">
-            <div class="table-empty">Belum ada slip insentif yang terbit untuk Anda pada periode ini. Silakan pilih bulan/tahun lain di atas.</div>
+            <div class="table-empty">Belum ada slip insentif yang terbit untuk Anda pada periode ini. Silakan pilih sumber/bulan/tahun lain di atas atau lihat riwayat di bawah.</div>
+        </div>
+    @endif
+
+    <!-- Card Riwayat Insentif -->
+    @if (!empty($riwayatInsentif))
+        <div class="no-print" style="background: white; border-radius: 16px; border: 1px solid #e2e8f0; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); margin-top: 24px;">
+            <div style="font-size: 13px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px; border-bottom: 1px solid #f1f5f9; padding-bottom: 8px;">
+                RIWAYAT INSENTIF &amp; INSENTIF PENDIDIKAN
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px;">
+                @foreach ($riwayatInsentif as $rw)
+                    @php
+                        $rwParams = ['my' => 1, 'sumber' => $rw['sumber'], 'tahun' => $rw['tahun'], 'id' => $rw['id']];
+                        if ($rw['sumber'] === 'gaji_bulanan') {
+                            $rwParams['bulan'] = $rw['bulan'];
+                        }
+                    @endphp
+                    <a href="{{ route('insentif.laporan-slip', $rwParams) }}" style="display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; text-decoration: none; transition: all 0.2s ease;" onmouseover="this.style.background='#f1f5f9'; this.style.borderColor='#cbd5e1';" onmouseout="this.style.background='#f8fafc'; this.style.borderColor='#e2e8f0';">
+                        <div style="display: flex; align-items: center; gap: 12px; min-width: 0;">
+                            <div style="font-size: 18px; width: 36px; height: 36px; background: #e0f2fe; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                                {!! $rw['icon'] !!}
+                            </div>
+                            <div style="min-width: 0;">
+                                <div style="font-weight: 700; color: #0f172a; font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ $rw['judul'] }}</div>
+                                <div style="font-size: 12px; color: #64748b; margin-top: 2px;">{{ $rw['periode'] }}</div>
+                            </div>
+                        </div>
+                        <div style="font-weight: 700; color: #0284c7; font-size: 14.5px; white-space: nowrap; margin-left: 8px;">
+                            Rp {{ number_format($rw['nominal'], 0, ',', '.') }}
+                        </div>
+                    </a>
+                @endforeach
+            </div>
         </div>
     @endif
 
@@ -169,7 +202,7 @@
         {{-- TAMPILKAN SLIP RESMI SATUAN YANG DIPILIH ADMIN --}}
         @php
             $item = $selectedSlip;
-            $bulanNama = \App\Http\Controllers\AbsensiController::BULAN[$item['bulan']] ?? ('Bulan ' . $item['bulan']);
+            [$insPendapatan, $insPotonganPend, $insPotonganNon] = $buildSlipRows($item);
         @endphp
 
         <div class="no-print" style="margin-bottom: 16px; padding: 12px 18px; background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 10px; display: flex; justify-content: space-between; align-items: center;">
@@ -181,48 +214,8 @@
             </a>
         </div>
 
-                @php
-            $insPendapatan = [
-                ['label' => 'TUNJANGAN JABATAN', 'value' => $item['insentif_jabatan'] ?? 0],
-                ['label' => 'TUNJANGAN PRESTASI', 'value' => $item['insentif_prestasi'] ?? 0],
-                ['label' => 'TUNJANGAN TRANSPORTASI', 'value' => $item['insentif_transportasi'] ?? 0],
-                ['label' => 'TUNJANGAN PANGAN', 'value' => $item['insentif_pangan'] ?? 0],
-                ['label' => 'TUNJANGAN BPJS KESEHATAN', 'value' => $item['insentif_bpjs_kesehatan'] ?? 0],
-                ['label' => 'TUNJANGAN PERUMAHAN', 'value' => $item['insentif_perumahan'] ?? 0],
-                ['label' => 'TUNJANGAN BPJS TENAGA KERJA', 'value' => $item['insentif_bpjs_tenaga_kerja'] ?? 0],
-                ['label' => 'TUNJANGAN PERUSAHAAN', 'value' => $item['insentif_perusahaan'] ?? 0],
-                ['label' => 'LEMBUR', 'value' => $item['lembur'] ?? 0],
-                ['label' => 'TUNJANGAN PAJAK', 'value' => $item['insentif_pajak'] ?? 0],
-                ['label' => 'TUNJANGAN AIR MINUM', 'value' => $item['insentif_air_minum'] ?? 0],
-                ['label' => 'TUNJANGAN KOMUNIKASI', 'value' => $item['insentif_komunikasi'] ?? 0],
-            ];
-            $insPotonganPend = [
-                ['label' => 'POTONGAN SANKSI', 'value' => $item['potongan_sanksi_perusahaan'] ?? 0],
-                ['label' => 'POTONGAN PMI / LAIN-LAIN', 'value' => $item['potongan_pmi_lain'] ?? 0],
-                ['label' => 'POTONGAN DAPENMA', 'value' => $item['potongan_dapenma'] ?? 0],
-                ['label' => 'POTONGAN BPJS TENAGA KERJA', 'value' => $item['potongan_bpjs_tenaga_kerja'] ?? 0],
-                ['label' => 'POTONGAN PERUMAHAN', 'value' => $item['potongan_perumahan'] ?? 0],
-                ['label' => 'POTONGAN TUNJANGAN PERUSAHAAN', 'value' => $item['potongan_insentif_perusahaan'] ?? 0],
-                ['label' => 'POTONGAN KORPRI', 'value' => $item['potongan_korpri'] ?? 0],
-                ['label' => 'POTONGAN PAJAK', 'value' => $item['potongan_pajak'] ?? 0],
-                ['label' => 'POTONGAN BPJS KESEHATAN', 'value' => $item['potongan_bpjs_kesehatan'] ?? 0],
-            ];
-            $insPotonganNon = [
-                ['label' => 'POTONGAN KOPERASI', 'value' => $item['potongan_koperasi'] ?? 0],
-                ['label' => 'POTONGAN DARMA WANITA', 'value' => $item['potongan_darma_wanita'] ?? 0],
-                ['label' => 'POTONGAN REKENING AIR MINUM', 'value' => $item['potongan_rekening_air_minum'] ?? 0],
-                ['label' => 'POTONGAN KAS', 'value' => $item['potongan_kas'] ?? 0],
-                ['label' => 'POTONGAN BANK BJB', 'value' => $item['potongan_bank_bjb'] ?? 0],
-                ['label' => 'POTONGAN BANK BJBS', 'value' => $item['potongan_bank_bjbs'] ?? 0],
-                ['label' => 'POTONGAN BANK BTN', 'value' => $item['potongan_bank_btn'] ?? 0],
-                ['label' => 'POTONGAN BANK BPR', 'value' => $item['potongan_bank_bpr'] ?? 0],
-                ['label' => 'POTONGAN ASURANSI/LAINNYA', 'value' => $item['potongan_asuransi'] ?? 0],
-                ['label' => 'POTONGAN ZAKAT', 'value' => $item['potongan_zakat_profesi'] ?? 0],
-            ];
-        @endphp
-
         @include('partials.official-slip', [
-            'judul' => 'DAFTAR INSENTIF & POTONGAN BULAN : ' . strtoupper($bulanNama) . ' ' . ($item['tahun'] ?? $tahun),
+            'judul' => $resolveSlipTitle($item),
             'data' => $item,
             'pendapatanRows' => $insPendapatan,
             'potonganPendapatanRows' => $insPotonganPend,
@@ -237,6 +230,11 @@
             $totBruto = $data->sum('total_insentif');
             $totPot = $data->sum('total_potongan');
             $totBersih = $data->sum('insentif_diterima');
+            $periodeNote = match ($sumber) {
+                'gaji_bulanan' => (\App\Http\Controllers\AbsensiController::BULAN[$bulan] ?? $bulan) . ' ' . $tahun,
+                'insentif_pendidikan' => 'Insentif Pendidikan ' . $tahun,
+                default => 'Gaji 13 ' . $tahun,
+            };
         @endphp
 
         <!-- Stat Cards -->
@@ -261,7 +259,7 @@
 
         <div style="margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
             <p class="report-note" style="margin:0;">
-                Menampilkan daftar slip insentif pegawai periode <b>{{ $sumber === 'gaji_bulanan' ? (\App\Http\Controllers\AbsensiController::BULAN[$bulan] ?? $bulan) . ' ' . $tahun : 'Gaji 13 ' . $tahun }}</b>. Klik <b>"Cetak Slip Resmi"</b> untuk melihat dan mencetak slip pegawai.
+                Menampilkan daftar slip insentif pegawai periode <b>{{ $periodeNote }}</b>. Klik <b>"Cetak Slip Resmi"</b> untuk melihat dan mencetak slip pegawai.
             </p>
             <div class="search-box" style="width: 260px;">
                 <input type="text" class="table-search-input" placeholder="Cari NIK, Nama, Unit..." style="width:100%; padding:8px 12px; border-radius:8px; border:1px solid #CBD5E1; font-size:13px;">
@@ -289,7 +287,7 @@
                             <td class="cell-nik"><b>{{ $d['nik'] }}</b></td>
                             <td class="cell-name">
                                 <b>{{ $d['nama'] }}</b>
-                                <div style="font-size:11px; color:#64748B;">Gol. {{ $d['golongan'] ?? '-' }}</div>
+                                <div style="font-size:11px; color:#64748B;">Gol. {{ $d['golongan'] ?? '-' }} &middot; {{ $d['periode'] ?? '' }}</div>
                             </td>
                             <td>
                                 <div>{{ $d['jabatan'] ?? '-' }}</div>
@@ -299,7 +297,7 @@
                             <td style="text-align:right; color:#DC2626;">Rp {{ number_format($d['total_potongan'], 0, ',', '.') }}</td>
                             <td style="text-align:right; font-weight:700; color:#0F2A3D;">Rp {{ number_format($d['insentif_diterima'], 0, ',', '.') }}</td>
                             <td style="white-space:nowrap; text-align:center;">
-                                <a href="{{ route('insentif.laporan-slip', ['sumber' => $sumber, 'bulan' => $bulan, 'tahun' => $tahun, 'nik' => $d['nik']]) }}" class="btn btn-outline btn-sm" style="font-weight:600; display:inline-flex; align-items:center; gap:6px;">
+                                <a href="{{ route('insentif.laporan-slip', ['sumber' => $sumber, 'bulan' => $bulan, 'tahun' => $tahun, 'id' => $d['id'], 'nik' => $d['nik']]) }}" class="btn btn-outline btn-sm" style="font-weight:600; display:inline-flex; align-items:center; gap:6px;">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="14" height="14"><path d="M6 9V3h12v6"/><path d="M6 18h12v4H6z"/><rect x="4" y="9" width="16" height="9" rx="1"/></svg>
                                     Cetak Slip Resmi
                                 </a>

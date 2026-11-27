@@ -32,7 +32,7 @@
                 <select id="pegawai_select" name="pegawai_nik" class="form-control searchable-pegawai" data-searchable="pegawai" required onchange="onPegawaiSelected(this.value)">
                     <option value="">-- Pilih Pegawai (Ketik NIK / Nama) --</option>
                     @foreach ($pegawaiList as $p)
-                        <option value="{{ $p['nik'] }}" data-id="{{ $p['id'] ?? '' }}" @selected(old('pegawai_nik') === $p['nik'])>
+                        <option value="{{ $p['nik'] }}" data-id="{{ $p['db_id'] ?? $p['id'] ?? '' }}" @selected(old('pegawai_nik') === $p['nik'])>
                             {{ $p['nik'] }} - {{ $p['nama'] }} ({{ $p['jabatan'] ?? '-' }})
                         </option>
                     @endforeach
@@ -40,12 +40,14 @@
                 <input type="hidden" name="pegawai_id" id="pegawai_id">
             </div>
 
-            <div class="form-group">
-                <label style="font-weight:600;">Bulan / Periode <span style="color:#DC2626;">*</span></label>
-                <input type="text" name="periode" id="periode" class="form-control" value="{{ old('periode', $defaultPeriode) }}" placeholder="Contoh: JULI 2026" required>
-            </div>
+            @include('partials.bulan-tahun-create-fields', [
+                'bulanList'    => $bulanList ?? null,
+                'tahunOptions' => $tahunOptions ?? null,
+                'defaultBulan' => $defaultBulan ?? now()->month,
+                'defaultTahun' => $defaultTahun ?? now()->year,
+            ])
 
-            <div class="form-group">
+            <div class="form-group span-2">
                 <label style="font-weight:600;">Status Data Pegawai</label>
                 <input type="text" id="info_status" class="form-control" value="Pilih pegawai untuk auto-fill nominal" disabled style="background:#F8FAFC; color:#475569;">
             </div>

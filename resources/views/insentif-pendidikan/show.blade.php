@@ -3,6 +3,13 @@
 @section('title', 'Slip Insentif Pendidikan - ' . $item['nama'])
 
 @section('content')
+@php
+    $myRole = (string) session('simpeg_user.userlevel');
+    $bisaKelola = in_array($myRole, ['1', '2'], true);
+    $backRoute = $myRole === '5'
+        ? route('insentif.laporan-slip', ['my' => 1, 'sumber' => 'insentif_pendidikan', 'id' => $item['id']])
+        : route('insentif-pendidikan.index', $backParams ?? []);
+@endphp
 <div class="page-head no-print">
     <div class="breadcrumb">Home / SDM / Insentif Pendidikan / Slip</div>
     <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
@@ -17,8 +24,10 @@
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="16" height="16"><path d="M6 9V3h12v6"/><path d="M6 18h12v4H6z"/><rect x="4" y="9" width="16" height="9" rx="1"/></svg>
                 Cetak Slip
             </button>
-            <a href="{{ route('insentif-pendidikan.create') }}" class="btn btn-outline" style="font-weight:600;">+ Input Baru</a>
-            <a href="{{ route('insentif-pendidikan.index') }}" class="btn btn-outline">Kembali ke Daftar</a>
+            @if ($bisaKelola)
+                <a href="{{ route('insentif-pendidikan.create') }}" class="btn btn-outline" style="font-weight:600;">+ Input Baru</a>
+            @endif
+            <a href="{{ $backRoute }}" class="btn btn-outline">Kembali</a>
         </div>
     </div>
 </div>

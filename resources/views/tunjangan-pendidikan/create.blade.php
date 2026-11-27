@@ -32,7 +32,7 @@
                 <select id="pegawai_select" name="pegawai_nik" class="form-control searchable-pegawai" data-searchable="pegawai" required onchange="onPegawaiSelected(this.value)">
                     <option value="">-- Pilih Pegawai (Ketik NIK / Nama) --</option>
                     @foreach ($pegawaiList as $p)
-                        <option value="{{ $p['nik'] }}" data-id="{{ $p['id'] ?? '' }}" @selected(old('pegawai_nik') === $p['nik'])>
+                        <option value="{{ $p['nik'] }}" data-id="{{ $p['db_id'] ?? $p['id'] ?? '' }}" @selected(old('pegawai_nik') === $p['nik'])>
                             {{ $p['nik'] }} - {{ $p['nama'] }} ({{ $p['jabatan'] ?? '-' }})
                         </option>
                     @endforeach
@@ -40,12 +40,14 @@
                 <input type="hidden" name="pegawai_id" id="pegawai_id">
             </div>
 
-            <div class="form-group">
-                <label style="font-weight:600;">Bulan / Periode <span style="color:#DC2626;">*</span></label>
-                <input type="text" name="bulan_label" id="bulan_label" class="form-control" value="{{ old('bulan_label', $defaultBulanLabel) }}" placeholder="Contoh: JULI 2026" required>
-            </div>
+            @include('partials.bulan-tahun-create-fields', [
+                'bulanList'    => $bulanList ?? null,
+                'tahunOptions' => $tahunOptions ?? null,
+                'defaultBulan' => $defaultBulan ?? now()->month,
+                'defaultTahun' => $defaultTahun ?? now()->year,
+            ])
 
-            <div class="form-group">
+            <div class="form-group span-2">
                 <label style="font-weight:600;">Status Keluarga & Hak Tunjangan</label>
                 <input type="text" id="info_keluarga" class="form-control" value="Pilih pegawai terlebih dahulu" disabled style="background:#F8FAFC; color:#475569;">
             </div>
@@ -131,9 +133,30 @@
 
 <script>
 const hitungKeluargaBaseUrl = "{{ url('tunjangan-pendidikan/ajax/hitung-keluarga') }}";
+let currentKeluargaState = {
+    loaded: false,
+    kawin: false,
+    jml_anak: 0,
+    berhak_keluarga: true,
+};
 
 function formatRupiah(num) {
     return 'Rp ' + Math.round(num).toLocaleString('id-ID');
+}
+
+function hitungPersenanDariGapok() {
+    if (!currentKeluargaState.loaded) return;
+
+    const gapok = parseFloat(document.getElementById('gapok').value) || 0;
+    const berhak = currentKeluargaState.berhak_keluarga !== false;
+    const jmlAnak = berhak ? Math.min(Math.max(parseInt(currentKeluargaState.jml_anak, 10) || 0, 0), 2) : 0;
+
+    document.getElementById('tunjangan_istri').value = (berhak && currentKeluargaState.kawin)
+        ? Math.round(gapok * 0.10)
+        : 0;
+    document.getElementById('tunjangan_anak').value = jmlAnak > 0
+        ? Math.round(gapok * 0.05 * jmlAnak)
+        : 0;
 }
 
 function hitungTotal() {
@@ -153,32 +176,59 @@ function hitungTotal() {
     document.getElementById('display-jumlah-diterima').textContent = formatRupiah(diterima);
 }
 
-function onPegawaiSelected(nik) {
+function onPegawaiSelected(nik, preserveExistingValues = false) {
     if (!nik) {
+        currentKeluargaState = { loaded: false, kawin: false, jml_anak: 0, berhak_keluarga: true };
+        document.getElementById('pegawai_id').value = '';
         document.getElementById('info_keluarga').value = 'Pilih pegawai terlebih dahulu';
+        if (!preserveExistingValues) {
+            document.getElementById('gapok').value = 0;
+            document.getElementById('tunjangan_istri').value = 0;
+            document.getElementById('tunjangan_anak').value = 0;
+            hitungTotal();
+        }
         return;
     }
 
     const select = document.getElementById('pegawai_select');
     const selectedOption = select.options[select.selectedIndex];
-    document.getElementById('pegawai_id').value = selectedOption.getAttribute('data-id') || '';
+    document.getElementById('pegawai_id').value = selectedOption ? (selectedOption.getAttribute('data-id') || '') : '';
 
-    document.getElementById('info_keluarga').value = 'Mengambil data keluarga...';
+    document.getElementById('info_keluarga').value = 'Mengambil data gaji pokok & keluarga...';
 
-    fetch(hitungKeluargaBaseUrl + '/' + encodeURIComponent(nik), {
+    const bulan = document.getElementById('bulan')?.value || '';
+    const tahun = document.getElementById('tahun')?.value || '';
+    const query = new URLSearchParams();
+    if (bulan) query.set('bulan', bulan);
+    if (tahun) query.set('tahun', tahun);
+    const url = hitungKeluargaBaseUrl + '/' + encodeURIComponent(nik) + (query.toString() ? '?' + query.toString() : '');
+
+    fetch(url, {
         headers: { 'Accept': 'application/json' }
     })
     .then(r => r.json())
     .then(data => {
         if (!data.success) return;
 
-        const info = (data.kawin ? 'Kawin (1 Istri)' : 'Belum Kawin') + ', Anak Tunjangan: ' + data.jml_anak;
+        const jmlAnak = Math.min(Math.max(parseInt(data.jml_anak, 10) || 0, 0), 2);
+        currentKeluargaState = {
+            loaded: true,
+            kawin: Boolean(data.kawin),
+            jml_anak: jmlAnak,
+            berhak_keluarga: data.berhak_keluarga !== false,
+        };
+
+        let info = (data.kawin ? 'Kawin (Tunj. Istri/Suami 10%)' : 'Belum Kawin (Tunj. Istri/Suami 0%)')
+            + ' • Anak Tunjangan: ' + jmlAnak + (jmlAnak > 0 ? ' (' + (jmlAnak * 5) + '%)' : ' (0%)');
+        if (data.berhak_keluarga === false) {
+            info = 'Status non-tetap (Tidak ada tunjangan keluarga)';
+        }
         document.getElementById('info_keluarga').value = info;
 
-        if (data.gapok > 0) {
-            document.getElementById('gapok').value = data.gapok;
-            document.getElementById('tunjangan_istri').value = data.tunjangan_istri;
-            document.getElementById('tunjangan_anak').value = data.tunjangan_anak;
+        if (!preserveExistingValues) {
+            document.getElementById('gapok').value = Math.round(parseFloat(data.gapok) || 0);
+            document.getElementById('tunjangan_istri').value = Math.round(parseFloat(data.tunjangan_istri) || 0);
+            document.getElementById('tunjangan_anak').value = Math.round(parseFloat(data.tunjangan_anak) || 0);
         }
 
         hitungTotal();
@@ -190,11 +240,27 @@ function onPegawaiSelected(nik) {
 }
 
 document.getElementById('gapok').addEventListener('input', function() {
-    const gapok = parseFloat(this.value) || 0;
-    // Auto-update proporsi tunjangan istri & anak jika ada
-    const infoStr = document.getElementById('info_keluarga').value || '';
-    if (infoStr.includes('Kawin')) {
-        document.getElementById('tunjangan_istri').value = Math.round(gapok * 0.1);
+    hitungPersenanDariGapok();
+    hitungTotal();
+});
+
+['bulan', 'tahun'].forEach(function(fieldId) {
+    const el = document.getElementById(fieldId);
+    if (el) {
+        el.addEventListener('change', function() {
+            const nik = document.getElementById('pegawai_select')?.value || '';
+            if (nik) {
+                onPegawaiSelected(nik, false);
+            }
+        });
+    }
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+    const initialNik = document.getElementById('pegawai_select')?.value || '';
+    if (initialNik) {
+        const hasOldValues = (parseFloat(document.getElementById('gapok')?.value) || 0) > 0;
+        onPegawaiSelected(initialNik, hasOldValues);
     }
     hitungTotal();
 });

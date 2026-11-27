@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\HasApprovalChain;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class GajiTigabelasController extends Controller
 {
@@ -475,13 +477,14 @@ class GajiTigabelasController extends Controller
     public function laporanSlip(Request $request)
     {
         $tahun = (int) $request->get('tahun', now()->year);
-        $userLogin = session('simpeg_user');
+        $userLogin = session('simpeg_user') ?? [];
+        $isPegawai = ((string) ($userLogin['userlevel'] ?? '') === '5') || $request->has('my');
         $format = $request->get('format', 'tpendidikan');
 
         $data = $this->gaji13Terbit($tahun);
 
-        if ($userLogin['userlevel'] === '5' || $request->has('my')) {
-            $data = $data->where('nik', $userLogin['nik']);
+        if ($isPegawai) {
+            $data = $data->where('nik', $userLogin['nik'] ?? '');
         }
 
         $data = $data->map(function ($row) {
@@ -489,20 +492,71 @@ class GajiTigabelasController extends Controller
             return $row;
         })->sortBy('nama')->values();
 
-        $tpData = null;
-        if (! empty($userLogin['nik'])) {
+        $tpList = collect();
+        $selectedTp = null;
+        if ($isPegawai && ! empty($userLogin['nik'])) {
             try {
-                $tpData = DB::table('tunjangan_pendidikan')
+                $tpRows = DB::table('tunjangan_pendidikan')
                     ->leftJoin('pegawai', 'tunjangan_pendidikan.pegawai_id', '=', 'pegawai.id')
-                    ->select('tunjangan_pendidikan.*')
+                    ->select(
+                        'tunjangan_pendidikan.*',
+                        'pegawai.nik as p_nik',
+                        'pegawai.name as p_name',
+                        'pegawai.jabatan as p_jabatan',
+                        'pegawai.unit_kerja as p_unit_kerja',
+                        'pegawai.golongan as p_golongan',
+                        'pegawai.golongan_detail as p_golongan_detail'
+                    )
                     ->where('pegawai.nik', $userLogin['nik'])
-                    ->where('tunjangan_pendidikan.bulan_label', 'like', "%{$tahun}%")
+                    ->where(function ($q) use ($tahun) {
+                        $q->where('tunjangan_pendidikan.bulan_label', 'like', "%{$tahun}%")
+                          ->orWhereYear('tunjangan_pendidikan.created_at', $tahun);
+                    })
                     ->orderByDesc('tunjangan_pendidikan.id')
-                    ->first();
-            } catch (\Throwable $e) {}
+                    ->get();
+
+                $tpList = $tpRows->map(function ($row) use ($tahun) {
+                    $gapok = (float) ($row->gapok ?? 0);
+                    $tIstri = (float) ($row->tunjangan_istri ?? 0);
+                    $tAnak = (float) ($row->tunjangan_anak ?? 0);
+                    $jmlPendapatan = $gapok + $tIstri + $tAnak;
+
+                    $potKoperasi = (float) ($row->potongan_koperasi ?? 0);
+                    $potKas = (float) ($row->potongan_kas ?? 0);
+                    $jmlPotongan = $potKoperasi + $potKas;
+                    $diterima = max(0, $jmlPendapatan - $jmlPotongan);
+
+                    return [
+                        'id'                 => $row->id,
+                        'nik'                => $row->p_nik ?? '-',
+                        'nama'               => $row->p_name ?? '-',
+                        'jabatan'            => $row->p_jabatan ?? '-',
+                        'unit_kerja'         => $row->p_unit_kerja ?? '-',
+                        'golongan'           => $row->p_golongan ?? '-',
+                        'golongan_detail'    => $row->p_golongan_detail ?? ($row->p_golongan ?? '-'),
+                        'bulan_label'        => $row->bulan_label ?? ('JULI ' . $tahun),
+                        'gapok'              => $gapok,
+                        'tunjangan_istri'    => $tIstri,
+                        'tunjangan_anak'     => $tAnak,
+                        'jumlah_pendapatan'  => $jmlPendapatan,
+                        'potongan_koperasi'  => $potKoperasi,
+                        'potongan_kas'       => $potKas,
+                        'jumlah_potongan'    => $jmlPotongan,
+                        'diterima'           => $diterima,
+                        'created_at'         => $row->created_at,
+                    ];
+                });
+
+                $requestedTpId = (int) $request->query('tp_id', 0);
+                $selectedTp = ($requestedTpId > 0 ? $tpList->firstWhere('id', $requestedTpId) : null) ?? $tpList->first();
+            } catch (\Throwable $e) {
+                Log::warning('Load tunjangan_pendidikan in laporanSlip failed: ' . $e->getMessage());
+            }
         }
 
-        return view('gaji-tigabelas.laporan-slip', compact('data', 'tahun', 'format', 'tpData'));
+        $tpData = $selectedTp ? (object) $selectedTp : null;
+
+        return view('gaji-tigabelas.laporan-slip', compact('data', 'tahun', 'format', 'tpData', 'tpList', 'selectedTp'));
     }
 
     public function laporanBukuBesar(Request $request)

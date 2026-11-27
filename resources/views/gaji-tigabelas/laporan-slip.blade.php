@@ -34,29 +34,45 @@
     </button>
 </div>
 
-@if (!empty($tpData))
-    <div class="no-print" style="margin-bottom:20px; background:#F0FDF4; border:1px solid #BBF7D0; border-radius:12px; padding:14px 18px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
-        <div style="display:flex; align-items:center; gap:10px;">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20" style="color:#15803D;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-            <div>
-                <div style="font-weight:700; color:#15803D; font-size:14px;">Slip Tunjangan Pendidikan Resmi (Regulasi 2026 - Format Gambar 1) Tersedia</div>
-                <div style="font-size:12.5px; color:#166534;">Periode: <strong>{{ $tpData->bulan_label }}</strong> &middot; Diterima: <strong>Rp {{ number_format(($tpData->gapok + $tpData->tunjangan_istri + $tpData->tunjangan_anak) - ($tpData->potongan_koperasi + $tpData->potongan_kas), 0, ',', '.') }}</strong></div>
-            </div>
-        </div>
-        <a href="{{ route('tunjangan-pendidikan.show', $tpData->id) }}" class="btn btn-primary btn-sm" style="font-weight:600; display:inline-flex; align-items:center; gap:6px;">
-            Lihat & Cetak Slip Resmi
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-        </a>
-    </div>
-@endif
-
 @if ($isPegawai)
     {{-- ========================================================= --}}
     {{-- TAMPILAN UNTUK PEGAWAI (LEVEL 5 / PRIBADI)                --}}
     {{-- ========================================================= --}}
     @php
         $item = $data->first();
+        $tpItems = $tpList ?? collect();
     @endphp
+
+    @if ($tpItems->isNotEmpty() && !empty($selectedTp))
+        <div class="no-print" style="margin-bottom:20px; background:#F0FDF4; border:1px solid #BBF7D0; border-radius:12px; padding:14px 18px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+            <div style="display:flex; align-items:center; gap:10px;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20" style="color:#15803D;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                <div>
+                    <div style="font-weight:700; color:#15803D; font-size:14px;">Slip Tunjangan Pendidikan Resmi (Regulasi 2026 - Format Gambar 1) Tersedia</div>
+                    <div style="font-size:12.5px; color:#166534;">Periode: <strong>{{ $selectedTp['bulan_label'] }}</strong> &middot; Diterima: <strong>Rp {{ number_format($selectedTp['diterima'], 0, ',', '.') }}</strong></div>
+                </div>
+            </div>
+            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                @if ($tpItems->count() > 1)
+                    @foreach ($tpItems as $tpOpt)
+                        <a href="{{ request()->fullUrlWithQuery(['tp_id' => $tpOpt['id']]) }}"
+                           class="btn btn-sm {{ $tpOpt['id'] === $selectedTp['id'] ? 'btn-primary' : 'btn-outline' }}"
+                           style="font-weight:600; font-size:12px;">
+                            {{ $tpOpt['bulan_label'] }}
+                        </a>
+                    @endforeach
+                @endif
+                <a href="{{ route('tunjangan-pendidikan.show', $selectedTp['id']) }}" class="btn btn-primary btn-sm" style="font-weight:600; display:inline-flex; align-items:center; gap:6px;">
+                    Lihat &amp; Cetak Slip Resmi
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                </a>
+            </div>
+        </div>
+
+        @if (!$item)
+            @include('tunjangan-pendidikan.partials.official-slip', ['item' => $selectedTp])
+        @endif
+    @endif
 
     @if ($item)
         @php
@@ -208,7 +224,7 @@
             ])
         @endif
 
-    @else
+    @elseif ($tpItems->isEmpty())
         <div class="table-card" style="padding: 40px; text-align: center; margin-top: 16px;">
             <div class="table-empty">Belum ada data Tunjangan Pendidikan / Gaji 13 yang terbit untuk Anda pada tahun {{ $tahun }}. Silakan pilih tahun lain di atas.</div>
         </div>

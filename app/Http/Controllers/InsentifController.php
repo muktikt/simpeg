@@ -17,16 +17,29 @@ class InsentifController extends Controller
      *   serta Potongan Keuangan (Koperasi, Dharma Wanita, Air Minum, Kas, Bank BJB/BJBS/BTN/BPR, Asuransi, Zakat).
      * - Insentif Diterima = Total Insentif - Total Potongan.
      */
-    protected function ambilData(Request $request): array
+    protected function parsePeriode(?string $periode, int $fallbackBulan, int $fallbackTahun): array
     {
-        $sumber = $request->get('sumber', 'gaji_bulanan');
-        $tahun = (int) $request->get('tahun', now()->year);
-        $bulan = (int) $request->get('bulan', now()->month);
+        $bulan = $fallbackBulan;
+        $tahun = $fallbackTahun;
+        $text = trim((string) $periode);
 
-        $userLogin = session('simpeg_user') ?? [];
-        $isPegawai = ((string) ($userLogin['userlevel'] ?? '') === '5') || $request->has('my');
-        $myNik = $userLogin['nik'] ?? '';
+        if ($text !== '') {
+            foreach (AbsensiController::BULAN as $num => $nama) {
+                if (stripos($text, $nama) !== false) {
+                    $bulan = (int) $num;
+                    break;
+                }
+            }
+            if (preg_match('/\b(20\d{2})\b/', $text, $m)) {
+                $tahun = (int) $m[1];
+            }
+        }
 
+        return [$bulan, $tahun];
+    }
+
+    protected function buildDataQuery(string $sumber, int $tahun, int $bulan, bool $isPegawai, string $myNik): \Illuminate\Support\Collection
+    {
         $data = collect();
 
         if ($sumber === 'gaji_bulanan') {
@@ -44,9 +57,9 @@ class InsentifController extends Controller
                     )
                     ->where('payroll.tahun', $tahun)
                     ->where('payroll.bulan', $bulan)
-                    ->whereIn('payroll.status', ['terbit', 'DITERBITKAN']);
+                    ->whereIn(DB::raw('LOWER(payroll.status)'), ['terbit', 'diterbitkan']);
 
-                if ($isPegawai && !empty($myNik)) {
+                if ($isPegawai && ! empty($myNik)) {
                     $query->where('pegawai.nik', $myNik);
                 }
 
@@ -56,19 +69,27 @@ class InsentifController extends Controller
                     // Fallback cek ke tabel insentif jika ada
                     $insQuery = DB::table('insentif')
                         ->leftJoin('pegawai', 'insentif.pegawai_id', '=', 'pegawai.id')
-                        ->select('insentif.*', 'pegawai.nik as p_nik', 'pegawai.name as p_name', 'pegawai.jabatan as p_jabatan', 'pegawai.unit_kerja as p_unit_kerja', 'pegawai.golongan as p_golongan')
+                        ->select(
+                            'insentif.*',
+                            'pegawai.nik as p_nik',
+                            'pegawai.name as p_name',
+                            'pegawai.jabatan as p_jabatan',
+                            'pegawai.unit_kerja as p_unit_kerja',
+                            'pegawai.golongan as p_golongan',
+                            'pegawai.golongan_detail as p_golongan_detail'
+                        )
                         ->where(function ($q) use ($bulan, $tahun) {
                             $mPadded = str_pad($bulan, 2, '0', STR_PAD_LEFT);
                             $bulanNama = AbsensiController::BULAN[$bulan] ?? '';
-                            $q->where('insentif.periode', 'like', "%{$mPadded}%{$tahun}%")
-                              ->orWhere('insentif.periode', 'like', "%{$bulanNama}%{$tahun}%");
+                            $q->where('insentif.periode', 'ilike', "%{$mPadded}%{$tahun}%")
+                              ->orWhere('insentif.periode', 'ilike', "%{$bulanNama}%{$tahun}%");
                         });
 
-                    if ($isPegawai && !empty($myNik)) {
+                    if ($isPegawai && ! empty($myNik)) {
                         $insQuery->where('pegawai.nik', $myNik);
                     }
 
-                    $rows = $insQuery->get();
+                    $rows = $insQuery->orderByDesc('insentif.id')->get();
                 }
 
                 $data = $rows->map(function ($r) use ($bulan, $tahun) {
@@ -91,8 +112,9 @@ class InsentifController extends Controller
                         'pegawai.golongan_detail as p_golongan_detail'
                     )
                     ->where(function ($q) use ($tahun) {
-                        $q->where('insentif.periode', 'like', "%{$tahun}%")
-                          ->orWhere('insentif.judul', 'like', "%{$tahun}%");
+                        $q->where('insentif.periode', 'ilike', "%{$tahun}%")
+                          ->orWhere('insentif.judul', 'ilike', "%{$tahun}%")
+                          ->orWhereYear('insentif.created_at', $tahun);
                     });
 
                 if ($isPegawai && ! empty($myNik)) {
@@ -102,7 +124,8 @@ class InsentifController extends Controller
                 $rowsIns = $queryIns->orderByDesc('insentif.id')->get();
 
                 $data = $rowsIns->map(function ($r) use ($bulan, $tahun) {
-                    return $this->formatRowToInsentif($r, $bulan, $tahun, 'insentif_pendidikan');
+                    [$rowBulan, $rowTahun] = $this->parsePeriode($r->periode ?? '', $bulan, $tahun);
+                    return $this->formatRowToInsentif($r, $rowBulan, $rowTahun, 'insentif_pendidikan');
                 });
             } catch (\Throwable $e) {
                 Log::error('Ambil data insentif pendidikan gagal: ' . $e->getMessage());
@@ -121,7 +144,7 @@ class InsentifController extends Controller
                         'pegawai.golongan as p_golongan'
                     )
                     ->where('gaji_13.tahun', $tahun)
-                    ->whereIn('gaji_13.status', ['terbit', 'DITERBITKAN']);
+                    ->whereIn(DB::raw('LOWER(gaji_13.status)'), ['terbit', 'diterbitkan']);
 
                 if ($isPegawai && ! empty($myNik)) {
                     $query13->where('pegawai.nik', $myNik);
@@ -137,6 +160,21 @@ class InsentifController extends Controller
             }
         }
 
+        return $data;
+    }
+
+    protected function ambilData(Request $request): array
+    {
+        $sumber = $request->get('sumber', 'gaji_bulanan');
+        $tahun = (int) $request->get('tahun', now()->year);
+        $bulan = (int) $request->get('bulan', now()->month);
+
+        $userLogin = session('simpeg_user') ?? [];
+        $isPegawai = ((string) ($userLogin['userlevel'] ?? '') === '5') || $request->has('my');
+        $myNik = (string) ($userLogin['nik'] ?? '');
+
+        $data = $this->buildDataQuery($sumber, $tahun, $bulan, $isPegawai, $myNik);
+
         return compact('data', 'sumber', 'tahun', 'bulan');
     }
 
@@ -145,12 +183,19 @@ class InsentifController extends Controller
      */
     protected function formatRowToInsentif(object $r, int $bulan, int $tahun, string $sumber = 'gaji_bulanan'): array
     {
+        $rowBulan = (int) ($r->bulan ?? $bulan);
+        $rowTahun = (int) ($r->tahun ?? $tahun);
+        if ($rowTahun <= 0 && ! empty($r->created_at)) {
+            $rowTahun = (int) date('Y', strtotime((string) $r->created_at));
+        }
+        $bulanNama = AbsensiController::BULAN[$rowBulan] ?? ('Bulan ' . $rowBulan);
+
         if ($sumber === 'gaji13') {
-            $periodeLabel = "Gaji 13 Tahun $tahun";
+            $periodeLabel = "Gaji 13 Tahun $rowTahun";
         } elseif ($sumber === 'insentif_pendidikan') {
-            $periodeLabel = ! empty($r->periode) ? $r->periode : "Insentif Pendidikan $tahun";
+            $periodeLabel = ! empty($r->periode) ? $r->periode : "Insentif Pendidikan $rowTahun";
         } else {
-            $periodeLabel = "$bulanNama $tahun";
+            $periodeLabel = ! empty($r->periode) ? $r->periode : "$bulanNama $rowTahun";
         }
 
         // Identitas Pegawai
@@ -268,9 +313,11 @@ class InsentifController extends Controller
             'jabatan' => $jabatan,
             'unit_kerja' => $unitKerja,
             'golongan' => $golongan,
+            'judul' => $r->judul ?? null,
             'periode' => $periodeLabel,
-            'bulan' => $bulan,
-            'tahun' => $tahun,
+            'bulan' => $rowBulan,
+            'tahun' => $rowTahun,
+            'sumber_data' => $sumber,
             'status' => 'Terbit & Final',
             'disetujui_oleh' => $r->disetujui_oleh ?? 'Nurpan, S.E., M.Si.',
             // Penerimaan
@@ -329,65 +376,157 @@ class InsentifController extends Controller
         $isPegawai = ($myRole === '5') || $request->has('my');
 
         $data = $ctx['data'];
+        $sumber = $ctx['sumber'];
+        $tahun = $ctx['tahun'];
+        $bulan = $ctx['bulan'];
         $riwayatInsentif = [];
         $selectedSlip = null;
+        $insentifPendidikanLatest = null;
 
         if ($isPegawai) {
-            $myNik = $userLogin['nik'] ?? '';
+            $myNik = (string) ($userLogin['nik'] ?? '');
+            $targetId = $request->query('id');
             // Pegawai hanya melihat datanya sendiri
             $myItems = $data->filter(fn ($r) => ($r['nik'] ?? '') === $myNik)->values();
-            $selectedSlip = $myItems->first();
+            $selectedSlip = $targetId
+                ? ($myItems->firstWhere('id', (int) $targetId) ?? $myItems->first())
+                : $myItems->first();
 
-            // Ambil seluruh riwayat insentif yang sudah terbit untuk pegawai ini
+            // Ambil seluruh riwayat insentif (dari tabel insentif, payroll terbit, & gaji_13 terbit)
             try {
-                $allPayrolls = DB::table('payroll')
-                    ->whereIn('status', ['terbit', 'DITERBITKAN'])
-                    ->where('pegawai_id', function ($q) use ($myNik) {
-                        $q->select('id')->from('pegawai')->where('nik', $myNik)->limit(1);
-                    })
-                    ->orderBy('tahun', 'desc')
-                    ->orderBy('bulan', 'desc')
-                    ->limit(12)
-                    ->get();
+                $pegawaiId = DB::table('pegawai')->where('nik', $myNik)->value('id');
+                if ($pegawaiId) {
+                    $allPayrolls = DB::table('payroll')
+                        ->whereIn(DB::raw('LOWER(status)'), ['terbit', 'diterbitkan'])
+                        ->where('pegawai_id', $pegawaiId)
+                        ->orderBy('tahun', 'desc')
+                        ->orderBy('bulan', 'desc')
+                        ->limit(12)
+                        ->get();
 
-                foreach ($allPayrolls as $p) {
-                    $m = (int) ($p->bulan ?? 0);
-                    $y = (int) ($p->tahun ?? now()->year);
-                    $bName = AbsensiController::BULAN[$m] ?? ('Bulan ' . $m);
+                    $payrollPeriodKeys = [];
+                    foreach ($allPayrolls as $p) {
+                        $m = (int) ($p->bulan ?? 0);
+                        $y = (int) ($p->tahun ?? now()->year);
+                        $bName = AbsensiController::BULAN[$m] ?? ('Bulan ' . $m);
+                        $payrollPeriodKeys[strtolower("$bName $y")] = true;
+                    }
 
-                    $fmt = $this->formatRowToInsentif($p, $m, $y);
-                    $riwayatInsentif[] = [
-                        'id' => $p->id,
-                        'judul' => 'Insentif ' . $bName,
-                        'periode' => "$bName $y",
-                        'nominal' => $fmt['insentif_diterima'],
-                        'total_insentif' => $fmt['total_insentif'],
-                        'total_potongan' => $fmt['total_potongan'],
-                        'bulan' => $m,
-                        'tahun' => $y,
-                        'icon' => '⭐',
-                    ];
+                    $allInsentifs = DB::table('insentif')
+                        ->where('pegawai_id', $pegawaiId)
+                        ->orderByDesc('id')
+                        ->limit(24)
+                        ->get();
+
+                    foreach ($allInsentifs as $ins) {
+                        $createdTs = ! empty($ins->created_at) ? strtotime((string) $ins->created_at) : time();
+                        [$insBulan, $insTahun] = $this->parsePeriode(
+                            $ins->periode ?? '',
+                            (int) date('n', $createdTs),
+                            (int) date('Y', $createdTs)
+                        );
+                        $periodeKey = strtolower(trim((string) ($ins->periode ?? '')));
+                        $isAutoSyncDuplicate = isset($payrollPeriodKeys[$periodeKey])
+                            && str_starts_with((string) ($ins->judul ?? ''), 'Slip Insentif ');
+
+                        if ($isAutoSyncDuplicate) {
+                            continue;
+                        }
+
+                        $fmt = $this->formatRowToInsentif($ins, $insBulan, $insTahun, 'insentif_pendidikan');
+                        $rwItem = [
+                            'id' => $ins->id,
+                            'sumber' => 'insentif_pendidikan',
+                            'judul' => ! empty($ins->judul) ? $ins->judul : ('Insentif Pendidikan ' . $fmt['periode']),
+                            'periode' => $fmt['periode'],
+                            'nominal' => $fmt['insentif_diterima'],
+                            'total_insentif' => $fmt['total_insentif'],
+                            'total_potongan' => $fmt['total_potongan'],
+                            'bulan' => $insBulan,
+                            'tahun' => $insTahun,
+                            'icon' => '🎓',
+                        ];
+                        $riwayatInsentif[] = $rwItem;
+                        if (! $insentifPendidikanLatest) {
+                            $insentifPendidikanLatest = $rwItem;
+                        }
+                    }
+
+                    foreach ($allPayrolls as $p) {
+                        $m = (int) ($p->bulan ?? 0);
+                        $y = (int) ($p->tahun ?? now()->year);
+                        $bName = AbsensiController::BULAN[$m] ?? ('Bulan ' . $m);
+
+                        $fmt = $this->formatRowToInsentif($p, $m, $y);
+                        $riwayatInsentif[] = [
+                            'id' => $p->id,
+                            'sumber' => 'gaji_bulanan',
+                            'judul' => 'Insentif ' . $bName,
+                            'periode' => "$bName $y",
+                            'nominal' => $fmt['insentif_diterima'],
+                            'total_insentif' => $fmt['total_insentif'],
+                            'total_potongan' => $fmt['total_potongan'],
+                            'bulan' => $m,
+                            'tahun' => $y,
+                            'icon' => '⭐',
+                        ];
+                    }
+
+                    $allGaji13 = DB::table('gaji_13')
+                        ->whereIn(DB::raw('LOWER(status)'), ['terbit', 'diterbitkan'])
+                        ->where('pegawai_id', $pegawaiId)
+                        ->orderByDesc('tahun')
+                        ->limit(5)
+                        ->get();
+
+                    foreach ($allGaji13 as $g13) {
+                        $y13 = (int) ($g13->tahun ?? now()->year);
+                        $fmt13 = $this->formatRowToInsentif($g13, 7, $y13, 'gaji13');
+                        $riwayatInsentif[] = [
+                            'id' => $g13->id,
+                            'sumber' => 'gaji13',
+                            'judul' => 'Insentif Pendidikan (Gaji 13)',
+                            'periode' => "Gaji 13 Tahun $y13",
+                            'nominal' => $fmt13['insentif_diterima'],
+                            'total_insentif' => $fmt13['total_insentif'],
+                            'total_potongan' => $fmt13['total_potongan'],
+                            'bulan' => 7,
+                            'tahun' => $y13,
+                            'icon' => '📘',
+                        ];
+                    }
                 }
             } catch (\Throwable $e) {
                 Log::warning('Riwayat insentif pegawai gagal dimuat: ' . $e->getMessage());
             }
 
+            // Jika pegawai buka menu Insentif tanpa filter eksplisit dan bulan berjalan kosong, tampilkan slip terbaru yang tersedia
+            $hasExplicitFilter = $request->filled('sumber') || $request->filled('bulan') || $request->filled('tahun') || $request->filled('id');
+            if (! $selectedSlip && ! $hasExplicitFilter && ! empty($riwayatInsentif)) {
+                $firstRw = $riwayatInsentif[0];
+                $sumber = $firstRw['sumber'];
+                $tahun = $firstRw['tahun'];
+                $bulan = $firstRw['bulan'];
+                $myItems = $this->buildDataQuery($sumber, $tahun, $bulan, true, $myNik);
+                $selectedSlip = $myItems->firstWhere('id', (int) $firstRw['id']) ?? $myItems->first();
+            }
+
             $data = $myItems;
         } else {
             // Tampilan Admin / Keuangan / Direksi
-            // Jika ada parameter NIK atau ID yang dipilih, tampilkan slip resminya
-            if ($request->has('nik') || $request->has('id')) {
+            // Jika ada parameter ID atau NIK yang dipilih, tampilkan slip resminya
+            if ($request->has('id') || $request->has('nik')) {
                 $targetNik = $request->get('nik');
                 $targetId = $request->get('id');
-                $selectedSlip = $data->first(function ($r) use ($targetNik, $targetId) {
-                    return ($targetId && ($r['id'] == $targetId)) || ($targetNik && ($r['nik'] == $targetNik));
-                });
+                $selectedSlip = $targetId
+                    ? $data->first(fn ($r) => (string) $r['id'] === (string) $targetId)
+                    : null;
+                if (! $selectedSlip && $targetNik) {
+                    $selectedSlip = $data->first(fn ($r) => (string) $r['nik'] === (string) $targetNik);
+                }
             }
         }
 
-        $sumber = $ctx['sumber'];
-        $tahun = $ctx['tahun'];
-        $bulan = $ctx['bulan'];
         $nominalKey = $this->nominalKey($sumber);
         $bulanList = AbsensiController::BULAN;
 
@@ -400,7 +539,8 @@ class InsentifController extends Controller
             'bulanList',
             'riwayatInsentif',
             'selectedSlip',
-            'isPegawai'
+            'isPegawai',
+            'insentifPendidikanLatest'
         ));
     }
 
@@ -409,39 +549,83 @@ class InsentifController extends Controller
      */
     public function show($id, Request $request)
     {
-        $payroll = DB::table('payroll')
-            ->leftJoin('pegawai', 'payroll.pegawai_id', '=', 'pegawai.id')
-            ->select(
-                'payroll.*',
-                'pegawai.nik as p_nik',
-                'pegawai.name as p_name',
-                'pegawai.jabatan as p_jabatan',
-                'pegawai.unit_kerja as p_unit_kerja',
-                'pegawai.golongan as p_golongan',
-                'pegawai.golongan_detail as p_golongan_detail'
-            )
-            ->where('payroll.id', $id)
-            ->first();
+        $sumberReq = (string) $request->query('sumber', 'gaji_bulanan');
+        $row = null;
+        $rowSource = $sumberReq;
 
-        if (! $payroll) {
+        if ($sumberReq === 'gaji13') {
+            $row = DB::table('gaji_13')
+                ->leftJoin('pegawai', 'gaji_13.pegawai_id', '=', 'pegawai.id')
+                ->select(
+                    'gaji_13.*',
+                    'pegawai.nik as p_nik',
+                    'pegawai.name as p_name',
+                    'pegawai.jabatan as p_jabatan',
+                    'pegawai.unit_kerja as p_unit_kerja',
+                    'pegawai.golongan as p_golongan',
+                    'pegawai.golongan_detail as p_golongan_detail'
+                )
+                ->where('gaji_13.id', $id)
+                ->first();
+        } elseif ($sumberReq !== 'insentif_pendidikan') {
+            $row = DB::table('payroll')
+                ->leftJoin('pegawai', 'payroll.pegawai_id', '=', 'pegawai.id')
+                ->select(
+                    'payroll.*',
+                    'pegawai.nik as p_nik',
+                    'pegawai.name as p_name',
+                    'pegawai.jabatan as p_jabatan',
+                    'pegawai.unit_kerja as p_unit_kerja',
+                    'pegawai.golongan as p_golongan',
+                    'pegawai.golongan_detail as p_golongan_detail'
+                )
+                ->where('payroll.id', $id)
+                ->first();
+            if ($row) {
+                $rowSource = 'gaji_bulanan';
+            }
+        }
+
+        if (! $row && $sumberReq !== 'gaji13') {
+            $row = DB::table('insentif')
+                ->leftJoin('pegawai', 'insentif.pegawai_id', '=', 'pegawai.id')
+                ->select(
+                    'insentif.*',
+                    'pegawai.nik as p_nik',
+                    'pegawai.name as p_name',
+                    'pegawai.jabatan as p_jabatan',
+                    'pegawai.unit_kerja as p_unit_kerja',
+                    'pegawai.golongan as p_golongan',
+                    'pegawai.golongan_detail as p_golongan_detail'
+                )
+                ->where('insentif.id', $id)
+                ->first();
+            if ($row) {
+                $rowSource = 'insentif_pendidikan';
+            }
+        }
+
+        if (! $row) {
             abort(404, 'Data slip insentif tidak ditemukan.');
         }
 
         $userLogin = session('simpeg_user') ?? [];
         $isPegawai = ((string) ($userLogin['userlevel'] ?? '') === '5') || request('my');
-        if ($isPegawai && ! empty($userLogin['nik']) && (string) ($payroll->p_nik ?? '') !== (string) $userLogin['nik']) {
+        if ($isPegawai && ! empty($userLogin['nik']) && (string) ($row->p_nik ?? '') !== (string) $userLogin['nik']) {
             abort(403, 'Anda tidak berhak melihat data pegawai lain.');
         }
-        if ($isPegawai && ! in_array(strtolower($payroll->status ?? ''), ['terbit', 'diterbitkan', 'y', 'final'])) {
+        if (in_array($rowSource, ['gaji_bulanan', 'gaji13'], true) && $isPegawai && ! in_array(strtolower($row->status ?? ''), ['terbit', 'diterbitkan', 'y', 'final'])) {
             abort(403, 'Slip insentif untuk periode ini belum diterbitkan.');
         }
 
-        $item = $this->formatRowToInsentif($payroll, (int) $payroll->bulan, (int) $payroll->tahun);
-        $userLogin = session('simpeg_user') ?? [];
-
-        // Proteksi jika pegawai login ingin melihat slip pegawai lain
-        if (($userLogin['userlevel'] ?? '') === '5' && ($userLogin['nik'] ?? '') !== $item['nik']) {
-            abort(403, 'Anda tidak memiliki hak akses melihat slip pegawai lain.');
+        if ($rowSource === 'gaji13') {
+            $item = $this->formatRowToInsentif($row, 7, (int) ($row->tahun ?? now()->year), 'gaji13');
+        } elseif ($rowSource === 'gaji_bulanan') {
+            $item = $this->formatRowToInsentif($row, (int) ($row->bulan ?? now()->month), (int) ($row->tahun ?? now()->year));
+        } else {
+            $createdTs = ! empty($row->created_at) ? strtotime((string) $row->created_at) : time();
+            [$insBulan, $insTahun] = $this->parsePeriode($row->periode ?? '', (int) date('n', $createdTs), (int) date('Y', $createdTs));
+            $item = $this->formatRowToInsentif($row, $insBulan, $insTahun, 'insentif_pendidikan');
         }
 
         return view('insentif.show', compact('item'));

@@ -49,26 +49,17 @@
 </div>
 
 <!-- Toolbar Filter -->
-<div class="toolbar">
-    <form method="GET" action="{{ route('tunjangan-pendidikan.index') }}" style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-        <select name="bulan_label" onchange="this.form.submit()" style="padding:9px 12px; border-radius:9px; border:1px solid var(--border); font-size:13px; background:#fff;">
-            @for ($y = now()->year; $y >= 2024; $y--)
-                <option value="JULI {{ $y }}" @selected($bulanLabel === "JULI {$y}")>JULI {{ $y }}</option>
-            @endfor
-            <option value="all" @selected($bulanLabel === 'all')>-- Semua Periode --</option>
-        </select>
-        
-        <div class="search-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-            <input type="text" name="q" value="{{ $search }}" placeholder="Cari NIK atau Nama..." style="border:none; outline:none; font-size:13px; width:200px;">
-        </div>
-        <button type="submit" class="btn btn-outline btn-sm">Filter</button>
-        @php
-            $hasCustomFilter = (!empty($search) || $bulanLabel !== ('JULI ' . now()->year));
-        @endphp
-        <a id="btn-reset-tunj-pend" href="{{ route('tunjangan-pendidikan.index') }}" class="btn btn-outline btn-sm" style="display:{{ $hasCustomFilter ? 'inline-flex' : 'none' }}; align-items:center; color:#DC2626; border-color:#FECACA;">Reset</a>
-    </form>
-</div>
+@include('partials.bulan-tahun-filter', [
+    'actionUrl'    => route('tunjangan-pendidikan.index'),
+    'resetBtnId'   => 'btn-reset-tunj-pend',
+    'bulan'        => $bulan,
+    'tahun'        => $tahun,
+    'defaultBulan' => $defaultBulan,
+    'defaultTahun' => $defaultTahun,
+    'bulanList'    => $bulanList,
+    'tahunOptions' => $tahunOptions,
+    'search'       => $search,
+])
 
 <!-- Table Card -->
 <div class="table-card">
@@ -133,26 +124,4 @@
         </tbody>
     </table>
 </div>
-
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    var form = document.querySelector('.toolbar form');
-    var btnReset = document.getElementById('btn-reset-tunj-pend');
-    if (form && btnReset) {
-        var defBulan = 'JULI {{ now()->year }}';
-
-        function checkTunjanganFilter() {
-            var b = form.querySelector('[name="bulan_label"]')?.value || defBulan;
-            var q = form.querySelector('[name="q"]')?.value?.trim() || '';
-            var isChanged = (b !== defBulan) || (q !== '');
-            btnReset.style.display = isChanged ? 'inline-flex' : 'none';
-        }
-
-        form.querySelectorAll('select, input').forEach(function(el) {
-            el.addEventListener('change', checkTunjanganFilter);
-            el.addEventListener('input', checkTunjanganFilter);
-        });
-    }
-});
-</script>
 @endsection

@@ -2,12 +2,15 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\HasBulanTahunFilter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class InsentifPendidikanController extends Controller
 {
+    use HasBulanTahunFilter;
     /**
      * Fitur Input & Cetak Slip Insentif Pendidikan (Sesuai Regulasi 2026).
      * Format: Seluruh Tunjangan di luar Pokok/Keluarga & Potongan Lengkap.
@@ -24,8 +27,8 @@ class InsentifPendidikanController extends Controller
 
     protected function getPegawaiDbId(string $nik, mixed $pegawaiId = null): ?string
     {
-        if ($pegawaiId && is_string($pegawaiId) && strlen($pegawaiId) === 36) {
-            return $pegawaiId;
+        if ($pegawaiId && Str::isUuid((string) $pegawaiId)) {
+            return (string) $pegawaiId;
         }
 
         return DB::table('pegawai')->where('nik', $nik)->value('id');
@@ -33,12 +36,12 @@ class InsentifPendidikanController extends Controller
 
     public function index(Request $request)
     {
-        $periode = $request->query('periode', 'JULI ' . now()->year);
-        $search = strtolower(trim((string) $request->query('q', '')));
-
         $userLogin = session('simpeg_user') ?? [];
         $isPegawai = ((string) ($userLogin['userlevel'] ?? '') === '5') || $request->has('my');
         $myNik = $userLogin['nik'] ?? '';
+
+        [$bulan, $tahun, $defaultBulan, $defaultTahun, $bulanList, $tahunOptions] = $this->resolveBulanTahunFilter($request, $isPegawai, 'periode');
+        $search = strtolower(trim((string) $request->query('q', '')));
 
         try {
             $query = DB::table('insentif')
@@ -57,9 +60,7 @@ class InsentifPendidikanController extends Controller
                 $query->where('pegawai.nik', $myNik);
             }
 
-            if (! empty($periode) && $periode !== 'all') {
-                $query->where('insentif.periode', $periode);
-            }
+            $this->applyBulanTahunColumnFilter($query, 'insentif.periode', $bulan, $tahun);
 
             $items = $query->orderByDesc('insentif.id')->get();
         } catch (\Throwable $e) {
@@ -131,7 +132,12 @@ class InsentifPendidikanController extends Controller
 
         return view('insentif-pendidikan.index', [
             'items'              => $items,
-            'periode'            => $periode,
+            'bulan'              => $bulan,
+            'tahun'              => $tahun,
+            'defaultBulan'       => $defaultBulan,
+            'defaultTahun'       => $defaultTahun,
+            'bulanList'          => $bulanList,
+            'tahunOptions'       => $tahunOptions,
             'search'             => $search,
             'totalInsentifSemua' => $totalInsentifSemua,
             'totalPotonganSemua' => $totalPotonganSemua,
@@ -142,11 +148,13 @@ class InsentifPendidikanController extends Controller
     public function create()
     {
         $pegawaiList = $this->pegawaiList();
-        $defaultPeriode = 'JULI ' . now()->year;
 
         return view('insentif-pendidikan.create', [
-            'pegawaiList'    => $pegawaiList,
-            'defaultPeriode' => $defaultPeriode,
+            'pegawaiList'  => $pegawaiList,
+            'bulanList'    => AbsensiController::BULAN,
+            'tahunOptions' => $this->tahunFilterOptions(),
+            'defaultBulan' => (int) now()->month,
+            'defaultTahun' => (int) now()->year,
         ]);
     }
 
@@ -216,7 +224,9 @@ class InsentifPendidikanController extends Controller
     {
         $request->validate([
             'pegawai_nik' => 'required|string',
-            'periode'     => 'required|string',
+            'bulan'       => 'required_without:periode|integer|min:1|max:12',
+            'tahun'       => 'required_without:periode|integer|min:2020|max:2100',
+            'periode'     => 'nullable|string',
         ]);
 
         $nik = trim($request->input('pegawai_nik'));
@@ -226,7 +236,7 @@ class InsentifPendidikanController extends Controller
             return back()->withInput()->with('error', "Pegawai dengan NIK {$nik} tidak ditemukan di database.");
         }
 
-        $periode = strtoupper(trim($request->input('periode')));
+        $periode = $this->resolveBulanTahunInput($request, 'periode');
         $judul = "DAFTAR INSENTIF & POTONGAN BULAN : " . $periode;
 
         $fields = [
@@ -355,7 +365,10 @@ class InsentifPendidikanController extends Controller
             'diterima'                    => $diterima,
         ]);
 
-        return view('insentif-pendidikan.show', compact('item'));
+        [$parsedBulan, $parsedTahun] = $this->parseBulanTahunFromLabel($item['periode'] ?? '');
+        $backParams = array_filter(['bulan' => $parsedBulan, 'tahun' => $parsedTahun]);
+
+        return view('insentif-pendidikan.show', compact('item', 'backParams'));
     }
 
     public function destroy(int $id)

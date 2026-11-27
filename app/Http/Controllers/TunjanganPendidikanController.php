@@ -2,12 +2,15 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\HasBulanTahunFilter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class TunjanganPendidikanController extends Controller
 {
+    use HasBulanTahunFilter;
     /**
      * Fitur Input & Cetak Slip Tunjangan Pendidikan (Sesuai Regulasi 2026).
      * Format: GAPOK + Tunj. Istri + Tunj. Anak - (Pot. Koperasi + Pot. Kas).
@@ -24,8 +27,8 @@ class TunjanganPendidikanController extends Controller
 
     protected function getPegawaiDbId(string $nik, mixed $pegawaiId = null): ?string
     {
-        if ($pegawaiId && is_string($pegawaiId) && strlen($pegawaiId) === 36) {
-            return $pegawaiId;
+        if ($pegawaiId && Str::isUuid((string) $pegawaiId)) {
+            return (string) $pegawaiId;
         }
 
         return DB::table('pegawai')->where('nik', $nik)->value('id');
@@ -33,12 +36,12 @@ class TunjanganPendidikanController extends Controller
 
     public function index(Request $request)
     {
-        $bulanLabel = $request->query('bulan_label', 'JULI ' . now()->year);
-        $search = strtolower(trim((string) $request->query('q', '')));
-
         $userLogin = session('simpeg_user') ?? [];
         $isPegawai = ((string) ($userLogin['userlevel'] ?? '') === '5') || $request->has('my');
         $myNik = $userLogin['nik'] ?? '';
+
+        [$bulan, $tahun, $defaultBulan, $defaultTahun, $bulanList, $tahunOptions] = $this->resolveBulanTahunFilter($request, $isPegawai, 'bulan_label');
+        $search = strtolower(trim((string) $request->query('q', '')));
 
         try {
             $query = DB::table('tunjangan_pendidikan')
@@ -57,9 +60,7 @@ class TunjanganPendidikanController extends Controller
                 $query->where('pegawai.nik', $myNik);
             }
 
-            if (! empty($bulanLabel) && $bulanLabel !== 'all') {
-                $query->where('tunjangan_pendidikan.bulan_label', $bulanLabel);
-            }
+            $this->applyBulanTahunColumnFilter($query, 'tunjangan_pendidikan.bulan_label', $bulan, $tahun);
 
             $items = $query->orderByDesc('tunjangan_pendidikan.id')->get();
         } catch (\Throwable $e) {
@@ -112,7 +113,12 @@ class TunjanganPendidikanController extends Controller
 
         return view('tunjangan-pendidikan.index', [
             'items'           => $items,
-            'bulanLabel'      => $bulanLabel,
+            'bulan'           => $bulan,
+            'tahun'           => $tahun,
+            'defaultBulan'    => $defaultBulan,
+            'defaultTahun'    => $defaultTahun,
+            'bulanList'       => $bulanList,
+            'tahunOptions'    => $tahunOptions,
             'search'          => $search,
             'totalPendapatan' => $totalPendapatan,
             'totalPotongan'   => $totalPotongan,
@@ -123,50 +129,111 @@ class TunjanganPendidikanController extends Controller
     public function create()
     {
         $pegawaiList = $this->pegawaiList();
-        $defaultBulanLabel = 'JULI ' . now()->year;
 
         return view('tunjangan-pendidikan.create', [
-            'pegawaiList'       => $pegawaiList,
-            'defaultBulanLabel' => $defaultBulanLabel,
+            'pegawaiList'  => $pegawaiList,
+            'bulanList'    => AbsensiController::BULAN,
+            'tahunOptions' => $this->tahunFilterOptions(),
+            'defaultBulan' => (int) now()->month,
+            'defaultTahun' => (int) now()->year,
         ]);
     }
 
-    public function hitungKeluargaJson(string $nik)
+    public function hitungKeluargaJson(Request $request, string $nik)
     {
-        $pegawai = collect($this->pegawaiList())->first(fn($p) => (string)$p['nik'] === $nik || (string)($p['id'] ?? '') === $nik);
+        $pegawai = collect($this->pegawaiList())->first(fn($p) => (string) $p['nik'] === $nik || (string) ($p['id'] ?? '') === $nik);
         if (! $pegawai) {
             return response()->json(['success' => false, 'message' => 'Pegawai tidak ditemukan.'], 404);
         }
 
-        $calc = app(GajiProsesController::class)->hitungKeluarga((int)($pegawai['id'] ?? 0));
-        $gapok = (float) ($pegawai['gapok'] ?? 0);
-
-        if ($gapok <= 0) {
-            // Ambil dari tbl_gapok jika ada
-            try {
-                $kodegol = $pegawai['kodegol'] ?? ($pegawai['golongan'] ?? '');
-                $thnGol = (int) ($pegawai['tahun_golongan'] ?? 0);
-                $rowGapok = DB::table('tbl_gapok')->where('id_golongan', $kodegol)->where('tahun_golongan', $thnGol)->value('nominal_gapok');
-                if ($rowGapok) {
-                    $gapok = (float) $rowGapok;
-                }
-            } catch (\Throwable $e) {}
+        $statusPegRaw = strtolower(trim((string) ($pegawai['status_peg'] ?? 'PT')));
+        $kategori = match ($statusPegRaw) {
+            'cp', 'capeg', 'calon pegawai' => 'capeg',
+            'hk', 'honor', 'honorer'       => 'honor',
+            'kt', 'kontrak', 'pkwt'        => 'kontrak',
+            'tt', 'tidak tetap'            => 'tt',
+            default                        => 'satuan',
+        };
+        if (! $request->filled('kategori')) {
+            $request->merge(['kategori' => $kategori]);
         }
 
-        $tunjIstri = $calc['kawin'] ? round($gapok * 0.1) : 0;
-        $jmlAnak = min((int)($calc['jml_anak'] ?? 0), 2);
-        $tunjAnak = round($gapok * 0.05 * $jmlAnak);
+        $calc = app(GajiProsesController::class)->hitungKeluarga((int) ($pegawai['id'] ?? 0), $request);
+
+        $kawin = (bool) ($calc['kawin'] ?? false);
+        $dbPegId = $pegawai['db_id'] ?? $this->getPegawaiDbId((string) ($pegawai['nik'] ?? $nik));
+
+        // Fallback cek kolom status_pernikahan di tabel pegawai jika tabel keluarga belum terisi pasangan
+        if (! $kawin && $dbPegId) {
+            try {
+                $statusNikah = strtolower(trim((string) (DB::table('pegawai')->where('id', $dbPegId)->value('status_pernikahan') ?? '')));
+                if (in_array($statusNikah, ['menikah', 'kawin', 'm', 'k'], true)) {
+                    $kawin = true;
+                }
+            } catch (\Throwable $e) {
+            }
+        }
+
+        $gapok = (float) ($pegawai['gapok'] ?? 0);
+
+        // 1. Ambil dari hasil perhitungan otomatis GajiProsesController (payroll terakhir / direksi / capeg / default master)
+        if ($gapok <= 0 && ! empty($calc['auto_komponen']['gapok'])) {
+            $gapok = (float) $calc['auto_komponen']['gapok'];
+        }
+
+        // 2. Fallback cek riwayat tunjangan_pendidikan / gaji_13 / master GajiPokokController jika masih 0
+        if ($gapok <= 0 && $dbPegId) {
+            try {
+                $prevTpGapok = DB::table('tunjangan_pendidikan')
+                    ->where('pegawai_id', $dbPegId)
+                    ->where('gapok', '>', 0)
+                    ->orderByDesc('id')
+                    ->value('gapok');
+                if ($prevTpGapok) {
+                    $gapok = (float) $prevTpGapok;
+                }
+            } catch (\Throwable $e) {
+            }
+        }
+
+        if ($gapok <= 0) {
+            try {
+                $golStr = strtoupper(trim((string) ($pegawai['golongan'] ?? '')));
+                if ($golStr !== '') {
+                    $matchedMaster = collect(app(GajiPokokController::class)->all())->first(function ($row) use ($golStr) {
+                        $kode = strtoupper(trim((string) ($row['golongan'] ?? '')));
+                        return $kode !== '' && (str_contains($golStr, $kode) || str_contains($kode, $golStr));
+                    });
+                    if ($matchedMaster && ! empty($matchedMaster['nominal'])) {
+                        $gapok = (float) $matchedMaster['nominal'];
+                    }
+                }
+            } catch (\Throwable $e) {
+            }
+        }
+
+        // Untuk Honorer / Kontrak / TT tidak mendapat tunjangan keluarga
+        $berhakTunjanganKeluarga = ! in_array($kategori, ['honor', 'kontrak', 'tt'], true);
+        $jmlAnak = $berhakTunjanganKeluarga ? min((int) ($calc['jml_anak'] ?? 0), 2) : 0;
+        $kawinBerhak = $berhakTunjanganKeluarga && $kawin;
+
+        $tunjIstri = $kawinBerhak ? (int) round($gapok * 0.10) : 0;
+        $tunjAnak = $jmlAnak > 0 ? (int) round($gapok * 0.05 * $jmlAnak) : 0;
 
         return response()->json([
-            'success'         => true,
-            'pegawai'         => $pegawai,
-            'gapok'           => $gapok,
-            'kawin'           => $calc['kawin'],
-            'jml_istri'       => $calc['jml_istri'] ?? ($calc['kawin'] ? 1 : 0),
-            'jml_anak'        => $jmlAnak,
-            'tunjangan_istri' => $tunjIstri,
-            'tunjangan_anak'  => $tunjAnak,
-            'total_keluarga'  => $gapok + $tunjIstri + $tunjAnak,
+            'success'           => true,
+            'pegawai'           => $pegawai,
+            'kategori'          => $calc['kategori'] ?? $kategori,
+            'berhak_keluarga'   => $berhakTunjanganKeluarga,
+            'gapok'             => (int) round($gapok),
+            'kawin'             => $kawinBerhak,
+            'status_kawin_asli' => $kawin,
+            'jml_istri'         => $kawinBerhak ? 1 : 0,
+            'total_anak'        => (int) ($calc['total_anak'] ?? $jmlAnak),
+            'jml_anak'          => $jmlAnak,
+            'tunjangan_istri'   => $tunjIstri,
+            'tunjangan_anak'    => $tunjAnak,
+            'total_keluarga'    => (int) round($gapok) + $tunjIstri + $tunjAnak,
         ]);
     }
 
@@ -174,7 +241,9 @@ class TunjanganPendidikanController extends Controller
     {
         $request->validate([
             'pegawai_nik'       => 'required|string',
-            'bulan_label'       => 'required|string',
+            'bulan'             => 'required_without:bulan_label|integer|min:1|max:12',
+            'tahun'             => 'required_without:bulan_label|integer|min:2020|max:2100',
+            'bulan_label'       => 'nullable|string',
             'gapok'             => 'required|numeric|min:0',
             'tunjangan_istri'   => 'nullable|numeric|min:0',
             'tunjangan_anak'    => 'nullable|numeric|min:0',
@@ -189,7 +258,7 @@ class TunjanganPendidikanController extends Controller
             return back()->withInput()->with('error', "Pegawai dengan NIK {$nik} tidak ditemukan di database utama.");
         }
 
-        $bulanLabel = strtoupper(trim($request->input('bulan_label')));
+        $bulanLabel = $this->resolveBulanTahunInput($request, 'bulan_label');
         $gapok = (int) $request->input('gapok');
         $tIstri = (int) $request->input('tunjangan_istri', 0);
         $tAnak = (int) $request->input('tunjangan_anak', 0);
@@ -270,7 +339,10 @@ class TunjanganPendidikanController extends Controller
             'created_at'         => $row->created_at,
         ];
 
-        return view('tunjangan-pendidikan.show', compact('item'));
+        [$parsedBulan, $parsedTahun] = $this->parseBulanTahunFromLabel($item['bulan_label']);
+        $backParams = array_filter(['bulan' => $parsedBulan, 'tahun' => $parsedTahun]);
+
+        return view('tunjangan-pendidikan.show', compact('item', 'backParams'));
     }
 
     public function destroy(int $id)
