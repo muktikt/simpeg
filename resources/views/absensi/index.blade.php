@@ -44,6 +44,18 @@
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
                 Input Absensi
             </a>
+            @if ($absensi->isNotEmpty())
+                <form action="{{ route('absensi.destroy-all') }}" method="POST" onsubmit="return confirmSubmit(event, 'Yakin ingin menghapus SEMUA data absensi periode {{ $bulanList[$bulan] }} {{ $tahun }} ({{ $absensi->count() }} data) sekaligus?', 'Hapus Semua Absensi', 'danger', 'Ya, Hapus Semua');" style="margin:0;">
+                    @csrf
+                    @method('DELETE')
+                    <input type="hidden" name="bulan" value="{{ $bulan }}">
+                    <input type="hidden" name="tahun" value="{{ $tahun }}">
+                    <button type="submit" class="btn btn-danger" style="font-weight:600;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                        Hapus Semua
+                    </button>
+                </form>
+            @endif
         </div>
     @endif
 </div>

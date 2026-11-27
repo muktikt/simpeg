@@ -328,6 +328,29 @@ class PrestasiController extends Controller
         return redirect()->route('prestasi.index')->with('success', 'Data prestasi berhasil dihapus.');
     }
 
+    public function destroyAll()
+    {
+        $deletedCount = 0;
+        try {
+            $rows = \Illuminate\Support\Facades\DB::table('prestasi')->get();
+            $deletedCount = $rows->count();
+            \Illuminate\Support\Facades\DB::table('prestasi')->delete();
+            foreach ($rows as $row) {
+                if (! empty($row->pegawai_id)) {
+                    static::syncPrestasiLemburToTables($row->pegawai_id, 0, 0, $row->tanggal ?? now()->toDateString());
+                }
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Destroy all prestasi failed: ' . $e->getMessage());
+        }
+
+        \Illuminate\Support\Facades\Cache::forget('simpeg_all_pegawai_list');
+        \Illuminate\Support\Facades\Cache::forget('pegawai_master_cache');
+        \Illuminate\Support\Facades\Cache::forget('simpeg_dashboard_stats');
+
+        return redirect()->route('prestasi.index')->with('success', "{$deletedCount} data prestasi berhasil dihapus semuanya.");
+    }
+
     public static function syncPrestasiLemburToTables(string $dbPegId, float $jamLembur, int $nominalLembur, string $tanggal): void
     {
         try {

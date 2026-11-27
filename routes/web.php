@@ -86,6 +86,7 @@ Route::middleware(['simpeg.auth'])->group(function () {
         Route::post('/', [AbsensiController::class, 'store'])->name('store');
         Route::get('/{id}/edit', [AbsensiController::class, 'edit'])->whereNumber('id')->name('edit');
         Route::put('/{id}', [AbsensiController::class, 'update'])->whereNumber('id')->name('update');
+        Route::delete('/destroy-all', [AbsensiController::class, 'destroyAll'])->name('destroy-all');
         Route::delete('/{id}', [AbsensiController::class, 'destroy'])->whereNumber('id')->name('destroy');
 
         // SET Hari Kerja - satu nilai global, bukan daftar.
@@ -141,6 +142,7 @@ Route::middleware(['simpeg.auth'])->group(function () {
         Route::post('/', [PrestasiController::class, 'store'])->name('store');
         Route::get('/{id}/edit', [PrestasiController::class, 'edit'])->whereNumber('id')->name('edit');
         Route::put('/{id}', [PrestasiController::class, 'update'])->whereNumber('id')->name('update');
+        Route::delete('/destroy-all', [PrestasiController::class, 'destroyAll'])->name('destroy-all');
         Route::delete('/{id}', [PrestasiController::class, 'destroy'])->whereNumber('id')->name('destroy');
     });
 

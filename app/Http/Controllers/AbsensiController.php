@@ -238,6 +238,36 @@ class AbsensiController extends Controller
         return redirect()->route('absensi.index', $params)->with('success', 'Data absensi berhasil dihapus.');
     }
 
+    public function destroyAll(Request $request)
+    {
+        $bulan = $request->input('bulan');
+        $tahun = $request->input('tahun');
+
+        $deletedCount = 0;
+        try {
+            $query = \Illuminate\Support\Facades\DB::table('attendance');
+            if ($bulan) {
+                $query->where('bulan', (int) $bulan);
+            }
+            if ($tahun) {
+                $query->where('tahun', (int) $tahun);
+            }
+            $deletedCount = $query->delete();
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Destroy all attendance failed: ' . $e->getMessage());
+        }
+
+        $params = [];
+        if ($bulan) {
+            $params['bulan'] = (int) $bulan;
+        }
+        if ($tahun) {
+            $params['tahun'] = (int) $tahun;
+        }
+
+        return redirect()->route('absensi.index', $params)->with('success', "{$deletedCount} data absensi berhasil dihapus semuanya.");
+    }
+
     /**
      * Halaman laporan - read-only, bisa dicetak (window.print via tombol di view).
      */
