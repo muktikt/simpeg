@@ -355,20 +355,21 @@ class GajiLaporanController extends Controller
         $prefix = sprintf('%04d-%02d', $tahun, $bulan);
         $monthPadded = str_pad($bulan, 2, '0', STR_PAD_LEFT);
 
-        $rows = $this->readUploadedRows($request->file('file_excel'));
+        $rows = $this->readUploadedRows($request->file('file_excel'), 'lembur');
         if (empty($rows)) {
             return back()->with('error', 'Gagal membaca isi file atau file kosong. Pastikan format sesuai template.');
         }
 
-        $headerMap = $this->extractHeaderMap($rows);
+        $headerMap = $this->extractHeaderMap($rows, ['jam_lembur', 'jam_lebur', 'lembur', 'total_uang_lembur', 'uang_lembur']);
         if (! $headerMap || ! isset($headerMap['nik'])) {
             return back()->with('error', 'Header kolom NIK tidak ditemukan dalam file. Gunakan template yang disediakan.');
         }
 
         $colNik = $headerMap['nik'];
-        $colJamLembur = $headerMap['jam_lembur'] ?? ($headerMap['lembur'] ?? null);
+        $colJamLembur = $this->findHeaderCol($headerMap, ['jam_lembur', 'jam_lebur', 'lembur', 'jml_jam_lembur']);
+        $colUangLembur = $this->findHeaderCol($headerMap, ['total_uang_lembur', 'uang_lembur', 'nominal_lembur']);
 
-        if ($colJamLembur === null) {
+        if ($colJamLembur === null && $colUangLembur === null) {
             return back()->with('error', 'Kolom Jam Lembur tidak ditemukan. Pastikan format kolom sesuai template.');
         }
 
@@ -385,7 +386,7 @@ class GajiLaporanController extends Controller
 
         $importedCount = 0;
         $updatedCount = 0;
-        $now = now();
+        $activeOvertimeCount = 0;
 
         foreach ($rows as $r) {
             $rawNik = (string) ($r[$colNik] ?? '');
@@ -399,12 +400,35 @@ class GajiLaporanController extends Controller
                 continue;
             }
 
-            $jamLembur = (float) preg_replace('/[^0-9.]/', '', (string)($r[$colJamLembur] ?? '0'));
+            $rawJam = $colJamLembur !== null ? str_replace(',', '.', trim((string)($r[$colJamLembur] ?? '0'))) : '0';
+            $jamLembur = (float) preg_replace('/[^0-9.]/', '', $rawJam);
             $nominalLembur = (int) round($jamLembur * PrestasiController::RATE_LEMBUR_PER_JAM);
+
+            if ($nominalLembur === 0 && $colUangLembur !== null) {
+                $rawNom = preg_replace('/[^0-9]/', '', (string) ($r[$colUangLembur] ?? '0'));
+                if ($rawNom !== '' && (int) $rawNom > 0) {
+                    $nominalLembur = (int) $rawNom;
+                    if ($jamLembur <= 0) {
+                        $jamLembur = round($nominalLembur / PrestasiController::RATE_LEMBUR_PER_JAM, 2);
+                    }
+                }
+            }
+
+            if ($jamLembur > 0 || $nominalLembur > 0) {
+                $activeOvertimeCount++;
+            }
+
+            // Jika baris di template memiliki jam_lembur = 0 dan pegawai belum pernah punya record lembur aktif,
+            // lewati agar 540 baris default "0" di template tidak dianggap semua diimpor dan tidak menimpa data kosong sia-sia.
+            $existingRow = $existingLembur->get($dbPegId);
+            $hasExistingActive = $existingRow && ((float) ($existingRow->jam_lembur ?? 0) > 0 || (int) ($existingRow->uang_lembur ?? 0) > 0);
+            if ($jamLembur <= 0 && $nominalLembur <= 0 && ! $hasExistingActive) {
+                continue;
+            }
 
             $alreadyExists = $existingLembur->has($dbPegId);
 
-            if ($alreadyExists && $mode === 'skip') {
+            if ($alreadyExists && $mode === 'skip' && $hasExistingActive) {
                 continue;
             }
 
@@ -427,11 +451,13 @@ class GajiLaporanController extends Controller
                     $meta = json_decode($pRow->keterangan ?? '{}', true) ?: [];
                     $meta['jam_lembur'] = $jamLembur;
                     $meta['nominal_lembur'] = $nominalLembur;
+                    $karyaVal = $meta['karya'] ?? ($pRow->judul ?? '-');
+                    $absVal = $meta['absensi'] ?? ($pRow->tingkat ?? '-');
+                    $meta['desc'] = "Karya: {$karyaVal}, Absensi: {$absVal}" . ($jamLembur > 0 ? ", Lembur: {$jamLembur} jam (Rp " . number_format($nominalLembur, 0, ',', '.') . ")" : '');
                     \Illuminate\Support\Facades\DB::table('prestasi')
                         ->where('id', $pRow->id)
                         ->update([
                             'keterangan' => json_encode($meta),
-                            'updated_at' => $now,
                         ]);
                 }
             } catch (\Throwable $e) {}
@@ -440,12 +466,18 @@ class GajiLaporanController extends Controller
                 $updatedCount++;
             } else {
                 $importedCount++;
+                $existingLembur->put($dbPegId, (object) ['pegawai_id' => $dbPegId, 'jam_lembur' => $jamLembur, 'uang_lembur' => $nominalLembur]);
             }
         }
 
         \Illuminate\Support\Facades\Cache::forget('simpeg_all_pegawai_list');
         \Illuminate\Support\Facades\Cache::forget('pegawai_master_cache');
         \Illuminate\Support\Facades\Cache::forget('simpeg_dashboard_stats');
+
+        if ($activeOvertimeCount === 0 && $importedCount === 0 && $updatedCount === 0) {
+            return redirect()->route('gaji-laporan.lembur', ['bulan' => $bulan, 'tahun' => $tahun])
+                ->with('error', 'Tidak ada data Jam Lembur > 0 di dalam file yang diunggah. Pastikan Anda mengisi angka Jam Lembur (lebih dari 0) lalu tekan Ctrl+S pada Excel sebelum mengunggah.');
+        }
 
         return redirect()->route('gaji-laporan.lembur', ['bulan' => $bulan, 'tahun' => $tahun])
             ->with('success', "Proses impor lembur selesai! {$importedCount} data baru ditambahkan, {$updatedCount} data diperbarui untuk periode {$fullBulanLabel}.");

@@ -339,22 +339,37 @@ class AbsensiController extends Controller
         $bulanLabel = self::BULAN[$bulan] ?? "Bulan {$bulan}";
         $fullBulanLabel = "{$bulanLabel} {$tahun}";
 
-        $rows = $this->readUploadedRows($request->file('file_excel'));
+        $rows = $this->readUploadedRows($request->file('file_excel'), 'absensi');
         if (empty($rows)) {
             return back()->with('error', 'Gagal membaca isi file atau file kosong. Pastikan format sesuai template.');
         }
 
-        $headerMap = $this->extractHeaderMap($rows);
+        $headerMap = $this->extractHeaderMap($rows, [
+            'hadir', 'hari_kerja', 'alpha', 'telat',
+            '07.30_-_08.00', '07.31_-_08.00', '08.01_-_08.30', 'no_in_-_out', 'no_in-out',
+        ]);
         if (! $headerMap || ! isset($headerMap['nik'])) {
             return back()->with('error', 'Header kolom NIK tidak ditemukan dalam file. Gunakan template yang disediakan.');
         }
 
-        // Cari indeks kolom pendukung
+        // Cari indeks kolom pendukung (mendukung baik format Template Web maupun format Rekap Jam Keterlambatan SIMPEG Lama)
         $colNik = $headerMap['nik'];
-        $colHadir = $headerMap['hadir'] ?? null;
-        $colSakit = $headerMap['sakit'] ?? null;
-        $colIzin = $headerMap['izin'] ?? null;
-        $colAlpha = $headerMap['alpha'] ?? null;
+        $colHariKerja = $this->findHeaderCol($headerMap, ['hari_kerja', 'hk']);
+        $colHadir = $this->findHeaderCol($headerMap, ['hadir', 'jml_hadir']);
+        $colSakit = $this->findHeaderCol($headerMap, ['sakit', 's']);
+        $colIzin = $this->findHeaderCol($headerMap, ['izin', 'i']);
+        $colAlpha = $this->findHeaderCol($headerMap, ['alpha', 'telat', 'alpa']);
+
+        // Kolom format keterlambatan SIMPEG lama (Sheet ABSENSI: 07.30-08.00, 08.01-08.30, 08.31-09.00, >09.00, Pulang Sblm 16.00, No In-Out)
+        $colTelatA = $this->findHeaderCol($headerMap, ['07.30_-_08.00', '07.31_-_08.00', 'telat_a']);
+        $colTelatB = $this->findHeaderCol($headerMap, ['08.01_-_08.30', 'telat_b']);
+        $colTelatC = $this->findHeaderCol($headerMap, ['08.31-_09.00', '08.31_-_09.00', 'telat_c']);
+        $colTelatD = $this->findHeaderCol($headerMap, ['>09.00', '>_09.00', '>_09.01', '>09.01', 'telat_d']);
+        $colPulangCepat = $this->findHeaderCol($headerMap, ['pulang_sblm_16.00', 'pulang_cepat']);
+        $colNoInOut = $this->findHeaderCol($headerMap, ['no_in_-_out', 'no_in-out', 'no_in_out']);
+        $isLegacyTelatFormat = ($colHadir === null && ($colTelatA !== null || $colTelatB !== null || $colTelatC !== null || $colTelatD !== null || $colNoInOut !== null));
+
+        $hariKerjaDefault = (int) cache()->get('simpeg_hari_kerja', 25);
 
         // Ambil mapping NIK -> UUID pegawai
         $pegawaiDbMap = \Illuminate\Support\Facades\DB::table('pegawai')->pluck('id', 'nik')->all();
@@ -382,10 +397,26 @@ class AbsensiController extends Controller
                 continue;
             }
 
-            $hadir = $colHadir !== null ? (int) preg_replace('/[^0-9]/', '', (string)($r[$colHadir] ?? '0')) : 0;
-            $sakit = $colSakit !== null ? (int) preg_replace('/[^0-9]/', '', (string)($r[$colSakit] ?? '0')) : 0;
-            $izin = $colIzin !== null ? (int) preg_replace('/[^0-9]/', '', (string)($r[$colIzin] ?? '0')) : 0;
-            $alpha = $colAlpha !== null ? (int) preg_replace('/[^0-9]/', '', (string)($r[$colAlpha] ?? '0')) : 0;
+            if ($isLegacyTelatFormat) {
+                $tA = $colTelatA !== null ? (int) preg_replace('/[^0-9]/', '', (string) ($r[$colTelatA] ?? '0')) : 0;
+                $tB = $colTelatB !== null ? (int) preg_replace('/[^0-9]/', '', (string) ($r[$colTelatB] ?? '0')) : 0;
+                $tC = $colTelatC !== null ? (int) preg_replace('/[^0-9]/', '', (string) ($r[$colTelatC] ?? '0')) : 0;
+                $tD = $colTelatD !== null ? (int) preg_replace('/[^0-9]/', '', (string) ($r[$colTelatD] ?? '0')) : 0;
+                $pCepat = $colPulangCepat !== null ? (int) preg_replace('/[^0-9]/', '', (string) ($r[$colPulangCepat] ?? '0')) : 0;
+                $noIo = $colNoInOut !== null ? (int) preg_replace('/[^0-9]/', '', (string) ($r[$colNoInOut] ?? '0')) : 0;
+
+                $totalTelatKali = $tA + $tB + $tC + $tD + $pCepat + $noIo;
+                $hkRow = $colHariKerja !== null ? (int) preg_replace('/[^0-9]/', '', (string) ($r[$colHariKerja] ?? (string) $hariKerjaDefault)) : $hariKerjaDefault;
+                $hadir = max(0, $hkRow - $noIo);
+                $sakit = 0;
+                $izin = 0;
+                $alpha = $totalTelatKali;
+            } else {
+                $hadir = $colHadir !== null ? (int) preg_replace('/[^0-9]/', '', (string)($r[$colHadir] ?? '0')) : 0;
+                $sakit = $colSakit !== null ? (int) preg_replace('/[^0-9]/', '', (string)($r[$colSakit] ?? '0')) : 0;
+                $izin = $colIzin !== null ? (int) preg_replace('/[^0-9]/', '', (string)($r[$colIzin] ?? '0')) : 0;
+                $alpha = $colAlpha !== null ? (int) preg_replace('/[^0-9]/', '', (string)($r[$colAlpha] ?? '0')) : 0;
+            }
 
             if ($existingRows->has($dbPegId)) {
                 if ($mode === 'update') {
@@ -399,12 +430,11 @@ class AbsensiController extends Controller
                             'hadir'       => $hadir,
                             'telat'       => $alpha,
                             'izin'        => $izin + $sakit,
-                            'updated_at'  => $now,
                         ]);
                     $updatedCount++;
                 }
             } else {
-                \Illuminate\Support\Facades\DB::table('attendance')->insert([
+                $newId = \Illuminate\Support\Facades\DB::table('attendance')->insertGetId([
                     'pegawai_id'  => $dbPegId,
                     'tahun'       => $tahun,
                     'bulan'       => $bulan,
@@ -414,6 +444,7 @@ class AbsensiController extends Controller
                     'izin'        => $izin + $sakit,
                     'created_at'  => $now,
                 ]);
+                $existingRows->put($dbPegId, (object) ['id' => $newId, 'pegawai_id' => $dbPegId]);
                 $importedCount++;
             }
         }

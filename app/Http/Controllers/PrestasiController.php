@@ -481,29 +481,30 @@ class PrestasiController extends Controller
         $bulanNama = AbsensiController::BULAN[$bulan] ?? "Bulan {$bulan}";
         $fullBulanLabel = "{$bulanNama} {$tahun}";
 
-        $rows = $this->readUploadedRows($request->file('file_excel'));
+        $rows = $this->readUploadedRows($request->file('file_excel'), 'prestasi');
         if (empty($rows)) {
             return back()->with('error', 'Gagal membaca isi file atau file kosong. Pastikan format sesuai template.');
         }
 
-        $headerMap = $this->extractHeaderMap($rows);
+        $headerMap = $this->extractHeaderMap($rows, ['karya', 'absensi', 'jam_lembur', 'jam_lebur', 'alpha', 'a']);
         if (! $headerMap || ! isset($headerMap['nik'])) {
             return back()->with('error', 'Header kolom NIK tidak ditemukan dalam file. Gunakan template yang disediakan.');
         }
 
         $colNik = $headerMap['nik'];
-        $colTanggal = $headerMap['tanggal'] ?? null;
-        $colKarya = $headerMap['karya'] ?? null;
-        $colAbsensi = $headerMap['absensi'] ?? null;
-        $colJamLembur = $headerMap['jam_lembur'] ?? ($headerMap['lembur'] ?? null);
-        $colAlpha = $headerMap['alpha'] ?? null;
-        $colIzinKet = $headerMap['izin_ket'] ?? null;
-        $colIzinNonKet = $headerMap['izin_non_ket'] ?? null;
-        $colSakitKet = $headerMap['sakit_ket'] ?? null;
-        $colSakitNonKet = $headerMap['sakit_non_ket'] ?? null;
-        $colDinasLuar = $headerMap['dinas_luar'] ?? null;
-        $colCuti = $headerMap['cuti'] ?? null;
-        $colKetCuti = $headerMap['keterangan_cuti'] ?? ($headerMap['alasan_cuti'] ?? null);
+        $colTanggal = $this->findHeaderCol($headerMap, ['tanggal', 'tgl_prestasi', 'tgl']);
+        $colKarya = $this->findHeaderCol($headerMap, ['karya', 'nilai_karya']);
+        $colAbsensi = $this->findHeaderCol($headerMap, ['absensi', 'nilai_absensi']);
+        $colJamLembur = $this->findHeaderCol($headerMap, ['jam_lembur', 'jam_lebur', 'lembur', 'jml_jam_lembur']);
+        $colTotalLembur = $this->findHeaderCol($headerMap, ['total_uang_lembur', 'uang_lembur', 'nominal_lembur']);
+        $colAlpha = $this->findHeaderCol($headerMap, ['alpha', 'a', 'alpa']);
+        $colIzinKet = $this->findHeaderCol($headerMap, ['izin_ket', 'i', 'izin_keterangan', 'izin']);
+        $colIzinNonKet = $this->findHeaderCol($headerMap, ['izin_non_ket', 'itk', 'izin_tanpa_ket', 'izin_tanpa_keterangan']);
+        $colSakitKet = $this->findHeaderCol($headerMap, ['sakit_ket', 's', 'sakit_keterangan', 'sakit']);
+        $colSakitNonKet = $this->findHeaderCol($headerMap, ['sakit_non_ket', 'std', 'stk', 'sakit_tanpa_ket', 'sakit_tanpa_dokter']);
+        $colDinasLuar = $this->findHeaderCol($headerMap, ['dinas_luar', 'dl']);
+        $colCuti = $this->findHeaderCol($headerMap, ['cuti']);
+        $colKetCuti = $this->findHeaderCol($headerMap, ['keterangan_cuti', 'ket_cuti', 'alasan_cuti']);
 
         $pegawaiDbMap = \Illuminate\Support\Facades\DB::table('pegawai')->pluck('id', 'nik')->all();
 
@@ -541,9 +542,26 @@ class PrestasiController extends Controller
             }
 
             $karya = $colKarya !== null ? trim((string)($r[$colKarya] ?? '40')) : '40';
+            if ($karya === '') {
+                $karya = '0';
+            }
             $absensi = $colAbsensi !== null ? trim((string)($r[$colAbsensi] ?? '60')) : '60';
-            $jamLembur = $colJamLembur !== null ? (float) preg_replace('/[^0-9.]/', '', (string)($r[$colJamLembur] ?? '0')) : 0.0;
+            if ($absensi === '') {
+                $absensi = '0';
+            }
+
+            $rawJam = $colJamLembur !== null ? str_replace(',', '.', trim((string)($r[$colJamLembur] ?? '0'))) : '0';
+            $jamLembur = (float) preg_replace('/[^0-9.]/', '', $rawJam);
             $nominalLembur = (int) round($jamLembur * self::RATE_LEMBUR_PER_JAM);
+            if ($nominalLembur === 0 && $colTotalLembur !== null) {
+                $rawNom = preg_replace('/[^0-9]/', '', (string) ($r[$colTotalLembur] ?? '0'));
+                if ($rawNom !== '' && (int) $rawNom > 0) {
+                    $nominalLembur = (int) $rawNom;
+                    if ($jamLembur <= 0) {
+                        $jamLembur = round($nominalLembur / self::RATE_LEMBUR_PER_JAM, 2);
+                    }
+                }
+            }
 
             $alpha = $colAlpha !== null ? (int) preg_replace('/[^0-9]/', '', (string)($r[$colAlpha] ?? '0')) : 0;
             $izinKet = $colIzinKet !== null ? (int) preg_replace('/[^0-9]/', '', (string)($r[$colIzinKet] ?? '0')) : 0;
@@ -553,6 +571,9 @@ class PrestasiController extends Controller
             $dinasLuar = $colDinasLuar !== null ? (int) preg_replace('/[^0-9]/', '', (string)($r[$colDinasLuar] ?? '0')) : 0;
             $cuti = $colCuti !== null ? (int) preg_replace('/[^0-9]/', '', (string)($r[$colCuti] ?? '0')) : 0;
             $alasanCuti = $colKetCuti !== null ? trim((string)($r[$colKetCuti] ?? '-')) : '-';
+            if ($alasanCuti === '' || $alasanCuti === '0') {
+                $alasanCuti = '-';
+            }
 
             $meta = [
                 'desc' => "Karya: {$karya}, Absensi: {$absensi}" . ($jamLembur > 0 ? ", Lembur: {$jamLembur} jam (Rp " . number_format($nominalLembur, 0, ',', '.') . ")" : ''),
@@ -580,12 +601,11 @@ class PrestasiController extends Controller
                             'tanggal'    => $tglVal,
                             'keterangan' => json_encode($meta),
                             'tingkat'    => $absensi,
-                            'updated_at' => $now,
                         ]);
                     $updatedCount++;
                 }
             } else {
-                \Illuminate\Support\Facades\DB::table('prestasi')->insert([
+                $newId = \Illuminate\Support\Facades\DB::table('prestasi')->insertGetId([
                     'pegawai_id' => $dbPegId,
                     'judul'      => $karya,
                     'tanggal'    => $tglVal,
@@ -593,6 +613,7 @@ class PrestasiController extends Controller
                     'tingkat'    => $absensi,
                     'created_at' => $now,
                 ]);
+                $existingRows->put($dbPegId, (object) ['id' => $newId, 'pegawai_id' => $dbPegId]);
                 $importedCount++;
             }
 
