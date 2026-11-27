@@ -1505,6 +1505,117 @@ class ApiPegawaiController extends Controller
     /**
      * Data & Submit Pengaduan
      */
+    /**
+     * Format array/list PHP menjadi literal ARRAY PostgreSQL {"a","b"}
+     */
+    protected function toPgArray($items): ?string
+    {
+        if (empty($items)) {
+            return null;
+        }
+        if (is_string($items)) {
+            $trim = trim($items);
+            if ($trim === '' || $trim === '{}' || $trim === '[]' || $trim === 'null') {
+                return null;
+            }
+            if (str_starts_with($trim, '[') && str_ends_with($trim, ']')) {
+                $decoded = json_decode($trim, true);
+                $items = is_array($decoded) ? $decoded : [$trim];
+            } elseif (str_starts_with($trim, '{') && str_ends_with($trim, '}')) {
+                return $trim;
+            } else {
+                $items = [$trim];
+            }
+        }
+        if (!is_array($items) || empty($items)) {
+            return null;
+        }
+        $escaped = array_map(function($val) {
+            $v = str_replace(['\\', '"'], ['\\\\', '\\"'], (string)$val);
+            return '"' . $v . '"';
+        }, array_values($items));
+        return '{' . implode(',', $escaped) . '}';
+    }
+
+    /**
+     * Validasi file dokumen: HANYA memperbolehkan format PDF, Word (.doc, .docx), Excel (.xls, .xlsx).
+     * Format gambar dan lainnya diblokir.
+     */
+    protected function validateDokumenFiles($files): ?string
+    {
+        if (empty($files)) {
+            return null;
+        }
+        $list = is_array($files) ? $files : (is_string($files) ? (json_decode($files, true) ?: [$files]) : []);
+        $allowedExtensions = ['pdf', 'doc', 'docx', 'xls', 'xlsx'];
+        $disallowedMimes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/bmp', 'image/svg+xml'];
+
+        foreach ($list as $item) {
+            if (!is_string($item)) continue;
+            $lower = strtolower(trim($item));
+            if (empty($lower)) continue;
+
+            foreach ($disallowedMimes as $mime) {
+                if (str_contains($lower, "data:$mime")) {
+                    return 'Format gambar tidak diizinkan di bagian Dokumen. Hanya file PDF (.pdf), Word (.doc, .docx), atau Excel (.xls, .xlsx) yang diperbolehkan.';
+                }
+            }
+
+            $ext = '';
+            if (preg_match('/name=[^;]*\.([a-z0-9]+)/i', $lower, $m)) {
+                $ext = strtolower($m[1]);
+            } else {
+                $clean = explode('?', $lower)[0];
+                $parts = explode('.', $clean);
+                if (count($parts) > 1) {
+                    $ext = strtolower(end($parts));
+                }
+            }
+
+            if (!empty($ext) && !in_array($ext, $allowedExtensions)) {
+                return "File dengan ekstensi \".$ext\" tidak diizinkan di bagian Dokumen. Hanya file PDF (.pdf), Word (.doc, .docx), atau Excel (.xls, .xlsx) yang diperbolehkan.";
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Menormalkan kolom ARRAY PostgreSQL menjadi array JSON PHP bersih.
+     */
+    protected function normalizePengaduanRows($rows): array
+    {
+        $arrayFields = [
+            'foto_bukti', 'dokumen_pendukung', 'video_bukti', 'voice_note',
+            'investigasi_foto', 'investigasi_video', 'investigasi_voice', 'investigasi_dokumen',
+            'hasil_foto', 'hasil_dokumen', 'hasil_voice', 'hasil_video'
+        ];
+        return collect($rows)->map(function ($row) use ($arrayFields) {
+            $arr = (array) $row;
+            foreach ($arrayFields as $f) {
+                $val = $arr[$f] ?? null;
+                if (empty($val) || $val === '{}' || $val === '[]' || $val === 'null') {
+                    $arr[$f] = [];
+                } elseif (is_string($val)) {
+                    $trim = trim($val);
+                    if (str_starts_with($trim, '[') && str_ends_with($trim, ']')) {
+                        $decoded = json_decode($trim, true);
+                        $arr[$f] = is_array($decoded) ? $decoded : [];
+                    } elseif (str_starts_with($trim, '{') && str_ends_with($trim, '}')) {
+                        $inner = trim(substr($trim, 1, -1));
+                        $arr[$f] = empty($inner) ? [] : array_values(array_filter(array_map(function($s) {
+                            return trim(trim($s), '"\'');
+                        }, explode(',', $inner))));
+                    } else {
+                        $arr[$f] = [$trim];
+                    }
+                } elseif (!is_array($val)) {
+                    $arr[$f] = [];
+                }
+            }
+            return $arr;
+        })->all();
+    }
+
     public function pengaduan(Request $request)
     {
         $authUser = $request->attributes->get('auth_user');
@@ -1513,37 +1624,8 @@ class ApiPegawaiController extends Controller
         $divisiKadiv = $authUser->divisi_kadiv ?? null;
         $isManager = in_array($userLevel, ['1', '7']) || in_array($dbRole, ['sdm', 'admin', 'direktur', 'kspi', 'kadiv', 'kadivkategori', 'tpdpk']);
 
-        $arrayFields = [
-            'foto_bukti', 'dokumen_pendukung', 'video_bukti', 'voice_note',
-            'investigasi_foto', 'investigasi_video', 'investigasi_voice', 'investigasi_dokumen',
-            'hasil_foto', 'hasil_dokumen', 'hasil_voice', 'hasil_video'
-        ];
-        $normalizePengaduanList = function ($rows) use ($arrayFields) {
-            return collect($rows)->map(function ($row) use ($arrayFields) {
-                $arr = (array) $row;
-                foreach ($arrayFields as $f) {
-                    $val = $arr[$f] ?? null;
-                    if (empty($val) || $val === '{}' || $val === '[]' || $val === 'null') {
-                        $arr[$f] = [];
-                    } elseif (is_string($val)) {
-                        $trim = trim($val);
-                        if (str_starts_with($trim, '[') && str_ends_with($trim, ']')) {
-                            $decoded = json_decode($trim, true);
-                            $arr[$f] = is_array($decoded) ? $decoded : [];
-                        } elseif (str_starts_with($trim, '{') && str_ends_with($trim, '}')) {
-                            $inner = trim(substr($trim, 1, -1));
-                            $arr[$f] = empty($inner) ? [] : array_values(array_filter(array_map(function($s) {
-                                return trim(trim($s), '"\'');
-                            }, explode(',', $inner))));
-                        } else {
-                            $arr[$f] = [$trim];
-                        }
-                    } elseif (!is_array($val)) {
-                        $arr[$f] = [];
-                    }
-                }
-                return $arr;
-            })->all();
+        $normalizePengaduanList = function ($rows) {
+            return $this->normalizePengaduanRows($rows);
         };
 
         // Jika peran manajerial meminta kotak masuk kasus (scope=role atau tab=masuk)
@@ -1690,6 +1772,13 @@ class ApiPegawaiController extends Controller
         $fotoBukti = $request->input('foto_bukti');
         $dokumenPendukung = $request->input('dokumen_pendukung');
 
+        if ($err = $this->validateDokumenFiles($dokumenPendukung)) {
+            return response()->json([
+                'success' => false,
+                'message' => $err,
+            ], 422);
+        }
+
         $id = DB::table('pengaduan_pegawai')->insertGetId([
             'nomor_pengaduan' => $nomorPengaduan,
             'pelapor_id' => $pegawai->id,
@@ -1705,8 +1794,8 @@ class ApiPegawaiController extends Controller
             'nik_pelaku' => !empty($nikPelaku) ? $nikPelaku : null,
             'jabatan_pelaku' => !empty($jabatanPelaku) ? $jabatanPelaku : null,
             'anonim' => $anonim,
-            'foto_bukti' => !empty($fotoBukti) ? (is_array($fotoBukti) ? json_encode($fotoBukti) : $fotoBukti) : null,
-            'dokumen_pendukung' => !empty($dokumenPendukung) ? (is_array($dokumenPendukung) ? json_encode($dokumenPendukung) : $dokumenPendukung) : null,
+            'foto_bukti' => $this->toPgArray($fotoBukti),
+            'dokumen_pendukung' => $this->toPgArray($dokumenPendukung),
             'status' => $status,
             'created_at' => $now,
             'updated_at' => $now,
@@ -1780,6 +1869,17 @@ class ApiPegawaiController extends Controller
             $updateData['catatan_kadiv'] = $request->input('catatan_kadiv');
         }
 
+        if ($request->has('dokumen_pendukung')) {
+            if ($err = $this->validateDokumenFiles($request->input('dokumen_pendukung'))) {
+                return response()->json(['success' => false, 'message' => $err], 422);
+            }
+        }
+        if ($request->has('investigasi_dokumen')) {
+            if ($err = $this->validateDokumenFiles($request->input('investigasi_dokumen'))) {
+                return response()->json(['success' => false, 'message' => $err], 422);
+            }
+        }
+
         $allowedExtra = [
             'executor_id',
             'keputusan_dirut_tahap1', 'catatan_dirut_tahap1',
@@ -1791,6 +1891,16 @@ class ApiPegawaiController extends Controller
             'arsip_pada_tahap', 'alasan_arsip', 'catatan_tindak_lanjut_selesai',
             'catatan_sdm', 'nomor_surat_putusan', 'jenis_sanksi', 'file_surat_putusan',
             'tanggal_surat_putusan',
+            'surat_rekomendasi', 'tanggal_hasil_investigasi',
+            'foto_bukti', 'dokumen_pendukung', 'video_bukti', 'voice_note',
+            'investigasi_foto', 'investigasi_video', 'investigasi_voice', 'investigasi_dokumen',
+            'hasil_foto', 'hasil_dokumen', 'hasil_voice', 'hasil_video',
+        ];
+
+        $arrayCols = [
+            'foto_bukti', 'dokumen_pendukung', 'video_bukti', 'voice_note',
+            'investigasi_foto', 'investigasi_video', 'investigasi_voice', 'investigasi_dokumen',
+            'hasil_foto', 'hasil_dokumen', 'hasil_voice', 'hasil_video',
         ];
         foreach ($allowedExtra as $col) {
             if ($request->has($col)) {
@@ -1806,6 +1916,9 @@ class ApiPegawaiController extends Controller
                     } else {
                         $val = $valStr;
                     }
+                }
+                if (in_array($col, $arrayCols)) {
+                    $val = $this->toPgArray($val);
                 }
                 $updateData[$col] = $val;
             }
@@ -1835,10 +1948,13 @@ class ApiPegawaiController extends Controller
             $request->header('X-Device-Info') ?: ($request->header('User-Agent') ?: 'SIMPEG Mobile App')
         );
 
+        $updatedRow = DB::table('pengaduan_pegawai')->where('id', $id)->first();
+        $normalizedData = $this->normalizePengaduanRows([$updatedRow]);
+
         return response()->json([
             'success' => true,
             'message' => 'Status pengaduan berhasil diperbarui.',
-            'data' => array_merge((array)$pengaduan, $updateData),
+            'data' => $normalizedData[0] ?? (array) $updatedRow,
         ]);
     }
 
